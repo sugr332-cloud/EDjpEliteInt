@@ -33,7 +33,7 @@ Track B does not block Track A or vice versa.
 |---|---|---|
 | 0 | Repository / build baseline | Fork exists; builds with `./gradlew :app:compileJava` on a clean checkout |
 | 1 | EliteIntel read-only inventory | Existing AI conversation pipeline (input → VEGA → LLM → chat display) documented with real file/class names |
-| 2 | Japanese localization | UI/HUD text reviewed for `gui.properties`/i18n gaps relevant to the integration |
+| 2 | Japanese localization | `Language.JA` exists and the P0 priority set (core UI, AI chat, HUD, navigation, announcements, log, setup warnings) is translated |
 | 3 | BodyContext Adapter | A component that reads EliteIntel's current system/body/journal state into a shape `EDpjKinsaku` can consume |
 | 4 | C-CORE integration boundary | Defined interface between EliteIntel and `EDpjKinsaku`'s prediction engine (in-process call, HTTP, or CLI — undecided) |
 | 5 | Aleoida vertical slice | One genus (Aleoida) working end-to-end in a real game session as proof of the boundary |
@@ -86,6 +86,17 @@ Scope for this pass, by explicit decision: gap audit only, not a translation eff
 Full localization (translating `gui.properties` and the other per-language resource families such as
 `ed_events_*`/`ai_action_aliases_*`, plus the DB alias column) is deliberately **not** undertaken now.
 It is a separate, large future task, tracked here rather than started.
+
+**Update (2026-09-12):** the audit above was superseded by real implementation, not just planning.
+`Language.JA` now exists (commit `11907a780`), all 14 `switch(language)` call sites this required are
+handled (see §10), and the P0 priority set — core UI labels, Vega/AI chat tab, HUD quick-status badges,
+navigation HUD card labels, announcements, log messages, setup/first-run warnings, about 140 keys — is
+translated in `gui_ja.properties`. The remaining ~640 `gui.properties` keys and the three other bundle
+families (`responses`/`ed_events`/`ai_action_aliases`, 831 keys total) are still not translated;
+`_ja.properties` stub files exist for them only so `BundleKeyParityTest`/`BundleQuotingTest` have a
+file to load, and every resulting gap is declared honestly in
+`app/src/test/resources/i18n-parity-baseline.txt` rather than silently missing. The `name_ja` material
+DB column is still not added.
 
 ## 5. Verified status (as of 2026-09-12)
 
@@ -265,3 +276,61 @@ and scale. No conversion function is needed in the future `BodyContext` adapter 
 Recommended, not required: capture one live `Scan` event from a body already known (via EDSM or
 BioScan) to sit inside a genus's gravity range, as a final end-to-end confirmation during the Phase 5
 Aleoida slice — this pass used existing anchors rather than a fresh live capture.
+
+## 10. Language.JA implementation (2026-09-12)
+
+`Language` is referenced by 14 `switch(language)` call sites across the codebase (found by re-grepping
+every switch on the enum, not just ones using a parameter literally named `language` — three used
+`lang`, one switched on `SystemSession.getInstance().getLanguage()` inline). Java requires an
+exhaustive switch over an enum to handle every constant, so all 14 needed a `case JA` before the code
+would compile. Eleven are locale/text-lookup plumbing (`MultiLingualTextProvider`, `EventsTextProvider`,
+`ResponseTextProvider`, `AiActionAliasTextProvider`, `StringUtls`, `PhraseCorrectionSuggestionDialog`,
+`NumberWords`, `LocalizedNumbers`, plus the language-name/locale switches) — mechanical, no functional
+compromise. Three needed a real decision:
+
+- **`ParakeetSTTImpl.toLangCode()`:** the bundled STT model's vocabulary
+  (`distribution/parakeet/tokens.txt`) contains no Japanese characters at all — checked directly, not
+  assumed. Japanese speech cannot be transcribed by this model regardless of what language hint is
+  passed. Returns `"en"` (documented as "the least-wrong of the codes this method already returns," not
+  a working substitute) — voice input stays unavailable for Japanese until a Japanese-capable STT model
+  is bundled, which is out of scope here.
+- **`InputNormalizerLocalizations` / `AiActionLocalizations`:** since STT produces no real Japanese
+  text, both route `JA` through the English rules/aliases rather than building unused Japanese
+  voice-command infrastructure for a language STT cannot reach. `FighterAttackTargetPhrasingTest` (a
+  safety-critical test guarding the one fighter order that cannot be taken back) needed a matching `JA`
+  entry using the same English stems for this reason.
+- **`GoogleVoiceProvider` / `EdgeVoiceProvider`:** unlike STT, both cloud TTS providers genuinely
+  support Japanese today, so this is completing existing provider capability, not building VOICEVOX.
+  Real voice codes: Google `ja-JP` / `ja-JP-Standard-A` (female) / `ja-JP-Standard-C` (male); Edge
+  `ja-JP` / `ja-JP-NanamiNeural` (female) / `ja-JP-KeitaNeural` (male). Not added to
+  `CHIRP3_HD_LANGUAGES` — that roster's Japanese coverage was not verified against the live API, so
+  Japanese stays on the same guaranteed-to-exist Standard tier `pt-PT` uses.
+
+**Translated (P0):** `gui_ja.properties` — core UI labels (tab/button/language names), the Vega/AI
+chat tab, HUD quick-status badges, navigation HUD card labels, announcement toggles, system log
+messages, and the setup/first-run warnings. About 140 keys.
+
+**Not translated (tracked, not hidden):** the remaining ~640 `gui.properties` keys, and the
+`responses`/`ed_events`/`ai_action_aliases` bundle families (831 keys). `BundleKeyParityTest` requires
+every declared `Language` to have a bundle file for every family (a missing file fails the test
+outright, not just a gap), so minimal stub `_ja.properties` files exist for the three untranslated
+families purely to satisfy that. Every gap this produces — the untranslated `gui.properties` remainder
+included — is declared line-by-line in `app/src/test/resources/i18n-parity-baseline.txt`, per that
+file's own existing mechanism (previously used for exactly one deliberate exclusion; now also carries
+this dated, explained backlog).
+
+**Fixed in passing:** `ai.chatInput.send` and `language.japanese` were missing from all 8 other
+translated languages (`BundleKeyParityTest` caught this too) — `ai.chatInput.send` dates back to the
+Phase 11 text-input commit `875e3f597`. Both are now translated in all 8, not baselined.
+
+**`DisplayNumeralsTest` exemption:** its number-spellout round-trip test is skipped for `JA`. It finds
+a spelled figure by scanning for space-delimited alphabetic word boundaries; Japanese text has no
+spaces between words, so the scan cannot locate a spelled figure even though ICU spells it correctly
+in isolation (confirmed: `NumberWords.of(100, Language.JA)` correctly produces "百"). Revisit once
+Japanese TTS narration is a real path (VOICEVOX, Phase 11) rather than an unused one.
+
+**Verified:** `:app:compileJava`/`:app:compileTestJava` succeed; full suite 3107 tests, 9 failures, all
+confirmed pre-existing via `git stash` (identical failures with this change removed) and unrelated
+(`JukeboxPlayerTest`/`TagScannerTest`, environment-specific audio file issues); a real launch (a second
+instance alongside one already running, only its own new PID touched) reached full startup —
+`SetupCheck`/`KeyBindCheck`/`DeviceService` all completing — with no new exception.
