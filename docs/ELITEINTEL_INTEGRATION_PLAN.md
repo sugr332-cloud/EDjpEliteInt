@@ -40,7 +40,7 @@ Track B does not block Track A or vice versa.
 | 6 | ~~Collection state~~ Aleoida MATCH candidates on the HUD | Reordered in execution (§13): showing a result turned out to be the natural next step after Phase 5's boundary proof, ahead of collection-state tracking. Renumbered here rather than left silently mismatched with what commit `a99127939` actually built, per §0's ground rule |
 | 7 | Collection state | Scanned/collected state tracked and reflected in the HUD (the original Phase 6) |
 | 8 | All species | Every C-CORE genus wired through the same boundary as Phase 5 |
-| 9 | Navigation integration | Distance/jump-count context (per `EDpjKinsaku`'s `DESTINATION_ETA_SPEC`) surfaced in EliteIntel |
+| 9 | ~~Navigation integration~~ **保留（on hold）** | 既存EliteIntelのNavigation機能で要求されたジャンプ数・距離等は既に実装済み。EDpjKinsaku `DESTINATION_ETA_SPEC`は未実装のため統合対象なし。Supercruise ETAは別途新規機能として扱う（§16） |
 | 10 | Exobiology value/ranking | `EDpjKinsaku`'s value/ranking model surfaced as prioritized recommendations |
 | 11 | AI conversation surface | Text input to VEGA (done, see below); VOICEVOX as a `TtsProvider` option (not started); C-CORE result injection into AI chat (done, §14) |
 | 12 | C-CORE distribution | Not in the original plan - added once Phases 4-7 exposed that they all assumed a system Python EliteIntel's actual commanders do not have. Executed and referred to throughout as "Phase 8" in commits/docs (§15); numbered 12 here only to avoid re-colliding with table row 8 ("All species"), which §15 does not touch |
@@ -618,3 +618,46 @@ end-to-end through the same binary. Default `test` task: 3129 tests, 9 failures,
 `JukeboxPlayerTest`/`TagScannerTest` failures already confirmed unrelated - no regression. A commander
 running the built jar with `distribution/ccore/windows/` alongside it now needs no Python, no pip, and
 no EDpjKinsaku checkout for C-CORE species evaluation to work.
+
+## 16. Phase 9: Navigation integration — 保留／on hold (2026-09-13)
+
+Read-only investigation only; no code changed, nothing committed for this phase.
+
+### Why this is on hold, not done or in progress
+
+The table's original Phase 9 description assumed `EDpjKinsaku`'s `DESTINATION_ETA_SPEC` had something
+built to bring into EliteIntel. Checked directly against both repos, that assumption does not hold:
+
+- **`EDpjKinsaku`'s `docs/DESTINATION_ETA_SPEC_V0.1.md` and `docs/PHASE_DESTINATION_ETA_V0.1.md` are
+  specs only.** The phase doc's own status is "Planned". A repo-wide search for
+  `distanceToArrival`/`distance_ls`/`eta_seconds`/`SupercruiseEtaEstimator` found no matching
+  implementation anywhere in `app/` - the one incidental hit (`app/bio/body_parameters.py`) is an
+  unrelated EDSM body-physical-parameters backfill column for the bio value model, not station
+  navigation. Per §0's ground rule: a spec document is not a fact about what exists.
+- **EliteIntel already has its own navigation feature, built independently of `EDpjKinsaku`, well
+  before this investigation**: `ShipRouteObjectiveSource` (HUD card - destination, next waypoint,
+  jump count, scoopable, contextual reminder for a material trader/technology broker/interstellar
+  factors/Vista Genomics/refuel errand) and `AnalyzeRouterQuery` (the
+  `query_ship_route_remaining_jumps` AI chat query - next waypoint, jumps remaining, and both
+  straight-line and total route distance in light-years via `NavigationUtils.calculateGalacticDistance`
+  over `NavRoute.json`'s X/Y/Z coordinates). Separately, per-station `distanceToArrival` (light seconds
+  from a system's arrival point) is already pervasive across EliteIntel's own EDSM/Spansh search DTOs
+  and already reaches AI chat through `AnalyzeMarketsQuery` for market results.
+- **The one piece that is genuinely missing anywhere - Supercruise ETA (a time estimate, not a
+  distance) - is missing from both repos equally.** It is not something Phase 9 could "surface" from
+  `EDpjKinsaku`, because there is nothing there yet to surface; building it would be new-feature work
+  against `DESTINATION_ETA_SPEC`'s heuristic model (§4 of that spec), independent of whichever repo
+  ends up hosting it.
+
+### Decision
+
+Phase 9 is left on hold rather than marked done or reworked now:
+- Not "done", because nothing was integrated in this phase - the existing jump-count/distance features
+  predate this investigation and were built for reasons unrelated to `EDpjKinsaku`.
+- Not reworked into "build the ETA estimator now", because that is a new feature under
+  `DESTINATION_ETA_SPEC`, not the "bring existing EDpjKinsaku output into EliteIntel" task Phase 9 was
+  originally scoped as - conflating the two would silently change what Phase 9 means.
+- Project priority instead moves to widening C-CORE's genus coverage (6 of 19 done), then exobiology
+  value/ranking (table Phase 10), then strengthening AI chat's use of exobiology data - the actual
+  cross-repo integration this project exists for. Supercruise ETA, if wanted later, is tracked as an
+  independent feature decision, not a resumption of Phase 9.
