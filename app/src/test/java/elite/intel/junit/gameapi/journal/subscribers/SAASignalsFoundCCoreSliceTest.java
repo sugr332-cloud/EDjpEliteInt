@@ -21,10 +21,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Phase 5 of the C-CORE integration plan (docs/ELITEINTEL_INTEGRATION_PLAN.md): the real
- * SAASignalsFound → CCoreAdapter → LocationDto.speciesEvaluations path, through the actual
- * {@code python -m app.cli bio evaluate} subprocess - not a fake one, since {@link CCoreAdapter} has no
- * seam for one yet and this is the one place that would catch the whole chain (including the
- * "Aleoids" journal stem → "Aleoida" C-CORE genus name conversion via BioForms) drifting apart.
+ * SAASignalsFound → CCoreAdapter → LocationDto.speciesEvaluations path, through the actual bundled
+ * {@code bio_entry} binary (Phase 8) - not a fake one, since {@link CCoreAdapter} has no seam for one
+ * yet and this is the one place that would catch the whole chain (including the "Aleoids" journal stem
+ * → "Aleoida" C-CORE genus name conversion via BioForms) drifting apart.
  */
 class SAASignalsFoundCCoreSliceTest {
 

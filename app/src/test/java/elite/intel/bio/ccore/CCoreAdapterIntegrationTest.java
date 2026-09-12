@@ -7,14 +7,14 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Exercises {@link CCoreAdapter} against the real {@code python -m app.cli bio evaluate} process, not a
- * fake one - this is the one place that would catch the request/response shape actually drifting from
+ * Exercises {@link CCoreAdapter} against the real bundled {@code bio_entry} binary, not a fake one -
+ * this is the one place that would catch the request/response shape actually drifting from
  * EDpjKinsaku's CLI, which {@link CCoreAdapterJsonTest} cannot (it never starts a process).
  * <p>
- * Requires a Python on PATH with EDpjKinsaku pip-installed (editable install confirmed to work from any
- * working directory - see {@link CCoreAdapter}'s class comment). Both were true on the machine and
- * checkout layout this was built against; there is no fake/skip path here yet because this adapter has
- * no other caller to protect from that dependency (see docs/ELITEINTEL_INTEGRATION_PLAN.md Phase 4).
+ * Requires {@code distribution/ccore/windows/bio_entry.exe} to exist at the path
+ * {@link elite.intel.util.AppPaths#getCCoreBinary()} resolves (see docs/ELITEINTEL_INTEGRATION_PLAN.md
+ * Phase 8) - true on the checkout this was built against; there is no fake/skip path here yet because
+ * this adapter has no other caller to protect from that dependency.
  */
 class CCoreAdapterIntegrationTest {
 

@@ -154,6 +154,27 @@ public final class AppPaths {
         return getDistributionFile("overlays/" + name);
     }
 
+    /**
+     * The standalone C-CORE {@code bio evaluate} binary, shipped in distribution/ccore/&lt;os&gt;/ like
+     * the overlay so the installer bundles it - a PyInstaller {@code --onedir} build of EDpjKinsaku's
+     * {@code app.cli.bio_entry} (see EDpjKinsaku's scripts/build_ccore_binary.ps1), replacing a system
+     * Python + pip-installed EDpjKinsaku as the thing {@code CCoreAdapter} depends on being present.
+     * <p>
+     * Deliberately a subdirectory per OS rather than flat like distribution/overlays/: a PyInstaller
+     * onedir build ships its own {@code _internal/} dependency folder next to the executable, and two
+     * platforms' same-named {@code _internal/} folders would collide in one flat directory the way the
+     * overlay's differently-named per-OS files never do.
+     * <p>
+     * Linux is not yet built (EliteIntel's Phase 8 C-CORE distribution work started with Windows only);
+     * this still resolves a path for it so the not-yet-existing-file case fails the same way any other
+     * missing distribution asset would, rather than throwing here.
+     */
+    public static Path getCCoreBinary() {
+        boolean windows = OsDetector.getOs() == OsDetector.OS.WINDOWS;
+        String name = windows ? "bio_entry.exe" : "bio_entry";
+        return getDistributionFile("ccore/" + (windows ? "windows" : "linux") + "/" + name);
+    }
+
     private static Path getDistributionFile(String subPath) {
         if (isRunningFromJar()) {
             return APP_DIR.resolve(subPath);

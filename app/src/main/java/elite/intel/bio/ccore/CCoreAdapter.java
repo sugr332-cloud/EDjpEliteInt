@@ -3,6 +3,7 @@ package elite.intel.bio.ccore;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
+import elite.intel.util.AppPaths;
 import elite.intel.util.json.GsonFactory;
 
 import java.io.IOException;
@@ -14,32 +15,29 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Calls EDpjKinsaku's C-CORE species-evaluation CLI ({@code edpj bio evaluate}) as a one-shot external
- * process per {@link #evaluate(String, BodyContext)} call: writes one request as JSON to its stdin,
- * reads its stdout as the response, and never keeps the process running past that call.
+ * Calls EDpjKinsaku's C-CORE species-evaluation logic as a one-shot external process per
+ * {@link #evaluate(String, BodyContext)} call: writes one request as JSON to its stdin, reads its
+ * stdout as the response, and never keeps the process running past that call.
  * <p>
- * {@code edpj.exe} (the pip-installed console script) is deliberately not used - on the machine this
- * was built on it lives in a Scripts directory that is not on PATH, while
- * {@code python -m app.cli bio evaluate} was confirmed to work from any working directory (EDpjKinsaku
- * is pip-installed in editable mode, so {@code app.cli} is importable regardless of this JVM's CWD).
- * See docs/ELITEINTEL_INTEGRATION_PLAN.md's Phase 4 section for the investigation this is built on.
+ * Runs the standalone binary at {@link AppPaths#getCCoreBinary()} - a PyInstaller {@code --onedir}
+ * build of EDpjKinsaku's {@code app.cli.bio_entry} module, bundled with EliteIntel like the TTS/STT
+ * models and the native HUD overlay (see docs/ELITEINTEL_INTEGRATION_PLAN.md's Phase 8 section) - not
+ * a system Python. An earlier version of this class shelled out to
+ * {@code python -m app.cli bio evaluate} on PATH, which required the commander's own machine to have
+ * Python and an editable-installed EDpjKinsaku; Phase 8's investigation measured that this bundled
+ * binary is both self-contained and faster to start (~125ms against the system-Python path's measured
+ * ~450-480ms). {@code bio_entry}'s Typer app has exactly one command, so Typer collapses it away when
+ * run standalone: no {@code bio}/{@code evaluate} arguments are passed, only the request JSON on stdin.
  * <p>
- * Not yet called from anywhere in the real pipeline - wiring this into
- * {@code ScanEventSubscriber}/the HUD is Phase 5. This class exists to be exercised on its own first.
+ * Called from {@code SAASignalsFoundSubscriber} at scan time (Phase 5); its result is read later by
+ * the HUD (Phase 6) and by VEGA's AI chat (Phase 7) from {@code LocationDto.speciesEvaluations},
+ * never by re-invoking this adapter.
  */
 public class CCoreAdapter {
 
     /**
-     * Assumes a working Python on PATH. Not user-configurable yet: adding a Settings-backed path
-     * (mirroring {@code PlayerSession.setJournalPath()}) is deliberately deferred until this adapter
-     * itself is proven, to keep this change scoped to the CLI boundary alone.
-     */
-    private static final String PYTHON_COMMAND = "python";
-
-    /**
-     * Measured cold latency is ~450-480ms (Python interpreter start plus the CLI's eagerly-imported
-     * subcommand modules); this leaves a wide margin for a slower machine before treating the process
-     * as hung.
+     * Measured cold latency of the bundled binary is ~125ms; this leaves a wide margin for a slower
+     * machine before treating the process as hung.
      */
     static final Duration TIMEOUT = Duration.ofSeconds(5);
 
@@ -72,14 +70,14 @@ public class CCoreAdapter {
     }
 
     private Process start() {
+        String binary = AppPaths.getCCoreBinary().toString();
         try {
-            return new ProcessBuilder(PYTHON_COMMAND, "-m", "app.cli", "bio", "evaluate")
+            return new ProcessBuilder(binary)
                     .redirectErrorStream(false)
                     .start();
         } catch (IOException e) {
             throw new CCoreAdapterException(
-                    "Could not start the C-CORE CLI (" + PYTHON_COMMAND + " -m app.cli bio evaluate): "
-                            + e.getMessage(), e);
+                    "Could not start the C-CORE binary (" + binary + "): " + e.getMessage(), e);
         }
     }
 
