@@ -86,7 +86,83 @@ LM Studio connectivity (the local LLM the pipeline reached and failed to call pa
 going forward: it served only to confirm the existing conversation path is reachable over text, not
 as an AI provider this project intends to build on.
 
-## 5. Division of responsibility with EDpjKinsaku
+## 5. Phase 4 investigation (read-only, 2026-09-12)
+
+Both sides of the boundary already have more structure than assumed. No code was changed to produce
+this section — only reading.
+
+### EliteIntel side: current body/system state already available
+
+- `PlayerSession.getInstance().getLocationData()` → `LocationData<Long,Long>` with
+  `getSystemAddress()` / `getInGameId()` — "where the commander is right now."
+- `LocationManager.getInstance().getLocation(starSystem, bodyId)` → `LocationDto`
+  (`app/src/main/java/elite/intel/gameapi/journal/events/dto/LocationDto.java`), the per-body cache
+  written by `ScanEventSubscriber.onScanEvent()` on every `Scan` journal event.
+- Field mapping from `LocationDto` to C-CORE's `BodyContext` (see below):
+
+  | `BodyContext` field | EliteIntel source | Note |
+  |---|---|---|
+  | `atmosphere` | `LocationDto.atmosphere` | set from `ScanEvent.getAtmosphereType()`, not `getAtmosphere()` |
+  | `body_type` | `LocationDto.planetClass` | set from `ScanEvent.getPlanetClass()` |
+  | `volcanism` | `LocationDto.volcanism` | raw `ScanEvent.getVolcanism()` string |
+  | `temperature` | `LocationDto.surfaceTemperature` | |
+  | `gravity` | `LocationDto.gravity` | **not** the journal's raw `SurfaceGravity` — recomputed via `GravityCalculator.calculateSurfaceGravity(massEM, radius)` because `ScanEventSubscriber.java:113-115` documents the raw journal value as inaccurate. Unit/scale parity with what the C-CORE rulesets were authored against is unverified — needs a real-data check in Phase 5, not an assumption. |
+  | `pressure` | **missing** | `ScanEvent.getSurfacePressure()` exists but is never copied into `LocationDto`. Closing this is a Phase 3 task (one field + one assignment in `ScanEventSubscriber`). Until then every pressure-gated rule can only return `INSUFFICIENT_DATA`. |
+  | `regions` | not tracked | leave `None` |
+
+- Genus detection already exists, independent of C-CORE: `LocationDto.genus` (`List<GenusDto>`),
+  populated from DSS/SAA signals. It already surfaces today as a HUD objective card
+  (`ui/overlay/ExobiologyObjectiveSource.java`) showing sample progress (X/3) and genus-level payout —
+  but with no species-level prediction. This is the exact gap C-CORE fills, and the natural place to
+  plug an evaluation result in once it exists.
+
+### EDpjKinsaku side: the public interface already exists
+
+`app/bio/c_core.py` already defines the contract this plan was describing conceptually:
+
+```python
+@dataclass(frozen=True)
+class BodyContext:
+    atmosphere: str | None
+    gravity: float | None
+    temperature: float | None
+    pressure: float | None
+    body_type: str | None
+    volcanism: str | None
+    regions: frozenset[str] | None = None
+
+@dataclass(frozen=True)
+class RuleEvaluation:
+    species_code: str
+    species_name: str
+    status: RuleStatus  # MATCH / NO_MATCH / INSUFFICIENT_DATA / RULE_DEFINITION_ERROR / RULESET_INCONSISTENCY
+    reason: str
+```
+
+One function per converted genus — `evaluate_aleoida(body: BodyContext) -> list[RuleEvaluation]`,
+plus `evaluate_cactoida` / `evaluate_concha` / `evaluate_fonticulua` / `evaluate_frutexa` /
+`evaluate_fumerola` for the other 5 done so far — with `aggregate_species_evaluations()` collapsing
+multi-ruleset ORs into one verdict per species. There is no genus-name dispatcher yet
+(`evaluate_genus(name, body)`); an adapter needs either its own lookup table or a corresponding small
+addition on the EDpjKinsaku side.
+
+`app/bio/body_context.py::body_context_from_parameters()` is a second, independent confirmation of
+the field mapping above: it adapts EDpjKinsaku's own cached EDSM data into the same `BodyContext`,
+and treats `atmosphere_type` (not `atmosphere`) as the `atmosphere` input — matching the EliteIntel
+mapping.
+
+### Open questions before Phase 4 can be implemented
+
+1. Transport (subprocess + stdio JSON / localhost HTTP / JNI / port to Java) — undecided; leaning
+   toward subprocess+JSON to keep `EDpjKinsaku`'s existing `pytest` suite as the source of truth.
+2. Genus-name dispatch: add `evaluate_genus(name, body)` on the EDpjKinsaku side, or keep a lookup
+   table entirely in the adapter?
+3. `gravity` unit/scale parity between EliteIntel's computed value and what the rulesets were authored
+   against — needs a real-data spot check against a known body, not an assumption.
+4. `pressure` is entirely unwired on the EliteIntel side (see table above) and blocks any
+   pressure-gated rule from returning anything but `INSUFFICIENT_DATA` until added.
+
+## 6. Division of responsibility with EDpjKinsaku
 
 `EDpjKinsaku` (C-CORE) owns species/ruleset prediction logic and stays genus-by-genus, independently
 testable via `pytest` and `bioscan-count`, with no dependency on EliteIntel. `EliteIntel` owns game
