@@ -44,7 +44,41 @@ Track B does not block Track A or vice versa.
 | 10 | Exobiology value/ranking | `EDpjKinsaku`'s value/ranking model surfaced as prioritized recommendations |
 | 11 | AI conversation surface | Text input to VEGA (done, see below); VOICEVOX as a `TtsProvider` option (not started) |
 
-## 3. Verified status (as of 2026-09-12)
+## 3. Phase 4 decisions (provisional, 2026-09-12)
+
+Direction set for the four open questions in §7, not yet implemented:
+
+1. **Transport:** subprocess + stdio JSON (tentative first choice), to keep `EDpjKinsaku`'s existing
+   `pytest` suite as the sole source of truth rather than duplicating logic behind an HTTP service.
+2. **Genus dispatch:** add `evaluate_genus(name, body)` on the `EDpjKinsaku` side rather than building
+   a name→function lookup table in the adapter, so the dispatch logic lives next to the functions it
+   dispatches to.
+3. **`gravity` unit/scale parity:** to be checked against one or a few real bodies once the adapter
+   exists — not yet done.
+4. **`pressure`:** wire `ScanEvent.getSurfacePressure()` into `LocationDto` in Phase 3. This is adding
+   one field and one assignment to existing data already flowing through `ScanEventSubscriber` — not a
+   new mechanism.
+
+## 4. Phase 2 audit (read-only, 2026-09-12)
+
+Scope for this pass, by explicit decision: gap audit only, not a translation effort. Findings:
+
+- `elite.intel.i18n.Language` has no `JA` constant (`EN, RU, UK, DE, FR, ES, PT, PTBZ, IT`).
+- No `gui_ja.properties` (or any `*_ja.properties`) exists anywhere under
+  `app/src/main/resources/i18n/` — every other supported language has one.
+- `Language.isGameLocalized()` would correctly exclude `JA` if added: Elite Dangerous ships no
+  Japanese client, so Japanese would be treated like Italian/Ukrainian today (English client, English
+  in-game noun names, translated app UI).
+- Material name aliasing spans "all nine" languages via dedicated DB columns
+  (`db-migration/01003__schema.sql`, `01017__schema.sql`, read by `MaterialNameDao`) — a tenth
+  (`name_ja`) would be needed for Japanese voice input to match material names the way it does for the
+  other nine.
+
+Full localization (translating `gui.properties` and the other per-language resource families such as
+`ed_events_*`/`ai_action_aliases_*`, plus the DB alias column) is deliberately **not** undertaken now.
+It is a separate, large future task, tracked here rather than started.
+
+## 5. Verified status (as of 2026-09-12)
 
 Only entries backed by an actual command run or a real file are listed as done. Everything else is
 "not started," regardless of what any prior conversation said.
@@ -54,14 +88,14 @@ Only entries backed by an actual command run or a real file are listed as done. 
 | 0 | Done | `sugr332-cloud/EliteIntel` fork exists; `./gradlew :app:compileJava` → BUILD SUCCESSFUL (JDK 21.0.12 Temurin) |
 | 1 | Done | AI input pipeline traced: `UserInputEvent` (`app/src/main/java/elite/intel/gameapi/UserInputEvent.java`) → `VegaSubsystemGate.onUserInput()` → `ThoughtDispatcher` → LLM → `AiResponseLogEvent` → `AiTabController` → `AiTabPanel` |
 | 2–10 | Not started | No BodyContext adapter, no C-CORE call boundary, no HUD panel exist in this repo |
-| 11 (text input) | Done | See §4 below |
+| 11 (text input) | Done | See §6 below |
 | 11 (VOICEVOX) | Not started | `TtsProvider` enum only has `KOKORO` / `GOOGLE` / `EDGE` |
 
 `EDpjKinsaku` C-CORE progress (verified via `git log`, last relevant commit `f03252c`, 2026-09-12):
 6 of 19 genera converted (31 species / 65 rulesets), `bioscan-count` 20/116/254/0 PASS, `pytest` 699
 passed. This is the Track A starting point once Phase 4 begins.
 
-## 4. What "Phase 11 text input" actually is
+## 6. What "Phase 11 text input" actually is
 
 This was investigative verification, not a phase deliverable in the sense of the table above. The
 question being answered was: *does EliteIntel's existing voice-only AI conversation also work over a
@@ -86,7 +120,7 @@ LM Studio connectivity (the local LLM the pipeline reached and failed to call pa
 going forward: it served only to confirm the existing conversation path is reachable over text, not
 as an AI provider this project intends to build on.
 
-## 5. Phase 4 investigation (read-only, 2026-09-12)
+## 7. Phase 4 investigation (read-only, 2026-09-12)
 
 Both sides of the boundary already have more structure than assumed. No code was changed to produce
 this section — only reading.
@@ -151,18 +185,9 @@ the field mapping above: it adapts EDpjKinsaku's own cached EDSM data into the s
 and treats `atmosphere_type` (not `atmosphere`) as the `atmosphere` input — matching the EliteIntel
 mapping.
 
-### Open questions before Phase 4 can be implemented
+These four questions are the ones resolved (three provisionally, one still genuinely open) in §3.
 
-1. Transport (subprocess + stdio JSON / localhost HTTP / JNI / port to Java) — undecided; leaning
-   toward subprocess+JSON to keep `EDpjKinsaku`'s existing `pytest` suite as the source of truth.
-2. Genus-name dispatch: add `evaluate_genus(name, body)` on the EDpjKinsaku side, or keep a lookup
-   table entirely in the adapter?
-3. `gravity` unit/scale parity between EliteIntel's computed value and what the rulesets were authored
-   against — needs a real-data spot check against a known body, not an assumption.
-4. `pressure` is entirely unwired on the EliteIntel side (see table above) and blocks any
-   pressure-gated rule from returning anything but `INSUFFICIENT_DATA` until added.
-
-## 6. Division of responsibility with EDpjKinsaku
+## 8. Division of responsibility with EDpjKinsaku
 
 `EDpjKinsaku` (C-CORE) owns species/ruleset prediction logic and stays genus-by-genus, independently
 testable via `pytest` and `bioscan-count`, with no dependency on EliteIntel. `EliteIntel` owns game
