@@ -48,10 +48,11 @@ Track B does not block Track A or vice versa.
 
 Direction set for the four open questions in §7, not yet implemented:
 
-1. **Transport:** ~~subprocess + stdio JSON (tentative first choice)~~ **Done**, `EDpjKinsaku` commit
-   `3e87288`: `edpj bio evaluate` reads `{"genus", "body"}` JSON on stdin and writes the aggregated
-   `RuleEvaluation` list as JSON on stdout (verified with a real `... | python -m app.cli bio evaluate`
-   pipe). This lives entirely in `EDpjKinsaku` — nothing on the EliteIntel side calls it yet.
+1. **Transport:** ~~subprocess + stdio JSON (tentative first choice)~~ **Done on both sides**,
+   `EDpjKinsaku` commit `3e87288` (`edpj bio evaluate` reads `{"genus", "body"}` JSON on stdin, writes
+   the aggregated `RuleEvaluation` list as JSON on stdout) and EliteIntel commit `890531a1a`
+   (`elite.intel.bio.ccore.CCoreAdapter`, a one-shot `ProcessBuilder` call — see §11). Not wired into
+   `ScanEventSubscriber`/the HUD yet; that is Phase 5.
 2. **Genus dispatch:** ~~add `evaluate_genus(name, body)` on the `EDpjKinsaku` side~~ **Done**, same
    commit: `evaluate_genus(name, body)` in `app/bio/c_core.py`, dispatching by lowercased genus name to
    the six converted evaluators, raising `KeyError` (not a silent empty list) for the other 13.
@@ -109,8 +110,8 @@ Only entries backed by an actual command run or a real file are listed as done. 
 | 1 | Done | AI input pipeline traced: `UserInputEvent` (`app/src/main/java/elite/intel/gameapi/UserInputEvent.java`) → `VegaSubsystemGate.onUserInput()` → `ThoughtDispatcher` → LLM → `AiResponseLogEvent` → `AiTabController` → `AiTabPanel` |
 | 2 | Audited, not implemented | See §4 |
 | 3 | Partially started | `pressure` field wired (commit `4e0882259`); no `BodyContext` adapter class exists yet — that is the rest of Phase 3 |
-| 4 | CLI boundary done on the `EDpjKinsaku` side | `edpj bio evaluate` (EDpjKinsaku commit `3e87288`); no EliteIntel code calls it yet — that is the rest of Phase 4 |
-| 5–10 | Not started | No HUD panel, no live call from EliteIntel into the CLI exist in this repo |
+| 4 | Adapter done on both sides | `edpj bio evaluate` (EDpjKinsaku `3e87288`) + `CCoreAdapter` (EliteIntel `890531a1a`, see §11); nothing in the real scan pipeline calls `CCoreAdapter` yet — that is Phase 5 |
+| 5–10 | Not started | No HUD panel, no call from `ScanEventSubscriber` into `CCoreAdapter` exist yet |
 | 11 (text input) | Done | See §6 below |
 | 11 (VOICEVOX) | Not started | `TtsProvider` enum only has `KOKORO` / `GOOGLE` / `EDGE` |
 
@@ -340,3 +341,62 @@ confirmed pre-existing via `git stash` (identical failures with this change remo
 (`JukeboxPlayerTest`/`TagScannerTest`, environment-specific audio file issues); a real launch (a second
 instance alongside one already running, only its own new PID touched) reached full startup —
 `SetupCheck`/`KeyBindCheck`/`DeviceService` all completing — with no new exception.
+
+## 11. C-CORE Adapter (2026-09-12)
+
+Read-only investigation into how EliteIntel's runtime can actually launch `edpj bio evaluate`, followed
+by the adapter itself (EliteIntel commit `890531a1a`) — scoped to the adapter alone, not wired into
+`ScanEventSubscriber` or the HUD (that is Phase 5).
+
+### Investigation findings
+
+- **`edpj.exe` (the pip-installed console script) is not reliably invokable.** `pip show edpj` reports
+  it editable-installed from this checkout, but the generated `edpj.exe` lives in
+  `AppData\Roaming\Python\Python311\Scripts\`, a directory that is **not on PATH** (PATH only carries
+  `AppData\Local\Programs\Python\Python311\Scripts`). `where edpj` fails; confirmed, not assumed.
+- **`python -m app.cli bio evaluate` works from any working directory** — tested from inside the
+  EliteIntel checkout itself, nowhere near EDpjKinsaku. Because `edpj` is pip-installed in *editable*
+  mode, `app.cli` is importable via site-packages regardless of CWD. This means the adapter needs no
+  knowledge of where EDpjKinsaku lives on disk — only a working Python interpreter.
+- **Cold latency measured at ~450-480ms** across three runs, dominated by Python startup plus
+  `app/cli/__main__.py` eagerly importing every subcommand module (`api`, `backfill`, `calibration`,
+  `collector`, `state`, `bio`) even though only `bio` is used. Sets the floor for timeout design; not
+  optimized in this pass.
+- **EliteIntel's existing subprocess conventions** (`Updater.java`, `NativeHudOverlay.java`): explicit
+  UTF-8 on all streams, stderr separated via `redirectError(Redirect.PIPE)`, bounded
+  `process.waitFor(timeout, TimeUnit)`, `process.destroy()`/`destroyForcibly()` as the backstop. Both
+  existing uses are fire-and-forget or persistent line-protocol children; neither is the one-shot
+  write-stdin-then-read-stdout-then-wait shape this adapter needed, so `CCoreAdapter` follows the
+  conventions but not the exact call shape of either.
+- **Existing path-configuration pattern**: `PlayerSession.setJournalPath()`/`getJournalPath()` via
+  `DirectorySetting` + a DB-backed DAO, "never throws, falls back to a default" read semantics. Noted as
+  the template for a future Python-path setting, deliberately not built yet (see decisions below).
+
+### Decisions
+
+- **Python path:** stays a hardcoded constant (`CCoreAdapter.PYTHON_COMMAND = "python"`, resolved via
+  PATH), not a Settings/DB-backed value. Adding that is deferred until the adapter itself is proven, to
+  keep this change scoped to the CLI boundary alone — it can be added later following the
+  `PlayerSession` pattern above with no change to the adapter's public shape.
+- **Scope:** the adapter only — `BodyContext`/`RuleEvaluation`/`RuleStatus` (field-for-field mirrors of
+  EDpjKinsaku's dataclasses, including JSON field names via `@SerializedName`) and
+  `CCoreAdapter.evaluate(genus, body)`. No call site in the real scan pipeline yet.
+
+### Implementation (`elite.intel.bio.ccore`)
+
+`CCoreAdapter.evaluate(String genus, BodyContext body)`: serializes the request with the shared
+`GsonFactory` Gson instance, starts `python -m app.cli bio evaluate` via `ProcessBuilder`, writes the
+request to stdin, drains stdout/stderr concurrently on separate threads (`StreamCollector` — necessary
+because reading either stream sequentially risks a deadlock if the child fills that pipe's OS buffer
+first), waits up to 5 seconds, and returns the parsed `List<RuleEvaluation>`. Throws
+`CCoreAdapterException` (unchecked, deliberately silent on how a caller should present a failure — this
+class has no caller yet to design that for) on: process failed to start, timeout, non-zero exit
+(including EDpjKinsaku's `KeyError` for a genus not yet converted), or unparseable stdout.
+
+**Verified:** `:app:compileJava`/`:app:compileTestJava` succeed. `CCoreAdapterJsonTest` (5 tests, no
+process involved — request field names, null-field omission, response parsing, malformed-JSON and
+empty-body error paths) and `CCoreAdapterIntegrationTest` (4 tests, the real subprocess — Aleoida Arcus'
+boundary body comes back `MATCH`, genus matching is case-insensitive, an empty body comes back
+`INSUFFICIENT_DATA` for all four Fumerola species, an unconverted genus like `"Tussock"` fails with a
+clean error naming the genus rather than an empty list) all pass. Full suite: 3116 tests, 9 failures,
+all the same pre-existing `JukeboxPlayerTest`/`TagScannerTest` failures already confirmed unrelated.
