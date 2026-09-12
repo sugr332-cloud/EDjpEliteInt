@@ -55,9 +55,12 @@ Direction set for the four open questions in §7, not yet implemented:
    dispatches to.
 3. **`gravity` unit/scale parity:** to be checked against one or a few real bodies once the adapter
    exists — not yet done.
-4. **`pressure`:** wire `ScanEvent.getSurfacePressure()` into `LocationDto` in Phase 3. This is adding
-   one field and one assignment to existing data already flowing through `ScanEventSubscriber` — not a
-   new mechanism.
+4. **`pressure`:** ~~wire `ScanEvent.getSurfacePressure()` into `LocationDto` in Phase 3.~~ **Done**,
+   commit `4e0882259`: added `LocationDto.surfacePressure` (mirroring the existing zero-guard pattern
+   used by `surfaceTemperature`/`gravity`) and one assignment in
+   `ScanEventSubscriber.onScanEvent()`. Verified via `:app:compileJava`/`:app:compileTestJava` and 24
+   passing tests across the new `LocationDtoPressureTest` plus five pre-existing `LocationDto`/`ScanEvent`
+   test classes (no effect on other consumers).
 
 ## 4. Phase 2 audit (read-only, 2026-09-12)
 
@@ -87,7 +90,9 @@ Only entries backed by an actual command run or a real file are listed as done. 
 |---|---|---|
 | 0 | Done | `sugr332-cloud/EliteIntel` fork exists; `./gradlew :app:compileJava` → BUILD SUCCESSFUL (JDK 21.0.12 Temurin) |
 | 1 | Done | AI input pipeline traced: `UserInputEvent` (`app/src/main/java/elite/intel/gameapi/UserInputEvent.java`) → `VegaSubsystemGate.onUserInput()` → `ThoughtDispatcher` → LLM → `AiResponseLogEvent` → `AiTabController` → `AiTabPanel` |
-| 2–10 | Not started | No BodyContext adapter, no C-CORE call boundary, no HUD panel exist in this repo |
+| 2 | Audited, not implemented | See §4 |
+| 3 | Partially started | `pressure` field wired (commit `4e0882259`); no `BodyContext` adapter class exists yet — that is the rest of Phase 3 |
+| 4–10 | Not started | No C-CORE call boundary, no HUD panel exist in this repo |
 | 11 (text input) | Done | See §6 below |
 | 11 (VOICEVOX) | Not started | `TtsProvider` enum only has `KOKORO` / `GOOGLE` / `EDGE` |
 
