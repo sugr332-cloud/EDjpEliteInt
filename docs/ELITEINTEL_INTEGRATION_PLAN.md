@@ -43,6 +43,7 @@ Track B does not block Track A or vice versa.
 | 9 | Navigation integration | Distance/jump-count context (per `EDpjKinsaku`'s `DESTINATION_ETA_SPEC`) surfaced in EliteIntel |
 | 10 | Exobiology value/ranking | `EDpjKinsaku`'s value/ranking model surfaced as prioritized recommendations |
 | 11 | AI conversation surface | Text input to VEGA (done, see below); VOICEVOX as a `TtsProvider` option (not started); C-CORE result injection into AI chat (done, §14) |
+| 12 | C-CORE distribution | Not in the original plan - added once Phases 4-7 exposed that they all assumed a system Python EliteIntel's actual commanders do not have. Executed and referred to throughout as "Phase 8" in commits/docs (§15); numbered 12 here only to avoid re-colliding with table row 8 ("All species"), which §15 does not touch |
 
 ## 3. Phase 4 decisions (provisional, 2026-09-12)
 
@@ -538,3 +539,82 @@ Gravis both evaluate to `MATCH` on the current body:
 ```
 C-CORE exobiology candidates: Aleoida Arcus, Aleoida Gravis
 ```
+
+## 15. Phase 8: C-CORE distribution (2026-09-13)
+
+Phase 4-7 all assumed a working `python -m app.cli bio evaluate` on the machine running EliteIntel.
+That is true on the dev machine this was built on (system Python 3.11 with EDpjKinsaku pip-installed
+in editable mode) but not on a commander's machine, which has neither Python nor EDpjKinsaku. Phase 8
+closes that gap: **8-A** investigated and measured distribution options; **8-B** implemented the
+chosen one.
+
+### 8-A: investigation and real-machine PyInstaller build (read-only, no commits)
+
+- **`app/bio/c_core.py` (the actual rule engine) has zero third-party dependencies** - only
+  `collections.abc`/`dataclasses`/`enum`. All rulesets are Python code in that one file; there are no
+  external ruleset/resource files to bundle. `app/cli/bio.py` (the CLI command) adds only `json`/`sys`/
+  `typer`, with no file I/O beyond stdin and no `DATABASE_URL` dependency.
+- **The heavy dependencies (sqlalchemy/psycopg/alembic/fastapi/uvicorn/pyzmq) come entirely from
+  `app/cli/__main__.py` eagerly importing every sibling CLI submodule** (`backfill`/`collector`/
+  `calibration`/`state`), none of which `bio evaluate` itself touches.
+- Built and ran real PyInstaller 6.22.2 executables on Windows for both the full CLI (**A**) and a
+  narrow `bio_app`-only entry point (**B**):
+
+  | | A: full `app.cli` | B: `bio_app` only |
+  |---|---|---|
+  | `--onefile` startup (5-run avg) | ~1,300ms | not built (rejected on A's result alone) |
+  | `--onedir` startup (5-run avg) | ~460ms | **~125ms** |
+  | `--onedir` bundle size | 44MB | **21MB** |
+  | sqlalchemy/psycopg/fastapi/uvicorn present | yes | **no** (confirmed absent from `_internal/`) |
+  | Aleoida Arcus boundary fixture result | MATCH (correct) | MATCH (correct, identical to A) |
+
+  **`--onefile` is unusable**: its per-run self-extraction cost (~1.3s) eats too much of
+  `CCoreAdapter`'s 5s timeout, on every single scan event. **`--onedir` is required.**
+- **Pitfall found and fixed**: EDpjKinsaku's editable install (`pip install -e .`) is invisible to
+  PyInstaller's static import analysis - a plain `pyinstaller entry.py` reports `app` itself as a
+  missing module and the built exe fails with `ModuleNotFoundError: No module named 'app'` at
+  startup. Passing `--paths <repo root>` fixes it; this is required for both A and B.
+- Existing `distribution/` precedent checked (`AppPaths.java`, `Installer.install4j`,
+  `.gitattributes`): EliteIntel already bundles a JRE, ONNX TTS/STT/embedding models, and a native HUD
+  overlay so commanders never install anything themselves. A had already broken that precedent (system
+  Python); B does not.
+- Size was not a deciding factor either way - the TTS model alone is 384MB, the embedding model
+  130MB, against 21-44MB for either C-CORE option.
+- **Decision: B** (dedicated entry point, `--onedir`). Linux packaging is explicitly deferred to a
+  later phase - PyInstaller cannot cross-compile, so it needs its own real build on Linux, not a
+  Windows-side guess.
+
+### 8-B: implementation
+
+- **EDpjKinsaku**: new `app/cli/bio_entry.py` (`from app.cli.bio import bio_app; bio_app()` - nothing
+  else), a `packaging` optional-dependency group (`pyinstaller>=6.0`) in `pyproject.toml`, and
+  `scripts/build_ccore_binary.ps1` (`--onedir`, `--paths <repo root>`). `bio_app` has exactly one
+  command, so Typer collapses it away when run standalone - the built binary takes no arguments, only
+  the same request JSON on stdin `edpj bio evaluate` always read.
+- **EliteIntel**: `AppPaths.getCCoreBinary()` added alongside `getOverlayBinary()`, resolving
+  `distribution/ccore/<os>/bio_entry(.exe)` - a per-OS subdirectory rather than overlay's flat
+  directory, because a PyInstaller onedir build's `_internal/` dependency folder would collide between
+  platforms in one flat directory the way overlay's differently-named per-OS files never do.
+  `CCoreAdapter.start()` now launches that binary directly with no arguments instead of
+  `python -m app.cli bio evaluate`; `PYTHON_COMMAND` is gone. `.gitattributes` gained a
+  `distribution/ccore/** filter=lfs` rule (a onedir build's file types vary too much to hand-pick by
+  extension the way overlay's DLL list does).
+- The real Windows binary (`bio_entry.exe` + `_internal/`, 21MB) is committed to
+  `distribution/ccore/windows/` via git-lfs, built by hand with the script above - there is no
+  automated cross-repo copy from EDpjKinsaku into EliteIntel yet (analogous to how `overlay/`'s
+  binaries are committed by hand after `buildOverlay`/`buildOverlayWindows`, except overlay's source
+  lives inside this repo and C-CORE's does not).
+
+### Not done in this phase (by design)
+
+Linux/macOS binaries, automating the EDpjKinsaku → EliteIntel binary copy, and any change to
+`SAASignalsFoundSubscriber`/the HUD/`ExobiologyCandidateFactSource` (none of them call `CCoreAdapter`
+differently - only what is inside `CCoreAdapter.start()` changed) were all left alone.
+
+**Verified:** `:app:compileJava`/`:app:compileTestJava` succeed. `CCoreAdapterIntegrationTest` (4
+tests, including the Aleoida Arcus boundary-MATCH fixture) and `CCoreAdapterJsonTest` (5 tests) pass
+against the real bundled binary. `subscriberTest` (`SAASignalsFoundCCoreSliceTest`, 2 tests) passes
+end-to-end through the same binary. Default `test` task: 3129 tests, 9 failures, the same pre-existing
+`JukeboxPlayerTest`/`TagScannerTest` failures already confirmed unrelated - no regression. A commander
+running the built jar with `distribution/ccore/windows/` alongside it now needs no Python, no pip, and
+no EDpjKinsaku checkout for C-CORE species evaluation to work.
