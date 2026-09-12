@@ -2,6 +2,10 @@ package elite.intel.gameapi.journal.subscribers;
 
 import com.google.common.eventbus.Subscribe;
 import elite.intel.ai.brain.vega.VegaRuntime;
+import elite.intel.bio.ccore.BodyContext;
+import elite.intel.bio.ccore.CCoreAdapter;
+import elite.intel.bio.ccore.CCoreAdapterException;
+import elite.intel.bio.ccore.RuleEvaluation;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.SignalName;
 import elite.intel.gameapi.data.BioForms;
@@ -12,6 +16,8 @@ import elite.intel.gameapi.journal.events.dto.MaterialDto;
 import elite.intel.session.PlayerSession;
 import elite.intel.session.Status;
 import elite.intel.util.ExoBio;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -22,8 +28,17 @@ import static elite.intel.util.StringUtls.localizedEvent;
 
 public class SAASignalsFoundSubscriber {
 
+    private static final Logger log = LogManager.getLogger(SAASignalsFoundSubscriber.class);
+
+    /**
+     * Phase 5 vertical slice (docs/ELITEINTEL_INTEGRATION_PLAN.md): C-CORE has rules for six genera so
+     * far, but only Aleoida is wired through the real pipeline while this connection is being proven.
+     */
+    private static final String CCORE_GENUS_SLICE = "Aleoida";
+
     private final PlayerSession playerSession = PlayerSession.getInstance();
     private final LocationManager locationManager = LocationManager.getInstance();
+    private final CCoreAdapter ccoreAdapter = new CCoreAdapter();
 
     private static void announce(String sb) {
         Status status = Status.getInstance();
@@ -77,6 +92,7 @@ public class SAASignalsFoundSubscriber {
                 if (liveSignals > 0) {
                     location.setBioSignals(liveSignals);
                     location.setGenus(toGenusDto(event.getGenuses(), location.getPlanetName()));
+                    evaluateCCoreSliceIfPresent(location);
                     boolean alreadySampledOut = surveyAlreadyComplete(location);
 
                     if (alreadySampledOut) {
@@ -212,5 +228,34 @@ public class SAASignalsFoundSubscriber {
             result.add(dto);
         }
         return result;
+    }
+
+    /**
+     * Calls C-CORE for {@link #CCORE_GENUS_SLICE} when this body's detected genuses include it, and
+     * stores the result on {@code location}. A body without it, or a CLI failure of any kind, leaves
+     * {@code location} exactly as it already was - this must never disrupt the announcement/signal
+     * processing around it, so every failure is logged and swallowed here rather than propagated.
+     */
+    private void evaluateCCoreSliceIfPresent(LocationDto location) {
+        boolean sliceGenusDetected = location.getGenus().stream()
+                .anyMatch(genus -> CCORE_GENUS_SLICE.equalsIgnoreCase(
+                        BioForms.englishGenusName(genus.getGenusSymbol())));
+        if (!sliceGenusDetected) return;
+
+        BodyContext body = new BodyContext(
+                location.getAtmosphere(),
+                location.getGravity() == 0 ? null : location.getGravity(),
+                location.getSurfaceTemperature() == 0 ? null : location.getSurfaceTemperature(),
+                location.getSurfacePressure() == 0 ? null : location.getSurfacePressure(),
+                location.getPlanetClass(),
+                location.getVolcanism(),
+                null);
+        try {
+            List<RuleEvaluation> evaluations = ccoreAdapter.evaluate(CCORE_GENUS_SLICE, body);
+            location.setSpeciesEvaluations(evaluations);
+            log.info("C-CORE {} evaluation for {}: {}", CCORE_GENUS_SLICE, location.getPlanetName(), evaluations);
+        } catch (CCoreAdapterException e) {
+            log.warn("C-CORE {} evaluation failed for {}: {}", CCORE_GENUS_SLICE, location.getPlanetName(), e.getMessage());
+        }
     }
 }

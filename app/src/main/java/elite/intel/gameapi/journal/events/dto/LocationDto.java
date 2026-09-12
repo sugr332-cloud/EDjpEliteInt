@@ -1,5 +1,6 @@
 package elite.intel.gameapi.journal.events.dto;
 
+import elite.intel.bio.ccore.RuleEvaluation;
 import elite.intel.gameapi.StationName;
 import elite.intel.gameapi.journal.events.FSSBodySignalsEvent;
 import elite.intel.gameapi.journal.events.SAASignalsFoundEvent;
@@ -33,6 +34,7 @@ public class LocationDto implements ToJsonConvertible {
     private List<FSSBodySignalsEvent.Signal> fssSignals;
     private List<GenusDto> genus = new ArrayList<>();
     private List<BioSampleDto> partialBioSamples = new ArrayList<>();
+    private List<RuleEvaluation> speciesEvaluations = new ArrayList<>();
     private List<String> stationServices;
     private List<String> powers;
     private Set<FssSignalDto> detectedSignals = new HashSet<>();
@@ -339,6 +341,22 @@ public class LocationDto implements ToJsonConvertible {
     public void setGenus(List<GenusDto> genus) {
         if (genus.isEmpty()) return;
         this.genus = genus;
+    }
+
+    /**
+     * C-CORE's species candidates for this body, for whichever genus was last evaluated (see
+     * {@code SAASignalsFoundSubscriber}). One entry per species C-CORE has a rule for in that genus,
+     * already aggregated across that species' rulesets - not one per ruleset, and not the same thing as
+     * {@link #getPartialBioSamples()}, which is what has actually been scanned rather than what the
+     * current body conditions make a candidate.
+     */
+    public List<RuleEvaluation> getSpeciesEvaluations() {
+        return speciesEvaluations;
+    }
+
+    public void setSpeciesEvaluations(List<RuleEvaluation> speciesEvaluations) {
+        if (speciesEvaluations == null) return;
+        this.speciesEvaluations = speciesEvaluations;
     }
 
     public List<BioSampleDto> getPartialBioSamples() {
