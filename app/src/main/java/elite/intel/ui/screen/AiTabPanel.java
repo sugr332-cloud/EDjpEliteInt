@@ -6,7 +6,9 @@ import elite.intel.ai.brain.vega.VegaRuntime;
 import elite.intel.ai.brain.vega.diag.VegaMemoryDump;
 import elite.intel.ai.brain.vega.memory.MemoryGateway;
 import elite.intel.ai.ears.MicDiagnosticsReport;
+import elite.intel.eventbus.GameEventBus;
 import elite.intel.eventbus.UiBus;
+import elite.intel.gameapi.UserInputEvent;
 import elite.intel.session.PlayerSession;
 import elite.intel.session.SystemSession;
 import elite.intel.ui.dialog.AudioInterfaceDialog;
@@ -70,6 +72,8 @@ public class AiTabPanel extends JPanel {
 
     private HudLogArea chatPanel;
     private HudLogArea systemPanel;
+    private HudTextField chatInputField;
+    private JButton chatSendButton;
 
     // QUICK STATUS readouts
     private HudStatusReadout sttBadge;
@@ -222,6 +226,7 @@ public class AiTabPanel extends JPanel {
 
         // --- Main log area (conversation top, system below) ---
         HudSection chatSection = logSection(getText("ai.section.conversation"), hudApplicationScrollPane(chatPanel));
+        chatSection.body().add(buildChatInputRow(), BorderLayout.SOUTH);
 
         HudSection systemSection = logSection(getText("ai.section.systemMessages"), hudApplicationScrollPane(systemPanel));
         HudGlyphButton copyLogButton = buildCopyLogButton();
@@ -324,6 +329,41 @@ public class AiTabPanel extends JPanel {
         root.add(centerWrap, BorderLayout.CENTER);
         root.add(bottom, BorderLayout.SOUTH);
         return root;
+    }
+
+    /**
+     * Builds the chat text-entry row below the conversation log: a HUD text field that submits on Enter,
+     * plus an explicit send button for parity. Both publish through the same {@link UserInputEvent} seam
+     * the microphone already uses ({@code DiagnosticsInputTailer} does the same thing for injected test
+     * phrases), so voice and typed commander input are indistinguishable to VEGA once they hit the bus.
+     */
+    private JPanel buildChatInputRow() {
+        chatInputField = (HudTextField) makeTextField();
+        chatInputField.setEnabled(false);
+        chatInputField.addActionListener(e -> sendChatInput());
+
+        chatSendButton = makeButtonSubtle(getText("ai.chatInput.send"));
+        chatSendButton.setEnabled(false);
+        chatSendButton.addActionListener(e -> sendChatInput());
+
+        JPanel row = transparentPanel(new BorderLayout(HUD_GAP, 0));
+        row.setBorder(BorderFactory.createEmptyBorder(HUD_GAP, 0, 0, 0));
+        row.add(chatInputField, BorderLayout.CENTER);
+        row.add(chatSendButton, BorderLayout.EAST);
+        return row;
+    }
+
+    /**
+     * Sends the typed commander line the same way a confirmed voice transcript arrives: as a
+     * {@link UserInputEvent} on {@link GameEventBus}. Blank input is not published - there is nothing
+     * for VEGA to act on, and an empty line would still show up in the chat log as if the commander
+     * had said something.
+     */
+    private void sendChatInput() {
+        String text = chatInputField.getText();
+        if (text == null || text.isBlank()) return;
+        GameEventBus.publish(new UserInputEvent(text.trim()));
+        chatInputField.setText("");
     }
 
     private HudSection logSection(String title, JComponent content) {
@@ -529,6 +569,8 @@ public class AiTabPanel extends JPanel {
         startStopServicesButton.setText(running ? getText("button.stopServices") : getText("button.startServices"));
         startStopServicesButton.setEnabled(!transitioning);
         recalibrateAudioButton.setEnabled(running);
+        chatInputField.setEnabled(running);
+        chatSendButton.setEnabled(running);
         // Sleep/Wake gates the hands-free microphone. Under push-to-talk the mapped button already does that,
         // so there is nothing left for it to gate and it is offered as disabled rather than as a lie.
         sleepWakeButton.setEnabled(running && !pttModeActive);
