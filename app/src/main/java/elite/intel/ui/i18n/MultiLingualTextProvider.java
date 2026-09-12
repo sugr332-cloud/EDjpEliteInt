@@ -125,6 +125,7 @@ public final class MultiLingualTextProvider {
             case PT -> Locale.forLanguageTag("pt");
             case PTBZ -> Locale.forLanguageTag("ptbz");
             case IT -> Locale.ITALIAN;
+            case JA -> Locale.JAPANESE;
         };
     }
 }

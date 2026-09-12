@@ -63,6 +63,7 @@ public final class ResponseTextProvider {
             case IT -> Locale.ITALIAN;
             case PT -> Locale.forLanguageTag("pt");
             case PTBZ -> Locale.forLanguageTag("ptbz");
+            case JA -> Locale.JAPANESE;
         };
     }
 }

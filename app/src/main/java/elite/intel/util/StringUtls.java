@@ -182,6 +182,7 @@ public class StringUtls {
             case PT -> "language.portuguese";
             case PTBZ -> "language.portugueseBrazilian";
             case IT -> "language.italian";
+            case JA -> "language.japanese";
         };
         return MultiLingualTextProvider.getText(effectiveTtsLanguage(), key);
     }

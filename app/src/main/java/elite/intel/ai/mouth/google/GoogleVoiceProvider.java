@@ -155,6 +155,7 @@ public class GoogleVoiceProvider implements VoiceProvider<VoiceSelectionParams> 
             case IT -> "it-IT";
             case PT -> "pt-PT";
             case PTBZ -> "pt-BR";
+            case JA -> "ja-JP";
         };
     }
 
@@ -235,6 +236,10 @@ public class GoogleVoiceProvider implements VoiceProvider<VoiceSelectionParams> 
             case IT -> male ? "it-IT-Standard-C" : "it-IT-Standard-A";
             case PT -> male ? "pt-PT-Standard-B" : "pt-PT-Standard-A";
             case PTBZ -> male ? "pt-BR-Standard-B" : "pt-BR-Standard-A";
+            // Not added to CHIRP3_HD_LANGUAGES above: unlike the others, ja-JP's Chirp3-HD coverage has not
+            // been confirmed against the live API, so this stays on the same guaranteed-to-exist Standard
+            // tier pt-PT uses (see the class field comment).
+            case JA -> male ? "ja-JP-Standard-C" : "ja-JP-Standard-A";
         };
     }
 }

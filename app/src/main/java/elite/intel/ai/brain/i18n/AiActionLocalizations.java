@@ -33,6 +33,10 @@ public final class AiActionLocalizations {
             case IT -> new ItalianAiActionAliases();
             case PT -> new PortugueseAiActionAliases();
             case PTBZ -> new BrazilianPortugueseAiActionAliases();
+            // See the matching comment in InputNormalizerLocalizations: Parakeet cannot transcribe
+            // Japanese speech at all, so there is no Japanese voice command text for wake-phrase/action
+            // matching to apply to yet. English is the closest thing to a working fallback.
+            case JA -> new EnglishAiActionAliases();
         };
     }
 

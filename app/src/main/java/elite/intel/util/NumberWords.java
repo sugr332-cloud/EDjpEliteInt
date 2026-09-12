@@ -95,6 +95,7 @@ public final class NumberWords {
             case PTBZ -> "pt-BR";
             case RU -> "ru";
             case UK -> "uk";
+            case JA -> "ja";
         };
     }
 

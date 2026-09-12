@@ -700,6 +700,12 @@ public class ParakeetSTTImpl implements EarsInterface {
             case IT -> "it";
             // Parakeet takes ISO 639-1 only: both Portuguese variants transcribe as "pt".
             case PT, PTBZ -> "pt";
+            // The bundled model's vocabulary (distribution/parakeet/tokens.txt) is Latin/Cyrillic only -
+            // no Japanese tokens exist, so Japanese speech cannot be transcribed by this model regardless
+            // of the language hint passed. "en" is not a working substitute, only the least-wrong of the
+            // codes this method already returns; voice input stays unavailable for Japanese until a
+            // Japanese-capable model is bundled.
+            case JA -> "en";
         };
     }
 

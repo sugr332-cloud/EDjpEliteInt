@@ -194,6 +194,7 @@ final class EdgeVoiceProvider {
             case IT -> "it-IT";
             case PT -> "pt-PT";
             case PTBZ -> "pt-BR";
+            case JA -> "ja-JP";
         };
     }
 
@@ -213,6 +214,7 @@ final class EdgeVoiceProvider {
             case IT -> male ? "it-IT-DiegoNeural" : "it-IT-ElsaNeural";
             case PT -> male ? "pt-PT-DuarteNeural" : "pt-PT-RaquelNeural";
             case PTBZ -> male ? "pt-BR-AntonioNeural" : "pt-BR-FranciscaNeural";
+            case JA -> male ? "ja-JP-KeitaNeural" : "ja-JP-NanamiNeural";
         };
     }
 }

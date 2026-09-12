@@ -61,7 +61,11 @@ class FighterAttackTargetPhrasingTest {
             entry(Language.ES, List.of(List.of("atac", "ataqu"), List.of("mi"), List.of("objetivo"))),
             entry(Language.IT, List.of(List.of("attacc", "concentr"), List.of("mio"), List.of("bersaglio"))),
             entry(Language.PT, List.of(List.of("atac"), List.of("meu"), List.of("alvo"))),
-            entry(Language.PTBZ, List.of(List.of("atac"), List.of("meu"), List.of("alvo")))
+            entry(Language.PTBZ, List.of(List.of("atac"), List.of("meu"), List.of("alvo"))),
+            // AiActionLocalizations routes JA to EnglishAiActionAliases (Parakeet cannot transcribe
+            // Japanese speech at all yet, see ParakeetSTTImpl.toLangCode()), so its aliases are the
+            // English ones and the same stems apply.
+            entry(Language.JA, List.of(List.of("attack"), List.of("my"), List.of("target")))
     );
 
     @ParameterizedTest(name = "{0} orders the attack in full words")

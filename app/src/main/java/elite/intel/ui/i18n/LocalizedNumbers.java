@@ -75,6 +75,7 @@ public final class LocalizedNumbers {
             case IT -> Locale.ITALIAN;
             case PT -> Locale.forLanguageTag("pt-PT");
             case PTBZ -> Locale.forLanguageTag("pt-BR");
+            case JA -> Locale.JAPANESE;
         };
     }
 }

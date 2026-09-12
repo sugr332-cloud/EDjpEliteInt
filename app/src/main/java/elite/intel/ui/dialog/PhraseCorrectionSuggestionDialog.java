@@ -183,6 +183,7 @@ public final class PhraseCorrectionSuggestionDialog extends JDialog {
             case IT -> getText("language.italian");
             case PT -> getText("language.portuguese");
             case PTBZ -> getText("language.portugueseBrazilian");
+            case JA -> getText("language.japanese");
         };
     }
 }

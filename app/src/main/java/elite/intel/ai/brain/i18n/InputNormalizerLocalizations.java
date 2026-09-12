@@ -61,6 +61,11 @@ public final class InputNormalizerLocalizations {
             case IT -> new ItalianInputNormalizerRules();
             case PT -> new PortugueseInputNormalizerRules();
             case PTBZ -> new BrazilianPortugueseInputNormalizerRules();
+            // ParakeetSTTImpl.toLangCode() cannot transcribe Japanese speech at all (the bundled model's
+            // vocabulary has no Japanese tokens) and already falls back to "en"; whatever text it produces
+            // for Japanese speech is Latin-alphabet, so the English rules are the only ones that could
+            // possibly apply to it. Not a real Japanese voice-input implementation.
+            case JA -> new EnglishInputNormalizerRules();
         };
     }
 
