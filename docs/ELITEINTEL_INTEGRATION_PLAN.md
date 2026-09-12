@@ -48,11 +48,13 @@ Track B does not block Track A or vice versa.
 
 Direction set for the four open questions in §7, not yet implemented:
 
-1. **Transport:** subprocess + stdio JSON (tentative first choice), to keep `EDpjKinsaku`'s existing
-   `pytest` suite as the sole source of truth rather than duplicating logic behind an HTTP service.
-2. **Genus dispatch:** add `evaluate_genus(name, body)` on the `EDpjKinsaku` side rather than building
-   a name→function lookup table in the adapter, so the dispatch logic lives next to the functions it
-   dispatches to.
+1. **Transport:** ~~subprocess + stdio JSON (tentative first choice)~~ **Done**, `EDpjKinsaku` commit
+   `3e87288`: `edpj bio evaluate` reads `{"genus", "body"}` JSON on stdin and writes the aggregated
+   `RuleEvaluation` list as JSON on stdout (verified with a real `... | python -m app.cli bio evaluate`
+   pipe). This lives entirely in `EDpjKinsaku` — nothing on the EliteIntel side calls it yet.
+2. **Genus dispatch:** ~~add `evaluate_genus(name, body)` on the `EDpjKinsaku` side~~ **Done**, same
+   commit: `evaluate_genus(name, body)` in `app/bio/c_core.py`, dispatching by lowercased genus name to
+   the six converted evaluators, raising `KeyError` (not a silent empty list) for the other 13.
 3. **`gravity` unit/scale parity:** **Investigated, no conversion needed** — see §9. `LocationDto.gravity`
    (Earth-g, EliteIntel's own recomputed value) and C-CORE's `BodyContext.gravity`/`min_gravity`/
    `max_gravity` (also Earth-g) are the same unit and scale. The raw journal `SurfaceGravity` (m/s²)
@@ -96,13 +98,16 @@ Only entries backed by an actual command run or a real file are listed as done. 
 | 1 | Done | AI input pipeline traced: `UserInputEvent` (`app/src/main/java/elite/intel/gameapi/UserInputEvent.java`) → `VegaSubsystemGate.onUserInput()` → `ThoughtDispatcher` → LLM → `AiResponseLogEvent` → `AiTabController` → `AiTabPanel` |
 | 2 | Audited, not implemented | See §4 |
 | 3 | Partially started | `pressure` field wired (commit `4e0882259`); no `BodyContext` adapter class exists yet — that is the rest of Phase 3 |
-| 4–10 | Not started | No C-CORE call boundary, no HUD panel exist in this repo |
+| 4 | CLI boundary done on the `EDpjKinsaku` side | `edpj bio evaluate` (EDpjKinsaku commit `3e87288`); no EliteIntel code calls it yet — that is the rest of Phase 4 |
+| 5–10 | Not started | No HUD panel, no live call from EliteIntel into the CLI exist in this repo |
 | 11 (text input) | Done | See §6 below |
 | 11 (VOICEVOX) | Not started | `TtsProvider` enum only has `KOKORO` / `GOOGLE` / `EDGE` |
 
-`EDpjKinsaku` C-CORE progress (verified via `git log`, last relevant commit `f03252c`, 2026-09-12):
-6 of 19 genera converted (31 species / 65 rulesets), `bioscan-count` 20/116/254/0 PASS, `pytest` 699
-passed. This is the Track A starting point once Phase 4 begins.
+`EDpjKinsaku` C-CORE progress (verified via `git log`, branch `bio-c-core-validation`, last relevant
+commit `3e87288`, 2026-09-12): 6 of 19 genera converted (31 species / 65 rulesets), `bioscan-count`
+20/116/254/0 PASS, `pytest` 707 passed (699 baseline + 8 for `evaluate_genus`/the new CLI). The CLI
+boundary (`edpj bio evaluate`) now exists and is independently verified; nothing in EliteIntel calls
+it yet.
 
 ## 6. What "Phase 11 text input" actually is
 
