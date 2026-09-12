@@ -110,8 +110,9 @@ Only entries backed by an actual command run or a real file are listed as done. 
 | 1 | Done | AI input pipeline traced: `UserInputEvent` (`app/src/main/java/elite/intel/gameapi/UserInputEvent.java`) → `VegaSubsystemGate.onUserInput()` → `ThoughtDispatcher` → LLM → `AiResponseLogEvent` → `AiTabController` → `AiTabPanel` |
 | 2 | Audited, not implemented | See §4 |
 | 3 | Partially started | `pressure` field wired (commit `4e0882259`); no `BodyContext` adapter class exists yet — that is the rest of Phase 3 |
-| 4 | Adapter done on both sides | `edpj bio evaluate` (EDpjKinsaku `3e87288`) + `CCoreAdapter` (EliteIntel `890531a1a`, see §11); nothing in the real scan pipeline calls `CCoreAdapter` yet — that is Phase 5 |
-| 5–10 | Not started | No HUD panel, no call from `ScanEventSubscriber` into `CCoreAdapter` exist yet |
+| 4 | Adapter done on both sides | `edpj bio evaluate` (EDpjKinsaku `3e87288`) + `CCoreAdapter` (EliteIntel `890531a1a`, see §11) |
+| 5 | Aleoida vertical slice: wired, not HUD-surfaced | `SAASignalsFoundSubscriber` → `CCoreAdapter` → `LocationDto.speciesEvaluations` (EliteIntel `ae4270496`, see §12), scoped to Aleoida only; nothing reads the stored result yet |
+| 6–10 | Not started | No HUD panel, no collection-state tracking, no other genus wired |
 | 11 (text input) | Done | See §6 below |
 | 11 (VOICEVOX) | Not started | `TtsProvider` enum only has `KOKORO` / `GOOGLE` / `EDGE` |
 
@@ -400,3 +401,45 @@ boundary body comes back `MATCH`, genus matching is case-insensitive, an empty b
 `INSUFFICIENT_DATA` for all four Fumerola species, an unconverted genus like `"Tussock"` fails with a
 clean error naming the genus rather than an empty list) all pass. Full suite: 3116 tests, 9 failures,
 all the same pre-existing `JukeboxPlayerTest`/`TagScannerTest` failures already confirmed unrelated.
+
+## 12. Phase 5: Aleoida vertical slice wired (2026-09-12)
+
+The first real call from the scan pipeline into `CCoreAdapter` (EliteIntel commit `ae4270496`).
+Deliberately narrow: one genus, one new storage field, no HUD/AI consumer yet.
+
+### Where and how
+
+- **Trigger:** `SAASignalsFoundSubscriber.onSAASignalsFound()`, immediately after
+  `location.setGenus(...)` inside the per-body `locationManager.updateBody(...)` lock. By the time a
+  `SAASignalsFound` (DSS) event arrives, an earlier `Scan` event has normally already populated the
+  body's physical fields via `ScanEventSubscriber` — this is why genus arrival, not the scan itself, is
+  the natural trigger.
+- **Genus name mismatch found and bridged:** `GenusDto.genusSymbol` holds Frontier's journal stem
+  (`"Aleoids"`), not the English display name C-CORE's `evaluate_genus()` dispatches on (`"Aleoida"`) —
+  confirmed by reading `BioForms.java`'s own `genus("Aleoids", "Aleoida", ...)` registration, not
+  assumed. Bridged with the already-existing `BioForms.englishGenusName()`, adding no new lookup table.
+- **Scope guard:** `SAASignalsFoundSubscriber.CCORE_GENUS_SLICE = "Aleoida"` — only a body whose
+  detected genuses include Aleoida (via the bridge above) ever reaches `CCoreAdapter`. C-CORE has six
+  genera converted; this phase proves the connection with one before widening it (Phase 7).
+- **Storage:** no existing field held anything like this — checked `LocationDto`, `GenusDto`, and
+  `BioSampleDto` directly rather than assuming one existed. `BioSampleDto` is what has actually been
+  scanned, a different concept from a body-conditions candidate list, so reusing it would have
+  conflated the two. Added `LocationDto.speciesEvaluations` (`List<RuleEvaluation>`), mirroring the
+  Phase 3 `surfacePressure` pattern — one new field, no new subsystem.
+- **Failure handling:** `CCoreAdapterException` is caught inside
+  `evaluateCCoreSliceIfPresent()` and logged, never propagated — the signal/announcement processing
+  around this call must keep working whether or not C-CORE (or Python) is available on the machine.
+
+### Not done in this phase (by design)
+
+HUD display, AI/chat consumption, VOICEVOX, cross-checking against completed `BioSampleDto` samples,
+and widening past Aleoida to the other five converted genera are all left for later phases.
+
+**Verified:** `:app:compileJava`/`:app:compileTestJava` succeed. `SAASignalsFoundCCoreSliceTest` (2
+tests) passes via `subscriberTest` — the dedicated Gradle task for this package
+(`elite.intel.junit.gameapi.journal.subscribers.*`), since the default `test` task excludes it for
+timing reasons (an existing, unrelated project convention, not something this change introduced):
+Aleoida Arcus' exact boundary body comes back `MATCH` end-to-end through the real CLI and lands on
+`LocationDto.speciesEvaluations`; a Tussock-only body never triggers a C-CORE call at all. Default
+`test` task: 3116 tests, 9 failures, all the same pre-existing `JukeboxPlayerTest`/`TagScannerTest`
+failures already confirmed unrelated.
