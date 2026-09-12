@@ -42,7 +42,7 @@ Track B does not block Track A or vice versa.
 | 8 | All species | Every C-CORE genus wired through the same boundary as Phase 5 |
 | 9 | Navigation integration | Distance/jump-count context (per `EDpjKinsaku`'s `DESTINATION_ETA_SPEC`) surfaced in EliteIntel |
 | 10 | Exobiology value/ranking | `EDpjKinsaku`'s value/ranking model surfaced as prioritized recommendations |
-| 11 | AI conversation surface | Text input to VEGA (done, see below); VOICEVOX as a `TtsProvider` option (not started); C-CORE result injection into AI chat (not started) |
+| 11 | AI conversation surface | Text input to VEGA (done, see below); VOICEVOX as a `TtsProvider` option (not started); C-CORE result injection into AI chat (done, §14) |
 
 ## 3. Phase 4 decisions (provisional, 2026-09-12)
 
@@ -486,3 +486,55 @@ never leak into that genus's row; Aleoida's five matches plus two more genuses c
 rather than exceed the row budget), all pass. Default `test` task: 3120 tests, 9 failures, all the same
 pre-existing `JukeboxPlayerTest`/`TagScannerTest` failures already confirmed unrelated. `subscriberTest`
 (Phase 5's async wiring): unaffected, still passing.
+
+## 14. Phase 7: C-CORE exobiology fact source for AI chat (2026-09-13)
+
+First consumption of a C-CORE result by VEGA's AI chat, via the existing `MemoryFactSource` extension
+mechanism (read-only investigation confirmed this mechanism already exists and is auto-wired — no new
+architecture was introduced). Reverses this plan's earlier "HUD next" direction (§2's original ordering
+of Phase 6 before Phase 11): once the investigation showed AI chat already has a formal fact-injection
+path, wiring C-CORE into it was the smaller, more natural next step than further HUD work.
+
+### Design
+
+- **New file:** `elite.intel.ai.brain.vega.memory.facts.sources.ExobiologyCandidateFactSource`,
+  `@RegisterMemoryFactSource`-annotated exactly like every other fact source — no registry/dispatcher
+  changes needed, auto-discovery picks it up.
+- **Reads only already-persisted state.** `factsFor()` reads `LocationDto.speciesEvaluations` — the
+  field Phase 5's `SAASignalsFoundSubscriber` already populates by calling `CCoreAdapter` at scan time.
+  This source **never** constructs a `CCoreAdapter` or shells out to the C-CORE CLI itself; the chat path
+  and the scan-time evaluation path stay fully decoupled, matching the explicit constraint that a chat
+  turn must not trigger a fresh C-CORE process call.
+- **`MATCH` only**, same filter `ExobiologyObjectiveSource` (Phase 6) already applies to the HUD — both
+  are independent readers of the same `LocationDto` field, neither depends on the other.
+- **Relevance reuses existing alias vocabulary.** `isRelevant()` calls the shared
+  `LocalizedFactRelevance.matches()` helper with the existing `query_exobiology_samples` and
+  `query_biome_analysis` keys from `ai_action_aliases.properties` (already covering phrases like "what
+  organisms are on this planet" / "what life is here" in every supported language) — no new alias
+  vocabulary invented.
+- **Situational gate matches `CurrentBodyFactSource`'s `AT_BODY` set exactly** (ship landed/gliding/in
+  orbit/in a ring, in an SRV, or on foot on a planet), checked before the `LocationManager` read so a
+  not-at-body turn never touches the DB.
+- **Genus-agnostic by design.** The fact source has no genus knowledge of its own — it reports whatever
+  C-CORE already decided and stored, whichever genus that happens to be (Aleoida only, for now, per
+  Phase 5's scope). Widening C-CORE's genus coverage (Phase 8) widens this fact source automatically,
+  with no changes needed here.
+
+### Not done in this phase (by design)
+
+Re-invoking the C-CORE CLI from the chat path, changing `CCoreAdapter`/`SAASignalsFoundSubscriber`/the
+HUD/the CLI, and inventing new relevance vocabulary were all explicitly out of scope and not touched.
+
+**Verified:** `:app:compileJava`/`:app:compileTestJava` succeed. New `ExobiologyCandidateFactSourceTest`
+(9 tests: single match, multiple matches preserving order, `NO_MATCH`-only ⇒ empty, `INSUFFICIENT_DATA`-
+only ⇒ empty, empty list ⇒ empty, null list ⇒ empty, relevant for an exobiology-samples-style query,
+relevant for a biome-analysis-style query, not relevant for an unrelated query) all pass. Default `test`
+task: 3129 tests, 9 failures, the same pre-existing `JukeboxPlayerTest`/`TagScannerTest` failures already
+confirmed unrelated — no regression from this change.
+
+Example fact line this source contributes to VEGA's `<facts>` block when Aleoida Arcus and Aleoida
+Gravis both evaluate to `MATCH` on the current body:
+
+```
+C-CORE exobiology candidates: Aleoida Arcus, Aleoida Gravis
+```
