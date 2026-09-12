@@ -78,9 +78,13 @@ generic text event, without changing VEGA/LLM/TTS?* It does. Concretely:
   confirmed the typed input reached VEGA's LLM gateway (it failed at LM Studio connectivity, which
   is a local environment issue unrelated to this change — the pipeline itself was reached).
 
-This is not yet committed to git. It should land as its own commit describing exactly this scope —
-not folded into a "Phase 11 complete" claim, since VOICEVOX and the C-CORE-context-injection idea
-discussed in conversation are still undesigned.
+Committed as its own commit (`875e3f597`) describing exactly this scope — not folded into a
+"Phase 11 complete" claim, since VOICEVOX and the C-CORE-context-injection idea discussed in
+conversation are still undesigned.
+
+LM Studio connectivity (the local LLM the pipeline reached and failed to call past) is out of scope
+going forward: it served only to confirm the existing conversation path is reachable over text, not
+as an AI provider this project intends to build on.
 
 ## 5. Division of responsibility with EDpjKinsaku
 
