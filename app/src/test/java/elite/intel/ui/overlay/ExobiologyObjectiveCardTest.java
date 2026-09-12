@@ -1,5 +1,7 @@
 package elite.intel.ui.overlay;
 
+import elite.intel.bio.ccore.RuleEvaluation;
+import elite.intel.bio.ccore.RuleStatus;
 import elite.intel.gameapi.journal.events.dto.BioSampleDto;
 import elite.intel.gameapi.journal.events.dto.GenusDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
@@ -196,6 +198,77 @@ class ExobiologyObjectiveCardTest {
         Optional<HudObjective> card = ExobiologyObjectiveSource.card(body, List.of(legacy), ID);
 
         assertTrue(card.isEmpty());
+    }
+
+    // -- Phase 6: C-CORE species candidates (docs/ELITEINTEL_INTEGRATION_PLAN.md) --------------------
+
+    @Test
+    void aleoidaMatchesAppearAsCheckmarkRowsRightAfterTheGenusRow() {
+        LocationDto body = bodyWith(genus("Aleoida", "$Codex_Ent_Aleoids_Genus_Name;"));
+        body.setSpeciesEvaluations(List.of(
+                evaluation("Aleoida Arcus", RuleStatus.MATCH),
+                evaluation("Aleoida Spica", RuleStatus.NO_MATCH),
+                evaluation("Aleoida Gravis", RuleStatus.MATCH),
+                evaluation("Aleoida Laminiae", RuleStatus.INSUFFICIENT_DATA)));
+
+        HudObjective card = ExobiologyObjectiveSource.card(body, List.of(), ID).orElseThrow();
+
+        // header, ALEOIDA genus row, then only the two MATCH species - NO_MATCH/INSUFFICIENT_DATA excluded
+        assertEquals(List.of("GENUS", "ALEOIDA", "ALEOIDA ARCUS", "ALEOIDA GRAVIS"), labels(card));
+        assertEquals("✓", card.rows().get(2).value());
+        assertEquals(HudRow.State.GOOD, card.rows().get(2).state());
+    }
+
+    @Test
+    void noAleoidaMatchesLeavesTheCardExactlyAsBeforePhase6() {
+        LocationDto body = bodyWith(genus("Aleoida", "$Codex_Ent_Aleoids_Genus_Name;"));
+        body.setSpeciesEvaluations(List.of(evaluation("Aleoida Arcus", RuleStatus.NO_MATCH)));
+
+        HudObjective card = ExobiologyObjectiveSource.card(body, List.of(), ID).orElseThrow();
+
+        assertEquals(List.of("GENUS", "ALEOIDA"), labels(card));
+    }
+
+    @Test
+    void aGenusOutsideTheCCoreSliceIsUnaffectedByMatches() {
+        // Species evaluations present but for a genus that is not the Phase 5/6 slice: must not leak in.
+        LocationDto body = bodyWith(genus("Bacterium", "$Codex_Ent_Bacterial_Genus_Name;"));
+        body.setSpeciesEvaluations(List.of(evaluation("Aleoida Arcus", RuleStatus.MATCH)));
+
+        HudObjective card = ExobiologyObjectiveSource.card(body, List.of(), ID).orElseThrow();
+
+        assertEquals(List.of("GENUS", "BACTERIUM"), labels(card));
+    }
+
+    /**
+     * The card's row budget is shared across genus rows and C-CORE match rows - it is a limit on the
+     * card, not on how many genuses fit. Aleoida's own five known species, if all matched, must not
+     * blow the six-row content budget checked in {@link #moreGenusesThanFitAreCountedInOneRow()}.
+     */
+    @Test
+    void matchRowsShareTheSameRowBudgetAsGenusRows() {
+        LocationDto body = bodyWith(genus("Aleoida", "$Codex_Ent_Aleoids_Genus_Name;"),
+                genus("Bacterium", "$Codex_Ent_Bacterial_Genus_Name;"),
+                genus("Fonticulua", "$Codex_Ent_Fonticulus_Genus_Name;"));
+        body.setSpeciesEvaluations(List.of(
+                evaluation("Aleoida Arcus", RuleStatus.MATCH),
+                evaluation("Aleoida Coronamus", RuleStatus.MATCH),
+                evaluation("Aleoida Gravis", RuleStatus.MATCH),
+                evaluation("Aleoida Laminiae", RuleStatus.MATCH),
+                evaluation("Aleoida Spica", RuleStatus.MATCH)));
+
+        HudObjective card = ExobiologyObjectiveSource.card(body, List.of(), ID).orElseThrow();
+
+        // header + content must never exceed header + MAX_GENUS_ROWS + one overflow row.
+        assertTrue(card.rows().size() <= ExobiologyObjectiveSource.MAX_GENUS_ROWS + 2,
+                "row budget exceeded: " + card.rows());
+        // Aleoida's row plus all 5 matches already consumes the entire budget, so the other two
+        // genuses cannot fit and must be folded into the overflow row.
+        assertEquals("MORE GENUS", card.rows().getLast().label());
+    }
+
+    private static RuleEvaluation evaluation(String speciesName, RuleStatus status) {
+        return new RuleEvaluation("$Codex_Ent_Test_Name;", speciesName, status, "test fixture");
     }
 
     // -- fixtures --------------------------------------------------------------

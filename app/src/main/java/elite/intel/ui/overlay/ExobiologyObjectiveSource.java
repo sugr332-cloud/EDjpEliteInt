@@ -1,7 +1,10 @@
 package elite.intel.ui.overlay;
 
+import elite.intel.bio.ccore.RuleEvaluation;
+import elite.intel.bio.ccore.RuleStatus;
 import elite.intel.db.managers.BioSamplesManager;
 import elite.intel.db.managers.LocationManager;
+import elite.intel.gameapi.data.BioForms;
 import elite.intel.gameapi.journal.events.dto.BioSampleDto;
 import elite.intel.gameapi.journal.events.dto.GenusDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
@@ -49,6 +52,14 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
      * at the far end of the pipe instead of showing more.
      */
     static final int MAX_GENUS_ROWS = 6;
+
+    /**
+     * Phase 6 vertical slice (docs/ELITEINTEL_INTEGRATION_PLAN.md): C-CORE species candidates are only
+     * surfaced for the one genus Phase 5 wired up. Matches {@code SAASignalsFoundSubscriber}'s own
+     * slice constant; not shared from there because that class has no public surface for it and a
+     * second one-line constant is cheaper than introducing one for a single string.
+     */
+    private static final String CCORE_GENUS_SLICE = "Aleoida";
 
     private final PlayerSession playerSession;
     private final LocationManager locationManager;
@@ -146,8 +157,13 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
         rows.add(HudRow.progress(HudText.get("overlay.card.row.genus"),
                 detected.size() - remaining.size(), detected.size()));
 
-        int shown = Math.min(remaining.size(), MAX_GENUS_ROWS);
-        for (GenusDto genus : remaining.subList(0, shown)) {
+        // A running budget, not a fixed slice of `remaining`: a genus in the C-CORE slice can add
+        // several species rows of its own (see below), and the card's row budget is shared across all
+        // of them, not just genus rows - the six-row limit is on the card, not on the genus count.
+        int budget = MAX_GENUS_ROWS;
+        int genusesShown = 0;
+        for (GenusDto genus : remaining) {
+            if (budget <= 0) break;
             String label = displayName(genus);
             Integer sampled = sampledStage(partials, genus);
             if (sampled != null && sampled > 0 && sampled < SAMPLES_PER_GENUS) {
@@ -157,9 +173,21 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
             } else {
                 rows.add(HudRow.of(label, payout(genus, body.isOurDiscovery())));
             }
+            budget--;
+            genusesShown++;
+
+            if (budget > 0 && CCORE_GENUS_SLICE.equalsIgnoreCase(BioForms.englishGenusName(genus.getGenusSymbol()))) {
+                for (RuleEvaluation candidate : matchedSpecies(body.getSpeciesEvaluations())) {
+                    if (budget <= 0) break;
+                    // A checkmark, not a translated word: MATCH is C-CORE's internal vocabulary (see
+                    // matchedSpecies()), not HUD copy, and a symbol needs no i18n entry in any language.
+                    rows.add(HudRow.of(candidate.speciesName().toUpperCase(Locale.ROOT), "✓", HudRow.State.GOOD));
+                    budget--;
+                }
+            }
         }
-        if (remaining.size() > shown) {
-            rows.add(HudRow.of(HudText.get("overlay.card.row.moreGenus"), "+" + (remaining.size() - shown)));
+        if (genusesShown < remaining.size()) {
+            rows.add(HudRow.of(HudText.get("overlay.card.row.moreGenus"), "+" + (remaining.size() - genusesShown)));
         }
 
         return Optional.of(new HudObjective(
@@ -168,6 +196,17 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
                 bodyLabel(body),
                 rows,
                 HudObjective.PRIORITY_AMBIENT));
+    }
+
+    /**
+     * The C-CORE candidates this body's current conditions actually satisfy, in the order C-CORE
+     * returned them. {@code NO_MATCH} and {@code INSUFFICIENT_DATA} stay out of the HUD on purpose -
+     * they are C-CORE's internal reasoning, not something the commander asked to see - but remain on
+     * {@link LocationDto#getSpeciesEvaluations()} for whatever reads that later.
+     */
+    private static List<RuleEvaluation> matchedSpecies(List<RuleEvaluation> evaluations) {
+        if (evaluations == null || evaluations.isEmpty()) return List.of();
+        return evaluations.stream().filter(e -> e.status() == RuleStatus.MATCH).toList();
     }
 
     /**
