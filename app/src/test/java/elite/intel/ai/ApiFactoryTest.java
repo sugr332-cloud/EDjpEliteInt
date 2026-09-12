@@ -54,4 +54,19 @@ class ApiFactoryTest {
                     "Google speaks Cyrillic and stays selectable under " + language);
         }
     }
+
+    /**
+     * Kokoro's Japanese speakers are held out and its phonemizer has no Japanese entry (see
+     * {@link TtsProvider#canVoice}), so - like Cyrillic, for an unrelated reason - it is never the mouth for a
+     * Japanese commander, not as a selection, and not as the stand-in for a keyless Google.
+     */
+    @Test
+    void kokoroNeverSpeaksForAJapaneseCommander() {
+        assertSame(EdgeTTSImpl.getInstance(), ApiFactory.selectMouth(TtsProvider.KOKORO, null, Language.JA),
+                "stored Kokoro under Japanese");
+        assertSame(EdgeTTSImpl.getInstance(), ApiFactory.selectMouth(TtsProvider.GOOGLE, "not-a-key", Language.JA),
+                "keyless Google under Japanese");
+        assertSame(GoogleTTSImpl.getInstance(), ApiFactory.selectMouth(TtsProvider.GOOGLE, GOOGLE_KEY, Language.JA),
+                "Google speaks Japanese and stays selectable");
+    }
 }

@@ -14,37 +14,29 @@ public final class AiResponseLanguagePolicy {
      * Resolves the effective AI response language based on the system session configuration
      * and available Text-to-Speech (TTS) settings.
      * <p>
-     * Google and Edge TTS voice every language we ship, so they impose nothing. The local Kokoro TTS constrains
-     * only Cyrillic: its phonemizer cannot read the script at all, so RU/UK have to be answered in
-     * English or they would not be spoken. Every other language is Latin-script and Kokoro speaks it,
-     * using its nearest voice where it has no native one — German is voiced with an accent, which beats
-     * answering a German commander in English.
+     * Delegates the actual capability question to {@link TtsProvider#canVoice}, the single place that decides
+     * whether an engine can voice a language, rather than repeating that decision here: this method used to
+     * carry its own copy of the Kokoro/Cyrillic rule, and a second copy is exactly how a case {@code canVoice}
+     * already knows about (Japanese - see its Javadoc) went unhandled here for a time. Google and Edge voice
+     * every language we ship, so they never fall through; Kokoro's few gaps (Cyrillic, Japanese) fall back to
+     * English.
      * <p>
-     * In practice a Cyrillic commander no longer reaches that fallback: {@code SystemSession.getTtsProvider()}
-     * withdraws Kokoro from them entirely (see {@link elite.intel.ai.mouth.TtsProvider#forLanguage}), so they
-     * are on Edge or Google and are answered in their own language. The English branch stays as the guard that
-     * makes this method true of any engine, not only of today's three.
+     * In practice a commander in one of Kokoro's gap languages no longer reaches that fallback for long:
+     * {@code SystemSession.getTtsProvider()} withdraws Kokoro from them entirely (see
+     * {@link TtsProvider#forLanguage}), so they are on Edge or Google and are answered in their own language.
+     * The English branch stays as the guard that makes this method true of any engine and any stored setting,
+     * not only of today's three providers.
      *
      * @param systemSession the session containing system language and TTS configuration details
-     * @return the session's language, except when the local TTS would have to voice Cyrillic, in which
-     * case English
+     * @return the session's language, except when the configured TTS cannot voice it, in which case English
      */
     public static Language resolveEffectiveAiResponseLanguage(SystemSession systemSession) {
         Language sessionLanguage = systemSession.getLanguage();
-
-        if (supportsConfiguredLanguage(systemSession)) {
-            return sessionLanguage;
-        }
-
-        return sessionLanguage.isCyrillicScript() ? Language.EN : sessionLanguage;
+        TtsProvider provider = systemSession.getTtsProvider();
+        return provider.canVoice(sessionLanguage) ? sessionLanguage : Language.EN;
     }
 
     public static boolean isGoogleTtsConfiguredAndUsable(SystemSession systemSession) {
         return systemSession.getTtsProvider() == TtsProvider.GOOGLE;
-    }
-
-    private static boolean supportsConfiguredLanguage(SystemSession systemSession) {
-        TtsProvider provider = systemSession.getTtsProvider();
-        return provider == TtsProvider.GOOGLE || provider == TtsProvider.EDGE;
     }
 }

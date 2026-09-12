@@ -42,12 +42,20 @@ public enum TtsProvider {
     /**
      * Whether this engine can voice the language at all - not "voice it well", but produce sound from it.
      * <p>
-     * Only {@link #KOKORO} ever answers no: its phonemizer has no Cyrillic front end, so Russian and
-     * Ukrainian text is not spoken with an accent, it is not spoken (see {@link Language#isCyrillicScript()}).
-     * {@link #GOOGLE} and {@link #EDGE} carry every language this app ships.
+     * Only {@link #KOKORO} ever answers no, for two unrelated reasons. Russian and Ukrainian: its phonemizer
+     * has no Cyrillic front end at all, so that text is not spoken with an accent, it is not spoken (see
+     * {@link Language#isCyrillicScript()}). Japanese: the bundled model's Japanese speakers are held out (see
+     * {@code KokoroVoices}, the {@code jf_}/{@code jm_} entries) and its phonemizer language table has no
+     * Japanese entry (see {@code KokoroTTS.kokoroLangCode}), so Japanese text would fall through to English
+     * phonemization rules rather than being read at all - a worse failure than Cyrillic's silence, since it
+     * produces sound that only sounds like an answer. {@link #GOOGLE} and {@link #EDGE} carry every language
+     * this app ships, Japanese included.
      */
     public boolean canVoice(Language language) {
-        return this != KOKORO || !language.isCyrillicScript();
+        if (this != KOKORO) {
+            return true;
+        }
+        return !language.isCyrillicScript() && language != Language.JA;
     }
 
     /**

@@ -6,21 +6,36 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Kokoro is the only engine that can fail to voice a language outright, and Cyrillic is the only language it
- * fails on. The rule is pinned here because three places lean on it - the stored setting the session hands
- * back, the mouth the factory builds, and the segment the settings panel withdraws - and all three would
- * degrade into silence rather than an error if it drifted.
+ * Kokoro is the only engine that can fail to voice a language outright, and Cyrillic and Japanese are the
+ * only languages it fails on - Cyrillic because its phonemizer has no front end for the script at all,
+ * Japanese because the bundled model's Japanese speakers are held out and its phonemizer language table has
+ * no Japanese entry (see {@link TtsProvider#canVoice}). The rule is pinned here because three places lean on
+ * it - the stored setting the session hands back, the mouth the factory builds, and the segment the settings
+ * panel withdraws - and all three would degrade into silence, or into reading the wrong script with the wrong
+ * pronunciation rules, if it drifted.
  */
 class TtsProviderLanguageTest {
 
     @Test
-    void onlyKokoroIsBeatenByCyrillic() {
+    void onlyKokoroIsBeatenByCyrillicOrJapanese() {
         for (Language language : Language.values()) {
             assertTrue(TtsProvider.EDGE.canVoice(language), "Edge carries every language: " + language);
             assertTrue(TtsProvider.GOOGLE.canVoice(language), "Google carries every language: " + language);
-            assertEquals(!language.isCyrillicScript(), TtsProvider.KOKORO.canVoice(language),
-                    "Kokoro against " + language);
+            boolean beatsKokoro = language.isCyrillicScript() || language == Language.JA;
+            assertEquals(!beatsKokoro, TtsProvider.KOKORO.canVoice(language), "Kokoro against " + language);
         }
+    }
+
+    @Test
+    void kokoroCannotVoiceJapanese() {
+        assertFalse(TtsProvider.KOKORO.canVoice(Language.JA),
+                "Japanese speakers are held out of the cast and the phonemizer has no Japanese entry");
+    }
+
+    @Test
+    void googleAndEdgeVoiceJapanese() {
+        assertTrue(TtsProvider.GOOGLE.canVoice(Language.JA));
+        assertTrue(TtsProvider.EDGE.canVoice(Language.JA));
     }
 
     @Test

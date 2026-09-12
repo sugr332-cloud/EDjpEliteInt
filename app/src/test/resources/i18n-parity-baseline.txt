@@ -698,7 +698,6 @@ gui|ja|MISSING|settings.ai.voice.edge
 gui|ja|MISSING|settings.ai.voice.edge.hint
 gui|ja|MISSING|settings.ai.voice.local
 gui|ja|MISSING|settings.ai.voice.local.hint
-gui|ja|MISSING|settings.ai.voice.local.unavailable
 gui|ja|MISSING|settings.audio.beepVolume
 gui|ja|MISSING|settings.audio.googleWaveNetPitch
 gui|ja|MISSING|settings.audio.noiseReduction.enable

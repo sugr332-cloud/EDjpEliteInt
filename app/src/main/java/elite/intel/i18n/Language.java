@@ -26,11 +26,12 @@ public enum Language {
     }
 
     /**
-     * Whether this language is written in Cyrillic script. This is the dividing line for the local Kokoro
-     * TTS: its phonemizer has no Cyrillic front end, so Cyrillic text cannot be voiced at all. Every other
-     * language we ship is Latin-script and Kokoro will speak it — with an accent when it has no native voice
-     * for it, which is acceptable. So Cyrillic is what forces English output, not "language without a Kokoro
-     * voice".
+     * Whether this language is written in Cyrillic script - one of two reasons the local Kokoro TTS cannot
+     * voice a language at all (its phonemizer has no Cyrillic front end), not the only one. Most other
+     * languages we ship are Latin-script and Kokoro will speak them, with an accent when it has no native
+     * voice, which is acceptable; Japanese is a further, unrelated exception (see
+     * {@link elite.intel.ai.mouth.TtsProvider#canVoice}) that this method does not detect. Callers deciding
+     * whether Kokoro can voice a language must use {@code TtsProvider.canVoice}, not this method alone.
      */
     public boolean isCyrillicScript() {
         return this == RU || this == UK;
