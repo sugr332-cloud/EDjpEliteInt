@@ -306,18 +306,24 @@ compromise. Three needed a real decision:
   `CHIRP3_HD_LANGUAGES` — that roster's Japanese coverage was not verified against the live API, so
   Japanese stays on the same guaranteed-to-exist Standard tier `pt-PT` uses.
 
-**Translated (P0):** `gui_ja.properties` — core UI labels (tab/button/language names), the Vega/AI
-chat tab, HUD quick-status badges, navigation HUD card labels, announcement toggles, system log
-messages, and the setup/first-run warnings. About 140 keys.
+**Translated (P0, commit `11907a780`):** `gui_ja.properties` — core UI labels (tab/button/language
+names), the Vega/AI chat tab, HUD quick-status badges, navigation HUD card labels, announcement
+toggles, system log messages, and the setup/first-run warnings. About 140 keys. Confirmed in a real
+game session by the commander: tabs/buttons/surface UI read correctly in Japanese.
 
-**Not translated (tracked, not hidden):** the remaining ~640 `gui.properties` keys, and the
-`responses`/`ed_events`/`ai_action_aliases` bundle families (831 keys). `BundleKeyParityTest` requires
-every declared `Language` to have a bundle file for every family (a missing file fails the test
-outright, not just a gap), so minimal stub `_ja.properties` files exist for the three untranslated
-families purely to satisfy that. Every gap this produces — the untranslated `gui.properties` remainder
-included — is declared line-by-line in `app/src/test/resources/i18n-parity-baseline.txt`, per that
-file's own existing mechanism (previously used for exactly one deliberate exclusion; now also carries
-this dated, explained backlog).
+**Translated (P1, commit `5c9716ec2`, 2026-09-12):** the bindings tab, the actions tab (built-in +
+custom commands), the input monitor tab, the remaining overlay HUD cards, and the jukebox tab. About
+407 more keys.
+
+**Not translated (tracked, not hidden):** the remaining `gui.properties` keys not covered by P0/P1
+(mostly `settings.*`/`speech.*`/`player.*`/`automation.*`/`overlay.settings.*`), and the
+`responses`/`ed_events`/`ai_action_aliases` bundle families (831 keys — mission/rank/event narration
+text and voice-command aliases). `BundleKeyParityTest` requires every declared `Language` to have a
+bundle file for every family (a missing file fails the test outright, not just a gap), so minimal stub
+`_ja.properties` files exist for the three untranslated families purely to satisfy that. Every gap this
+produces is declared line-by-line in `app/src/test/resources/i18n-parity-baseline.txt`, per that file's
+own existing mechanism (previously used for exactly one deliberate exclusion; now also carries this
+dated, explained backlog — down to ~1,111 lines after P1, from 1,485 after P0).
 
 **Fixed in passing:** `ai.chatInput.send` and `language.japanese` were missing from all 8 other
 translated languages (`BundleKeyParityTest` caught this too) — `ai.chatInput.send` dates back to the
