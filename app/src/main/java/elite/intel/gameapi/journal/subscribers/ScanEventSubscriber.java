@@ -118,6 +118,7 @@ public class ScanEventSubscriber {
                 location.setPlanetName(event.getBodyName());
                 location.setRadius(event.getRadius());
                 location.setSurfaceTemperature(event.getSurfaceTemperature());
+                location.setSurfacePressure(event.getSurfacePressure());
                 location.setLandable(event.isLandable());
                 location.setPlanetClass(event.getPlanetClass());
                 location.setTerraformable("Terraformable".equalsIgnoreCase(event.getTerraformState()));
