@@ -37,12 +37,12 @@ Track B does not block Track A or vice versa.
 | 3 | BodyContext Adapter | A component that reads EliteIntel's current system/body/journal state into a shape `EDpjKinsaku` can consume |
 | 4 | C-CORE integration boundary | Defined interface between EliteIntel and `EDpjKinsaku`'s prediction engine (in-process call, HTTP, or CLI — undecided) |
 | 5 | Aleoida vertical slice | One genus (Aleoida) working end-to-end in a real game session as proof of the boundary |
-| 6 | Collection state | Scanned/collected state tracked and reflected in the HUD |
-| 7 | All species | Every C-CORE genus wired through the same boundary as Phase 5 |
-| 8 | Navigation integration | Distance/jump-count context (per `EDpjKinsaku`'s `DESTINATION_ETA_SPEC`) surfaced in EliteIntel |
-| 9 | Current Body HUD | A dedicated HUD panel/overlay showing the current body's exobiology prediction |
+| 6 | ~~Collection state~~ Aleoida MATCH candidates on the HUD | Reordered in execution (§13): showing a result turned out to be the natural next step after Phase 5's boundary proof, ahead of collection-state tracking. Renumbered here rather than left silently mismatched with what commit `a99127939` actually built, per §0's ground rule |
+| 7 | Collection state | Scanned/collected state tracked and reflected in the HUD (the original Phase 6) |
+| 8 | All species | Every C-CORE genus wired through the same boundary as Phase 5 |
+| 9 | Navigation integration | Distance/jump-count context (per `EDpjKinsaku`'s `DESTINATION_ETA_SPEC`) surfaced in EliteIntel |
 | 10 | Exobiology value/ranking | `EDpjKinsaku`'s value/ranking model surfaced as prioritized recommendations |
-| 11 | AI conversation surface | Text input to VEGA (done, see below); VOICEVOX as a `TtsProvider` option (not started) |
+| 11 | AI conversation surface | Text input to VEGA (done, see below); VOICEVOX as a `TtsProvider` option (not started); C-CORE result injection into AI chat (not started) |
 
 ## 3. Phase 4 decisions (provisional, 2026-09-12)
 
@@ -111,8 +111,10 @@ Only entries backed by an actual command run or a real file are listed as done. 
 | 2 | Audited, not implemented | See §4 |
 | 3 | Partially started | `pressure` field wired (commit `4e0882259`); no `BodyContext` adapter class exists yet — that is the rest of Phase 3 |
 | 4 | Adapter done on both sides | `edpj bio evaluate` (EDpjKinsaku `3e87288`) + `CCoreAdapter` (EliteIntel `890531a1a`, see §11) |
-| 5 | Aleoida vertical slice: wired, not HUD-surfaced | `SAASignalsFoundSubscriber` → `CCoreAdapter` → `LocationDto.speciesEvaluations` (EliteIntel `ae4270496`, see §12), scoped to Aleoida only; nothing reads the stored result yet |
-| 6–10 | Not started | No HUD panel, no collection-state tracking, no other genus wired |
+| 5 | Aleoida vertical slice done | `SAASignalsFoundSubscriber` → `CCoreAdapter` → `LocationDto.speciesEvaluations` (EliteIntel `ae4270496`, see §12), scoped to Aleoida only |
+| 6 | Aleoida MATCH candidates on the HUD | `ExobiologyObjectiveSource` extended, not a new card (EliteIntel `a99127939`, see §13); NO_MATCH/INSUFFICIENT_DATA intentionally not shown |
+| 7–10 | Not started | No collection-state tracking, no other genus wired, no navigation/value-ranking integration |
+| 11 (C-CORE → AI chat) | Not started | No C-CORE result has been injected into a VEGA prompt/response yet |
 | 11 (text input) | Done | See §6 below |
 | 11 (VOICEVOX) | Not started | `TtsProvider` enum only has `KOKORO` / `GOOGLE` / `EDGE` |
 
@@ -443,3 +445,44 @@ Aleoida Arcus' exact boundary body comes back `MATCH` end-to-end through the rea
 `LocationDto.speciesEvaluations`; a Tussock-only body never triggers a C-CORE call at all. Default
 `test` task: 3116 tests, 9 failures, all the same pre-existing `JukeboxPlayerTest`/`TagScannerTest`
 failures already confirmed unrelated.
+
+## 13. Phase 6: Aleoida MATCH candidates on the HUD (2026-09-13)
+
+First surfacing of a C-CORE result to the commander (EliteIntel commit `a99127939`). Renumbered ahead
+of the original Phase 6 ("Collection state") — see §2 — because showing a result was the natural next
+step once Phase 5 proved the boundary, not because collection-state tracking stopped mattering.
+
+### Design
+
+- **Extends the existing card, does not add a new one.** `HudObjectiveSource` implementations compete
+  for one shared display slot (`HudObjective.priority`); `ExobiologyObjectiveSource` already owns the
+  exobiology slot (genus list + sample progress, `PRIORITY_AMBIENT`). A second exobiology-flavoured card
+  would only have fought that one for the same slot, so this phase extends `card()` instead.
+- **Aleoida only**, matching Phase 5's slice. A body's genus row gets extra rows — one per species in
+  `LocationDto.speciesEvaluations` with `status == MATCH` — only when that genus resolves (via the same
+  `BioForms.englishGenusName()` bridge Phase 5 uses) to `"Aleoida"`.
+- **Only `MATCH` reaches the HUD.** `NO_MATCH` and `INSUFFICIENT_DATA` are C-CORE's internal reasoning,
+  not something the commander asked to see; they stay on `LocationDto.speciesEvaluations` for any later
+  consumer (e.g. Phase 11's AI chat injection) but are filtered out of the card by `matchedSpecies()`.
+- **A checkmark, not translated text.** The match row's value is a bare `✓`, not an i18n key — `MATCH`
+  is C-CORE's vocabulary, not HUD copy, and a symbol needs no translation in any language.
+- **Zero matches ⇒ unchanged card.** A body with no `MATCH` species (including one with no
+  `speciesEvaluations` at all, e.g. before Phase 5 ran or when C-CORE was unreachable) renders exactly
+  as it did before this phase — the existing genus/sample-progress row only.
+- **Row budget is now a shared running total**, not a fixed per-genus slice: the existing six-row card
+  budget (`MAX_GENUS_ROWS`) is spent across genus rows and species-match rows together, since Aleoida
+  alone can contribute up to five extra rows. The existing "+N more" overflow row already existed for
+  when genuses do not fit; it now also fires when match rows crowd out later genuses.
+
+### Not done in this phase (by design)
+
+Widening past Aleoida, showing `NO_MATCH`/`INSUFFICIENT_DATA` anywhere, AI/chat consumption, VOICEVOX,
+and collection-state tracking (the original Phase 6/now Phase 7) are all left for later phases.
+
+**Verified:** `:app:compileJava`/`:app:compileTestJava` succeed. `ExobiologyObjectiveCardTest`: 16
+tests (12 existing + 4 new — match rows appear in order immediately after the genus row; zero matches
+leaves the card byte-for-byte unchanged; species evaluations on the body but for a non-sliced genus
+never leak into that genus's row; Aleoida's five matches plus two more genuses correctly overflow
+rather than exceed the row budget), all pass. Default `test` task: 3120 tests, 9 failures, all the same
+pre-existing `JukeboxPlayerTest`/`TagScannerTest` failures already confirmed unrelated. `subscriberTest`
+(Phase 5's async wiring): unaffected, still passing.
