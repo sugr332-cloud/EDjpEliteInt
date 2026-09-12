@@ -53,8 +53,12 @@ Direction set for the four open questions in §7, not yet implemented:
 2. **Genus dispatch:** add `evaluate_genus(name, body)` on the `EDpjKinsaku` side rather than building
    a name→function lookup table in the adapter, so the dispatch logic lives next to the functions it
    dispatches to.
-3. **`gravity` unit/scale parity:** to be checked against one or a few real bodies once the adapter
-   exists — not yet done.
+3. **`gravity` unit/scale parity:** **Investigated, no conversion needed** — see §9. `LocationDto.gravity`
+   (Earth-g, EliteIntel's own recomputed value) and C-CORE's `BodyContext.gravity`/`min_gravity`/
+   `max_gravity` (also Earth-g) are the same unit and scale. The raw journal `SurfaceGravity` (m/s²)
+   must never be the value passed — which EliteIntel's existing code already avoids, for a different
+   documented reason (accuracy, not units). A single live-game spot-check during the Phase 5 Aleoida
+   slice is still worth doing as final confirmation, but nothing here blocks starting Phase 4 design.
 4. **`pressure`:** ~~wire `ScanEvent.getSurfacePressure()` into `LocationDto` in Phase 3.~~ **Done**,
    commit `4e0882259`: added `LocationDto.surfacePressure` (mirroring the existing zero-guard pattern
    used by `surfaceTemperature`/`gravity`) and one assignment in
@@ -199,3 +203,60 @@ testable via `pytest` and `bioscan-count`, with no dependency on EliteIntel. `El
 state capture, the HUD/UI, and the AI conversation surface. Phase 4 (§2) is where a boundary between
 them gets defined — until then, no EliteIntel code should reach into `EDpjKinsaku` internals or vice
 versa.
+
+## 9. Gravity parity investigation (read-only, 2026-09-12)
+
+No code changed to produce this section. Question: can `LocationDto.gravity` be passed straight into
+C-CORE's `BodyContext.gravity` (and, through it, `NormalizedRule.min_gravity`/`max_gravity`), or does
+it need converting first?
+
+### The two candidate values, and why they differ
+
+| Source | Value | Unit |
+|---|---|---|
+| Journal `Scan.SurfaceGravity` | e.g. `9.81` in `ScanEventTest`'s fixture | **m/s²** (Frontier's journal convention) |
+| `LocationDto.gravity` | computed by `GravityCalculator.calculateSurfaceGravity(massEM, radiusMetres)` | **Earth gravities (g)** — Earth itself = `1.0` |
+
+`ScanEventSubscriber` already discards the raw journal value and stores only the computed one
+(`ScanEventSubscriber.java:113-115`: "DO NOT use event.getSurfaceGravity() as it is not accurate").
+That comment is about accuracy, not units, but it has the side effect of already avoiding the
+unit mismatch this investigation was checking for.
+
+### What C-CORE expects
+
+`app/bio/c_core.py` defines `min_gravity`/`max_gravity` on every genus converted so far (63 bounded
+rules across the 6 genera). Every single bound in the file, across every genus, falls in **0.04 to
+0.65**:
+
+```
+grep -oE 'm(in|ax)_gravity=[0-9.]+' app/bio/c_core.py | sort -t= -k2 -n | (head -3; echo ...; tail -3)
+```
+
+Values in that range cannot be m/s² (a body at 0.04-0.65 m/s² would be barely more massive than a
+speck of dust) but are exactly the range real Elite Dangerous exobiology occupies in Earth-g (organics
+only spawn on low-gravity bodies). `app/bio/body_context.py::body_context_from_parameters()` passes
+EDSM's own cached `gravity` column straight through with **no conversion** into `BodyContext.gravity`,
+which only makes sense if EDSM's `gravity` field is already Earth-g — matching EliteIntel's own EDSM
+DTO (`elite.intel.gameapi.search.edsm.dto.data.BodyData.gravity`), which the codebase treats as
+directly comparable to `LocationDto.gravity` (both consumed as Earth-g elsewhere in EliteIntel).
+
+### Anchor data points (existing, real, already trusted by each codebase's own tests)
+
+| Body | Mass / Radius | `LocationDto.gravity` (computed) | Plausible for C-CORE's 0.04-0.65 range? |
+|---|---|---|---|
+| Earth (exact, sanity check) | 1.0 EM / 6,371,000 m | `1.00` g | No — real Earth has no organics rule to satisfy, correctly outside range |
+| Colonia 4 (real, named class III gas giant — `GravityCalculatorTest`) | — | `199.31` g | No — gas giants correctly fall far outside every organics range |
+| Synthetic rocky body (`GravityCalculatorTest`, EDSM-style input) | 0.513865 EM / 4,977,078.5 m | `0.84` g | No — above every genus's `max_gravity` (highest is 0.65), i.e. correctly excluded as "too heavy for any organics" |
+
+No currently-available fixture happens to land inside 0.04-0.65 g, so this pass could not show a
+`MATCH`-eligible body end-to-end — but that is a fixture-coverage gap, not evidence against parity: all
+three anchors behave exactly as physically expected once interpreted as Earth-g, and none would make
+sense interpreted as m/s².
+
+### Conclusion
+
+**そのまま渡せる (pass as-is)** — `LocationDto.gravity` and C-CORE's gravity fields are the same unit
+and scale. No conversion function is needed in the future `BodyContext` adapter for this field.
+Recommended, not required: capture one live `Scan` event from a body already known (via EDSM or
+BioScan) to sit inside a genus's gravity range, as a final end-to-end confirmation during the Phase 5
+Aleoida slice — this pass used existing anchors rather than a fresh live capture.
