@@ -42,7 +42,7 @@ Track B does not block Track A or vice versa.
 | 8 | All species | Every C-CORE genus wired through the same boundary as Phase 5 |
 | 9 | ~~Navigation integration~~ **保留（on hold）** | 既存EliteIntelのNavigation機能で要求されたジャンプ数・距離等は既に実装済み。EDpjKinsaku `DESTINATION_ETA_SPEC`は未実装のため統合対象なし。Supercruise ETAは別途新規機能として扱う（§16） |
 | 10 | Exobiology value/ranking | `EDpjKinsaku`'s value/ranking model surfaced as prioritized recommendations |
-| 11 | AI conversation surface | Text input to VEGA (done, see below); VOICEVOX as a `TtsProvider` option (not started); C-CORE result injection into AI chat (done, §14) |
+| 11 | AI conversation surface | Text input to VEGA (done, see below); VOICEVOX as a `TtsProvider` option (not started); C-CORE result injection into AI chat (done, §14); Japanese conversation vertical slice - input/LLM-response-language/TTS fallback (done, §17, pending real-machine confirmation) |
 | 12 | C-CORE distribution | Not in the original plan - added once Phases 4-7 exposed that they all assumed a system Python EliteIntel's actual commanders do not have. Executed and referred to throughout as "Phase 8" in commits/docs (§15); numbered 12 here only to avoid re-colliding with table row 8 ("All species"), which §15 does not touch |
 
 ## 3. Phase 4 decisions (provisional, 2026-09-12)
@@ -661,3 +661,69 @@ Phase 9 is left on hold rather than marked done or reworked now:
   value/ranking (table Phase 10), then strengthening AI chat's use of exobiology data - the actual
   cross-repo integration this project exists for. Supercruise ETA, if wanted later, is tracked as an
   independent feature decision, not a resumption of Phase 9.
+
+## 17. Phase 10: Japanese AI conversation (2026-09-13)
+
+### 10-A: investigation (read-only)
+
+Traced the full commander-turn pipeline end to end (`AiTabPanel` → `UserInputEvent` →
+`VegaSubsystemGate` → `ThoughtDispatcher.submitCommanderInput()` → `PhoneticInputNormalizer` →
+`CommanderThought` → `PromptComposer`/`CommanderPrompt`'s `<language>` rule → `LlmGateway` → `speak.text`
+→ `SpeechGateway` → `TtsProvider`) against `Language.JA`. Found: typed Japanese input is untouched by any
+translation step; the system prompt already instructs the LLM to write `speak.text` in the commander's
+language (`{inputLanguage}`/`{language}`, both resolving to "Japanese" via
+`AiResponseLanguagePolicy.resolveEffectiveAiResponseLanguage`); C-CORE facts
+(`ExobiologyCandidateFactSource`) are plain English text appended to the system message and are
+independent of the response-language rule, so they need no Japanese-specific handling. The one real
+defect found was TTS: Kokoro's Japanese speakers are held out and its phonemizer has no Japanese entry,
+yet `TtsProvider.canVoice(Language.JA)` returned `true`, so a Japanese commander on the default (Kokoro)
+TTS provider would have Japanese text read with English pronunciation rules instead of being voiced at
+all - fixed in 10-B. Parakeet STT's Japanese gap (no Japanese vocabulary in the bundled model) was
+confirmed as an already-documented, honest limitation, not a hidden defect, and left alone.
+
+### 10-B: implementation (EliteIntel commit `334b35b1b`)
+
+`TtsProvider.canVoice()` now excludes `Language.JA` for `KOKORO`, alongside Cyrillic.
+`AiResponseLanguagePolicy.resolveEffectiveAiResponseLanguage()` was refactored to delegate to
+`TtsProvider.canVoice()` instead of carrying its own separate copy of "which languages Kokoro cannot
+voice" - the duplication is exactly how the Japanese gap went unnoticed while the Cyrillic case stayed
+correct. The single `canVoice()` fix propagates automatically through every consumer
+(`SystemSession.getTtsProvider()`, `ApiFactory.selectMouth()`, `RadioVoicing`, the AI-services settings
+panel) with no changes needed to any of them. `RadioVoicingTest` needed the same Cyrillic→Cyrillic-or-
+Japanese update as `TtsProviderLanguageTest`, found only once the fix exposed it as a new test failure -
+not anticipated by the 10-A investigation, a reminder that "found every affected file" claims from a
+read-only pass should be treated as provisional until the tests actually run.
+
+**Verified:** `:app:compileJava`/`:app:compileTestJava` succeed. `TtsProviderLanguageTest`,
+`AiResponseLanguagePolicyTest`, `ApiFactoryTest`, `RadioVoicingTest`, `BundleKeyParityTest`,
+`BundleQuotingTest` all pass, all four TTS-related ones extended with explicit Japanese cases rather than
+only widening an existing loop. Default `test` task: 3134 tests, 9 failures, the same pre-existing
+`JukeboxPlayerTest`/`TagScannerTest` failures already confirmed unrelated.
+
+### Real-machine verification: scope, not yet performed
+
+Everything above was verified through real production singletons (`SystemSession`, the real DB,
+`TtsProvider`, `ApiFactory`) exercised by automated tests, not mocks - but no human has yet spoken to a
+running EliteIntel in Japanese and listened to the result. That verification is scoped to exactly three
+checks, deliberately excluding the separately-tracked System Map station-selection gap (undecided A/B/C
+per the investigation above the fold - not part of this vertical slice):
+
+1. **Japanese voice input** - speaking in Japanese, EliteIntel recognises it (text chat input already
+   works per 10-A; this checks the STT path specifically, independent of Parakeet's documented Japanese
+   transcription gap - the commander may be typing or using a different STT path).
+2. **Japanese voice response** - VEGA replies in Japanese, and the TTS output is actually pronounced as
+   Japanese (the 10-B fix's real payoff: confirms the Kokoro→Edge fallback is audible, not just
+   type-checked).
+3. **Game operation from a Japanese utterance** - "マップを開いて" opens the Galaxy Map
+   (`display_open_galaxy_map`); "ミッションの目的地に行って" runs `navigate_to_active_mission` and a
+   route is actually plotted to the mission's destination system.
+
+Passing all three confirms the vertical slice (voice → AI CLI → Japanese reply → Japanese TTS → game
+action) end to end on a real machine. Not in scope here: selecting the mission's specific destination
+station within the System Map. A separate read-only investigation (session conversation only, not yet
+written up in this document) found `MissionDto` already carries `destinationStation`/
+`destinationSettlement`, `Status.isSystemMapOpen()` and the whole `GameInputStep`/`GameControllerBus`/
+`KeyProcessor` input pipeline are already reusable, but no code path exists yet to select a station once
+the System Map is open, and it is not known from code alone whether the System Map even offers a
+text-searchable UI the way the Galaxy Map does - real-machine confirmation of that UI is a separate,
+not-yet-scheduled piece of work.
