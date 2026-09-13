@@ -96,7 +96,76 @@ EliteIntel → LlmGateway → Gemini CLI / Claude CLI
 
 両者はプロセス実行という共通点を持つが、入力データ、出力データ、失敗時処理、責務を分離する。
 
-## 7. 現在の実装との差分
+## 7. 日本語音声入出力のテスト仕様
+
+Phase 11 では、テキスト経路だけでなく **日本語の音声入出力を実機で確認することを完了条件に含める**。
+
+### 7.1 音声入力（STT）
+
+日本語音声入力について、以下を確認する。
+
+- [ ] 日本語音声を入力できる
+- [ ] STT が日本語発話を `UserInputEvent` に到達させられる
+- [ ] 日本語の固有名詞・ゲーム内用語を含む発話で致命的な認識崩れがない
+- [ ] 認識結果が AI 会話の通常テキスト入力と同一経路に入る
+- [ ] STT が日本語モデル未対応の場合、その制約を明示したうえで代替経路を確認する
+
+**重要:** 日本語STTモデル未対応を「日本語音声入力対応済み」とみなさない。実際に日本語音声を入力し、認識結果が確認できた場合のみ PASS とする。
+
+### 7.2 日本語LLM応答
+
+- [ ] 日本語音声入力を受けた会話が LlmGateway / CLI Provider まで到達する
+- [ ] LLM が日本語で応答する
+- [ ] CLI Provider の stdout から応答を正常に取得できる
+- [ ] エラー時に UI がフリーズせず、既存のエラー表示・ログ経路へ戻る
+
+### 7.3 音声出力（TTS）
+
+- [ ] LLM の日本語応答が TTS へ渡る
+- [ ] 日本語を発話可能な TTS Provider が選択される
+- [ ] 実機で日本語音声が再生される
+- [ ] TTS 非対応 Provider を選択した場合、無音・クラッシュではなく既定のフォールバック動作になる
+- [ ] 日本語音声再生失敗時もテキスト応答自体は失われない
+
+VOICEVOX を採用する場合、VOICEVOX 固有の導入・起動条件は TtsProvider 実装仕様で別途定義する。本仕様では「日本語音声出力を実機で確認できること」を完了条件とする。
+
+### 7.4 音声入出力のE2E試験
+
+最低1回、以下を一連の実機テストとして実施する。
+
+```text
+日本語で発話
+   ↓
+STT
+   ↓
+UserInputEvent
+   ↓
+VEGA / ThoughtDispatcher
+   ↓
+LlmGateway
+   ↓
+Gemini CLI または Claude CLI
+   ↓
+日本語LLM応答
+   ↓
+TtsProvider
+   ↓
+日本語音声再生
+```
+
+テスト記録には少なくとも以下を残す。
+
+- 使用OS / 実機
+- 使用STT Provider / モデル
+- 使用AI CLI Provider（Gemini CLI / Claude CLI）
+- 使用TTS Provider
+- 発話内容
+- STT認識結果
+- LLM応答結果
+- TTS再生結果
+- PASS / FAIL と失敗時の原因
+
+## 8. 現在の実装との差分
 
 2026-09-13 の read-only 調査時点では、EliteIntel の AI 会話経路は `LlmGateway` を経由して既存の LLM Provider を呼び出す構成であり、Gemini CLI / Claude CLI を起動する AI Provider 実装は確認されていない。
 
@@ -104,7 +173,9 @@ EliteIntel → LlmGateway → Gemini CLI / Claude CLI
 
 C-CORE の CLI (`CCoreAdapter` → `ProcessBuilder` → `bio_entry.exe`) は別途実装済みであり、本項の未実装判定には含めない。
 
-## 8. Phase 11 CLI Provider 完了条件
+日本語音声入出力についても、コード上のフォールバックや Provider 定義だけでは完了扱いにせず、上記の実機E2E試験を完了条件とする。
+
+## 9. Phase 11 CLI Provider 完了条件
 
 以下をすべて満たした場合に AI Provider CLI 化を完了とする。
 
@@ -118,9 +189,15 @@ C-CORE の CLI (`CCoreAdapter` → `ProcessBuilder` → `bio_entry.exe`) は別�
 - [ ] 既存の `AiTabPanel → UserInputEvent → VEGA → ThoughtDispatcher → LlmGateway → AiResponseLogEvent` 経路を維持できる
 - [ ] AI 会話について HTTP API 直接呼び出しに依存しない
 - [ ] CLI Provider のテストを追加する
+- [ ] 日本語STTの実機E2E試験がPASS
+- [ ] 日本語LLM応答の実機E2E試験がPASS
+- [ ] 日本語TTS再生の実機E2E試験がPASS
+- [ ] STT → LLM CLI → TTS の日本語E2E試験がPASS
 
-## 9. 実装順序
+## 10. 実装順序
 
 この仕様は設計固定用であり、このコミットでは実装変更を行わない。
 
 次回の Phase 11 実装では、まず現在の `LlmGateway` / Provider 抽象と設定経路を read-only で再確認し、その既存構造を壊さない最小変更として CLI Provider を追加する。
+
+その後、音声入出力について単体・結合テストを追加し、最後に実機で日本語 STT → CLI LLM → TTS のE2E確認を行う。実機未確認の場合は Phase 11 完了とは記録しない。
