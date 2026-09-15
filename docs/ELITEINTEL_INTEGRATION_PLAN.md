@@ -110,7 +110,7 @@ v2-P1 で確定した残量を、**表示 → 応答 → 通知 → 指示** の
 4. **J-4 指示:** `ai_action_aliases` 198 キー（日本語の言い回しでアクションを指示できるようにする）
 5. **J-5 指示の照合:** `name_ja` 列追加と素材名照合、`PhoneticInputNormalizer` の日本語入力確認、**および商品（commodity）の日本語照合辞書**（下記参照）
 
-J-1〜J-4 はそれぞれ内部をさらに画面・機能単位のサブカテゴリに分けてよいが、コミットはサブカテゴリ単位とする。
+J-1〜J-5 の具体的なサブカテゴリ（サブフェーズ）と変更許可範囲は §R.14 の実装台帳で固定する。コミットはサブフェーズ単位とする。
 
 #### J-5 商品（commodity）辞書の欠落（2026-09-15 判明）
 
@@ -299,7 +299,7 @@ Provider の差し替えで Game Context schema / C-CORE / Journal state / HUD r
 
 ### R.11 現在の優先作業
 
-1. **Track J:** v2-P2 の J-1（`gui` 残り 256 キー）からカテゴリ単位で着手する。v2-P0/P1 は完了済みなので再調査しない。
+1. **Track J:** v2-P2 を §R.14 の実装台帳 P2-J1（`gui` の `settings.` 51 キー）から順に、§R.13 の手順で進める。v2-P0/P1 は完了済みなので再調査しない。
 2. **Track G:** v2-P3 の着手前 read-only 確認（`agy` の非対話実行方式と tool-call JSON 契約の成立可否）を実機で行う。
 3. C-CORE の追加・拡張（v2-P9）はその後。
 
@@ -343,6 +343,215 @@ Provider の差し替えで Game Context schema / C-CORE / Journal state / HUD r
 - 許可リストに載っていない自由文保存コマンドが存在しないことをコードレビューで確認する。
 - v2-P3（`agy` 導入）は、このルールと R.6 の実行境界の両方を満たすまで、DB にアクセスできる環境では
   実行しない。
+
+### R.13 agy 実装統制（Execution Protocol）
+
+#### R.13.0 適用範囲
+
+この節は、**開発作業を `agy`（Antigravity CLI）に実装させるとき**の手順を定める。
+v2-P3 の「EliteIntel の AI Provider として `agy` を実行時に呼び出す」話（§R.6）とは別物である。
+§R.2（基本方針）、§R.6（実行時の安全境界）、§R.10（非目標）、§R.12（DB 非汚染）は、この節の前提としてそのまま適用する。
+
+- `agy` に渡す作業単位は §R.14 の**実装台帳の 1 行（サブフェーズ）**だけとする。
+- 本計画書（`docs/ELITEINTEL_INTEGRATION_PLAN.md`）を正本とし、台帳にない作業は行わせない。
+
+#### R.13.1 作業の流れ（ゲート）
+
+```text
+指示（Phase ID・Plan commit・作業ブランチを指定）
+  ↓
+Plan commit / ブランチ確認 ── 不一致 → STOP
+  ↓
+START REPORT
+  ↓
+READ-ONLY 調査（ファイル編集・コマンドによる変更をしない）
+  ↓
+PLAN CHECK（変更ファイル・変更内容・テストを提示して停止）
+  ↓
+ユーザー承認 ── 承認がなければ実装しない
+  ↓
+実装（許可ファイルのみ）
+  ↓
+TEST GATE → DIFF GATE
+  ↓
+ローカルコミット（作業ブランチのみ）
+  ↓
+END REPORT（停止。次のサブフェーズへ進まない）
+```
+
+- START REPORT を出す前にファイルを変更してはならない。
+- 「計画書を読んだのでそのまま実装する」は禁止。PLAN CHECK とユーザー承認を必ず挟む。
+
+#### R.13.2 計画書バージョンの固定
+
+- 指示には **Plan commit**（本計画書を最後に変更したコミットの SHA）を必ず含める。
+- `agy` は開始時に `git log -1 --format=%H -- docs/ELITEINTEL_INTEGRATION_PLAN.md` を実行し、指定の Plan commit と一致することを確認する。一致しなければ STOP。
+- リポジトリ全体の HEAD ではなく、計画書ファイルの最終変更コミットで照合する（他ファイルのコミットで無効にならないようにするため）。
+
+#### R.13.3 変更許可範囲
+
+- 各サブフェーズの**変更許可ファイル**は §R.14 に列挙したものだけとする。列挙外のファイルは、関連していても変更しない。
+- 翻訳サブフェーズ（P2-J1〜P2-J14）の共通の変更禁止対象: Java コード、DB schema / migration、AI Provider、`agy` 連携、C-CORE（`c-core/`）、installer / `distribution/`、依存関係（`build.gradle` など）、CI、他サブフェーズの対象キー、本計画書。
+- 許可範囲外の変更が必要と判断した場合は、次の形式で報告して STOP する。
+
+```text
+===== BLOCKED =====
+Phase: <ID>
+理由: <許可範囲外の変更が必要な理由>
+変更候補: <ファイル>
+対応: 実装を停止し、ユーザーの判断を待つ
+===== END =====
+```
+
+#### R.13.4 計画との差異
+
+- 計画書にない変更（改善提案・リファクタリング・「ついでの修正」を含む）は行わない。
+- 検出した場合は `PLAN DEVIATION`（対象・理由を記載）を報告し、その変更をせずにサブフェーズを終える。
+- 計画の変更が必要な場合は `PLAN CHANGE REQUEST` を出して停止する。**`agy` は本計画書を変更しない。** 計画書の更新はユーザーの承認後に別作業として行う。
+
+#### R.13.5 START REPORT
+
+```text
+===== PHASE START =====
+Phase: <ID>
+Plan commit: <SHA>（確認結果: 一致）
+作業ブランチ: <branch>（確認結果: 一致）
+agy バージョン / 実行モード: <agy --version の結果> / <mode>
+目的:
+変更許可ファイル:
+変更禁止:
+READ-ONLY で確認するもの:
+実装予定:
+実行するテスト:
+完了条件:
+このサブフェーズでは次のサブフェーズへ進まない。
+これから READ-ONLY 調査を行う。調査後は PLAN CHECK を提示して停止する。
+===== END =====
+```
+
+#### R.13.6 TEST GATE / DIFF GATE
+
+- **TEST GATE:** §R.14 の各行に定めたテストを実行し、結果を END REPORT に記載する。失敗したまま完了扱いにしない。
+- **DIFF GATE:** `git diff --name-only` の結果が変更許可ファイルに収まっていることを確認する。
+  翻訳サブフェーズでは、`i18n-parity-baseline.txt` の差分が**そのサブフェーズの対象キーの `|ja|MISSING` 行の削除だけ**であることも確認する。
+
+#### R.13.7 END REPORT
+
+```text
+===== PHASE END =====
+Phase: <ID>
+結果: DONE / PARTIAL / BLOCKED / FAILED
+変更したファイル:
+変更内容:
+変更していないことを確認した対象: （R.13.3 の変更禁止対象）
+実行したテスト: <名前> : PASS / FAIL
+未実施:
+問題:
+計画との差異: なし / PLAN DEVIATION の内容
+Git: before <SHA> / after <SHA> / branch <branch> / push: していない
+次のサブフェーズ: <ID>（自動的には進まない）
+===== END =====
+```
+
+#### R.13.8 完了の定義
+
+**DONE** は次のすべてを満たす場合に限る。1 つでも欠ければ PARTIAL / BLOCKED / FAILED とする。
+
+- 実装済み
+- TEST GATE の全テストが PASS
+- DIFF GATE 確認済み（変更が許可ファイル内）
+- 計画との差異なし
+- 既存機能の回帰なし（R.14 で指定したテスト範囲で確認）
+
+#### R.13.9 Git / ブランチ
+
+- 1 サブフェーズ = 1 作業ブランチ = 1 ローカルコミットを基本とする。ブランチ名は `v2/<phase-id>`（例: `v2/p2-j1`）。
+- 作業ブランチはユーザーが事前に作成し、指示に記載する。`agy` は現在のブランチが一致することを確認する。
+- `agy` に禁止する操作: ブランチの作成・切り替え、merge、rebase、push、PR 作成、タグ作成、`main` へのコミット。
+- merge と push はユーザーが END REPORT と差分を確認した後に行う。
+
+#### R.13.10 agy の実行設定
+
+以下は 2026-09-15 時点の公開情報に基づく。**モード名・オプション名は `agy` のバージョンで変わりうるため、初回に実機の `agy --help` と設定で確認し、START REPORT に記録する。**
+
+- 実行モードは `default` / `accept-edits` / `plan` の 3 種類とされ、プロンプト内の Shift+Tab または `~/.gemini/antigravity-cli/settings.json` の `agentMode` で切り替える。
+  - READ-ONLY 調査・PLAN CHECK: `plan`
+  - 実装: `default`（編集ごとに確認が入る）
+  - `accept-edits`: 原則禁止
+- モードが制御するのはファイル編集だけで、シェルコマンド（`run_command`）は `/permissions` のツール許可ルールで別に管理される。コマンド実行は確認ありの設定のままにする。
+- `--dangerously-skip-permissions`（全ツール自動承認）は使用禁止。`/permissions` の常時許可プリセットも同様に禁止。
+- `--sandbox` の有無と挙動は実機で確認し、利用できる場合は使う。
+- **subagent・background task・並列実装・別サブフェーズへの委譲は禁止する。**
+- headless 出力（`--print` / JSON 系出力）で START / END REPORT を機械検証する仕組みは将来課題とする。非 TTY 環境で `agy -p` の標準出力が空になるという報告（google-antigravity/antigravity-cli issue #76）があるため、headless 利用は実機で出力取得を確認してから採用する。この問題は v2-P3（実行時の子プロセス呼び出し）にも影響するため、§R.6 の着手前確認でも同じ点を確認する。
+
+#### R.13.11 agy への基本指示（テンプレート）
+
+毎回この短い指示だけを渡し、詳細は本計画書を参照させる。
+
+```text
+EDjpEliteIntel の実装計画書 docs/ELITEINTEL_INTEGRATION_PLAN.md を正本として使用してください。
+§R.13（agy 実装統制）に従ってください。
+
+Phase: <ID>（§R.14 の該当行のみ）
+Plan commit: <SHA>
+作業ブランチ: v2/<phase-id>
+
+- 開始時に Plan commit と作業ブランチを確認し、一致しなければ停止してください。
+- START REPORT を出してから READ-ONLY 調査を行い、PLAN CHECK を提示して停止してください。
+- 承認後にのみ、§R.14 の変更許可ファイルだけを変更してください。
+- 計画書にない変更、計画書自体の変更、subagent の利用、ブランチ操作、push は行わないでください。
+- 実装後は TEST GATE と DIFF GATE を実施し、END REPORT を出して停止してください。次のサブフェーズへは進まないでください。
+
+これから何をするかを説明し、許可を得てから作業を開始すること。
+```
+
+### R.14 実装台帳（v2-P2 Track J）
+
+件数は `main` = `1b636c8f` 時点の `app/src/test/resources/i18n-parity-baseline.txt` の `|ja|MISSING` 行から計測した。
+キーの接頭辞で対象を固定し、START REPORT で実際のキー一覧を確定する。件数がずれていた場合は PLAN CHANGE REQUEST とする。
+
+#### 翻訳サブフェーズ共通
+
+- **変更許可ファイル:** 該当バンドルの `app/src/main/resources/i18n/<bundle>_ja.properties`、および `app/src/test/resources/i18n-parity-baseline.txt`（対象キーの `|ja|MISSING` 行の削除のみ）
+- **TEST GATE:** `./gradlew --no-daemon :app:test --tests '*BundleKeyParityTest' --tests '*BundleQuotingTest'`
+- **表示確認:** 画面に出る文言のサブフェーズ（P2-J1〜P2-J8）は、該当画面の目視確認結果を END REPORT に記載する。ゲーム起動が必要な確認は「未実施」として記載してよい。
+- 翻訳ルールは §R.5 に従う。
+
+| ID | 旧カテゴリ | バンドル | 対象キー（接頭辞） | 件数 |
+|---|---|---|---|---|
+| P2-J1 | J-1 表示 | `gui` | `settings.` | 51 |
+| P2-J2 | J-1 表示 | `gui` | `speech.` `audio.` | 54 |
+| P2-J3 | J-1 表示 | `gui` | `player.` | 34 |
+| P2-J4 | J-1 表示 | `gui` | `overlay.` `readout.` `obs.` | 39 |
+| P2-J5 | J-1 表示 | `gui` | `automation.` | 23 |
+| P2-J6 | J-1 表示 | `gui` | `stats.` | 21 |
+| P2-J7 | J-1 表示 | `gui` | `ship.` `trade.` `location.` `status.` `state.` | 26 |
+| P2-J8 | J-1 表示 | `gui` | `app.` `popup.` `manual.` | 8 |
+| P2-J9 | J-2 応答 | `responses` | `handler.` のうち `commodity` `tradeRoute` `tradeProfile` `tradeStop` `missionCommodity` `trader` `cargo` `broker` `construction` `fleetCarrier` `fleetCarrierRoute` `refuel` | 92 |
+| P2-J10 | J-2 応答 | `responses` | `handler.` の上記以外 | 148 |
+| P2-J11 | J-2 応答 | `responses` | `query.` `speech.` `vega.` `carrier.` | 46 |
+| P2-J12 | J-3 通知 | `ed_events` | `event.` | 216 |
+| P2-J13 | J-3 通知 | `ed_events` | `rank.` `ranks.` `game.` `tts.` `subsystem.` | 131 |
+| P2-J14 | J-4 指示 | `ai_action_aliases` | 全キー | 198 |
+
+合計 1,087 件（`gui` 256 / `responses` 286 / `ed_events` 347 / `ai_action_aliases` 198）。
+
+- **P2-J14 の追加 TEST GATE:** 共通テストに加えて `--tests '*AiActionLocalizationsTest' --tests '*AliasPhraseTest' --tests '*AliasVocabularyTest' --tests '*PhoneticInputNormalizerTest'` を実行する（指示の別名はコマンド照合に使われるため）。
+
+#### コード変更を伴うサブフェーズ（翻訳共通ルールは適用しない）
+
+| ID | 旧カテゴリ | 内容 | 変更許可ファイル | TEST GATE |
+|---|---|---|---|---|
+| P2-J15 | J-5 照合 | 素材・商品の日本語名 → canonical 英語名の照合（§R.5 J-5、§R.12、`docs/RECOVERED_R5_R8_AGY_SAFETY.md` R.5）。商品側は**既存の多言語商品 DB カラム構造を日本語で拡張**し、`FuzzySearch.fuzzyCommodityMatch` に日本語ブランチを追加する。**新規の汎用辞書フレームワークは作らない。** | **READ-ONLY 調査の後、PLAN CHANGE REQUEST で本台帳に確定させてから実装する**（DB schema / Java を含む見込みのため、先に計画書を更新する） | 確定時に記載 |
+| P2-J16 | J-5 照合 | `PhoneticInputNormalizer` の日本語入力に対する挙動確認 | なし（READ-ONLY 調査と報告のみ。修正が必要なら PLAN CHANGE REQUEST） | `PhoneticInputNormalizerTest`、`PhoneticMapOrderingTest` |
+
+#### 完了後
+
+P2-J1〜P2-J16 がすべて DONE になった時点で §R.5 の完了条件を確認し、§R.3 の v2-P2 の状態を更新する（計画書の更新はユーザーが行う）。
+
+#### v2-P3 以降の台帳
+
+v2-P3 以降は、§R.6 の着手前 read-only 確認の結果を踏まえて、同じ形式（ID・変更許可ファイル・TEST GATE）で本節に追加する。追加されるまで `agy` に実装させない。
 
 ## 1. Scope
 
