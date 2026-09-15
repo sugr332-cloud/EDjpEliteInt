@@ -72,12 +72,12 @@ C-CORE の追加・拡張（v2-P9）はこの 2 トラックの後に回す。�
 | v2-P0 | 現状固定 / read-only baseline | **完了** | 旧 Phase 0・1（§5）。build 成功、AI 入力経路を実ファイルで追跡済み |
 | v2-P1 | 日本語化 inventory（表示〜指示） | **完了（数値確定）** | R.4 の件数は `i18n-parity-baseline.txt` と各 `.properties` から計測 |
 | v2-P2 | 既存機能の日本語置換（表示 → 指示） | **進行中** | `Language.JA`（`11907a78`）、P0（`11907a78`）・P1（`5c9716ec`）翻訳済み。残りは R.4 |
-| v2-P3 | AI Provider CLI 化 / `agy` 対応 | **未着手** | `ProviderEnum` は API 系のみ。`PHASE11_AI_PROVIDER_CLI_SPEC.md` の CLI 化方針を `agy` 既定に更新（同文書冒頭の改訂注記） |
+| v2-P3 | AI Provider CLI 化 / `agy` 対応 | **未着手** | `ProviderEnum` は API 系のみ。`PHASE11_AI_PROVIDER_CLI_SPEC.md` の CLI 化方針を `agy` 既定に更新（同文書冒頭の改訂注記）。**着手前に R.6「agy の実行境界（安全要件）」を満たすこと** |
 | v2-P4 | 日本語自然言語による問い合わせ・指示（テキスト） | 一部実装 | 旧 Phase 10（§17）: 日本語テキスト入力・日本語応答方針は実装済み。`agy` 経由では未確認 |
-| v2-P5 | 音声入出力（STT / TTS / VOICEVOX） | 一部実装 | Kokoro→日本語フォールバック（`334b35b1`）。実機 E2E は未実施（`PHASE11_VOICE_IO_PHASE_UPDATE.md`） |
+| v2-P5 | 音声入出力（STT / TTS / VOICEVOX） | 一部実装 | Kokoro→日本語フォールバック（`334b35b1`）。実機 E2E は未実施（`PHASE11_VOICE_IO_PHASE_UPDATE.md`）。**同梱 STT（`ParakeetSTTImpl`）は日本語語彙を持たず日本語音声を認識できない（§10 で確認済み）。日本語 STT は別バックエンドを新規に選定する（CLI 方式を含めて検証、R.7）** |
 | v2-P6 | Game Action / Ship Control の安全化 | 既存機能あり | 既存 `GameInputStep` / `GameControllerBus` / `KeyProcessor`。System Map 駅選択は未実装（§17） |
 | v2-P7 | HUD / Overlay / VR | 既存機能あり | Aleoida MATCH 表示は実装済み（旧 Phase 6、§13） |
-| v2-P8 | Generic Game Data / Trade Assistant | 既存機能あり | 既存 Spansh / trade 機能。日本語化は v2-P2 の対象 |
+| v2-P8 | Generic Game Data / Trade Assistant | 既存機能あり（艤装検索は欠落） | 既存 Spansh / trade 機能（`FindCommodityCommand` 等）。日本語化は v2-P2 の対象。**艤装（モジュール）をギャラクシー内で検索するコマンドは存在しない**（`ShowModulesPanelCommand` はモジュール画面を開くだけ、`query_local_outfitting` は現在地の艤装を LLM に読ませるだけで、`find_commodity` のような「範囲 ly 内から探す」経路がない）。新規コマンドが必要（R.7） |
 | v2-P9 | C-CORE 統合の拡張（全 species / collection state / value / ranking） | 一部完了・後段 | C-CORE 本体は `c-core/`（54 tests passed）。旧 Phase 4・5・6・7(§14)・12(§15) 完了。旧 Phase 7（collection state）・8（all species）・10（value/ranking）未着手。旧 Phase 9 は保留（§16） |
 | v2-P10 | Offline Assistant（ローカル CLI provider） | 未着手 | — |
 | v2-P11 | Installer / Update / Runtime packaging | 一部 | C-CORE 同梱（旧 Phase 12、§15）のみ。`c-core/` からの `bio_entry` ビルド成果物を `distribution/ccore/windows/` へ置く工程は手動 |
@@ -108,9 +108,22 @@ v2-P1 で確定した残量を、**表示 → 応答 → 通知 → 指示** の
 2. **J-2 応答:** `responses` 286 キー
 3. **J-3 通知:** `ed_events` 347 キー
 4. **J-4 指示:** `ai_action_aliases` 198 キー（日本語の言い回しでアクションを指示できるようにする）
-5. **J-5 指示の照合:** `name_ja` 列追加と素材名照合、`PhoneticInputNormalizer` の日本語入力確認
+5. **J-5 指示の照合:** `name_ja` 列追加と素材名照合、`PhoneticInputNormalizer` の日本語入力確認、**および商品（commodity）の日本語照合辞書**（下記参照）
 
 J-1〜J-4 はそれぞれ内部をさらに画面・機能単位のサブカテゴリに分けてよいが、コミットはサブカテゴリ単位とする。
+
+#### J-5 商品（commodity）辞書の欠落（2026-09-15 判明）
+
+**現状（コード確認済み）:** `FindCommodityCommand`（および `AddMiningTargetCommand` など同じ経路を使うコマンド）は、
+LLM への抽出指示（`ActionParameterSpec`）で「商品名を翻訳せず小文字のまま抽出する」ことを明示したうえで、
+`FuzzySearch.fuzzyCommodityMatch()` で英語の商品テーブルにあいまい照合している。**日本語の商品名（例:「金」）は
+この照合を通らないため見つからない。** J-5 は素材（material）の `name_ja` 列のみを対象としており、商品
+（commodity）側には対応する日本語辞書が存在しない。
+
+**方針:** LLM に商品名の自由英訳をさせない。J-5 の `name_ja` と同じ考え方で、商品にも
+**日本語名 → canonical 英語名の決定的な辞書**（DB 列 or 静的テーブル）を追加し、`FuzzySearch` 相当の照合を
+その辞書経由で行う。辞書に無い日本語名は `UNKNOWN` として扱い、検索・保存のどちらも行わない（曖昧なまま
+Spansh 検索や DB 書き込みに渡さない。R.12 の DB 非汚染ルールとも一致する）。
 
 #### ルール
 
@@ -162,6 +175,7 @@ J-1〜J-4 はそれぞれ内部をさらに画面・機能単位のサブカテ�
 
 - `i18n-parity-baseline.txt` に `|ja|` の行が残っていない。
 - `name_ja` 列が追加され、日本語の素材名で指示できる。
+- 商品（commodity）の日本語 → canonical 英語名辞書が追加され、日本語の商品名で `find_commodity` 等が動作する。辞書に無い名前は `UNKNOWN` として検索・保存されない。
 - 現在 EliteIntel に存在する主要機能が日本語 UI で利用でき、未翻訳の英語 UI が意図せず残っていない。
 - localization test が成功し、既存機能の挙動を変更していない。
 - J-1〜J-5 の全カテゴリについて、翻訳・検証・コミットが完了している。
@@ -199,6 +213,7 @@ agy process（stdin / stdout / stderr / exit code）
 - `agy` の非対話実行方式（引数、stdin 入力可否、出力形式、終了コード）
 - VEGA の tool-calling ターンを CLI でどう表現するか。`LlmProviderAdapter.parse` は整形済み tool-call 以外を `INVALID_RESPONSE` にするため、**`agy` に JSON の tool-call 形式で出力させる契約**が成立するかを確認する
 - 既存の `CCoreAdapter`（`ProcessBuilder`）のプロセス実行・タイムアウト処理のうち再利用できる部分（ただし C-CORE と AI Provider の責務は統合しない）
+- **`agy` のエージェント機能（シェル実行・ファイル操作）を無効化または制限して起動できるか。** できない場合は下記「`agy` の実行境界（安全要件）」に従う
 
 #### 必須仕様
 
@@ -209,6 +224,25 @@ agy process（stdin / stdout / stderr / exit code）
 - `agy` が存在しない・失敗した場合も UI がフリーズせず、LLM を使わない決定的なコマンド経路は継続する。
 - Provider 固有仕様を Game Context / C-CORE に漏らさない。
 - 既存 API adapter（Gemini / Anthropic / OpenAI など）は削除しないが、AI 会話の既定にはしない。
+
+#### `agy` の実行境界（安全要件、2026-09-15 追加）
+
+`agy`（Antigravity CLI）はエージェント型 CLI であり、単なる HTTP API クライアントとは異なる。
+CLI 自身がシェル実行やファイル編集を行う機能を持つ可能性があるため、何も制限せずに起動すると、
+DB ファイルへ直接アクセスできる経路が生まれてしまう。**このリスクは §R.12（DB 非汚染ルール）の
+「LLM から DB への直接経路」の中で最大のものである。** v2-P3 の実装（着手前確認を含む）は次を満たすこと。
+
+- **`agy` は tool-call JSON を生成する生成器としてのみ使う。** 生成された tool-call の実行（DB 書き込み・
+  ゲーム操作）は、既存の `IntelCommand` / `CommandRegistry` 経由の決定的コードが行う。`agy` プロセス自身に
+  実行させない。
+- **`agy` のエージェント機能（シェル実行・ファイル編集など）は、無効化または制限できることを実機で確認して
+  から採用を決める。** 「着手前の read-only 確認」（本節の上）にこの確認項目を追加する。
+- **無効化・制限できることが確認できない場合、DB にアクセスできる環境では `agy` を実行しない。** 確認が
+  取れるまでは v2-P3 の実装を進めない。
+- **`agy` の作業ディレクトリは空の一時ディレクトリにする。** リポジトリのチェックアウトや DB ファイルが
+  置かれたディレクトリを作業ディレクトリにしない。
+- **DB のパス・接続情報・その他の秘密情報を `agy` に渡さない。** プロンプトや環境変数、CLI 引数のいずれ
+  にも含めない。`agy` の出力（stdout/stderr）をそのままファイルへ保存する処理も行わない。
 
 #### 完了条件
 
@@ -221,10 +255,10 @@ agy process（stdin / stdout / stderr / exit code）
 
 - **v2-P4 日本語 Assistant / 自然言語:** deterministic command は LLM 不在でも利用可能。ゲームの事実は Journal / Status / Session から取得し、LLM が事実を捏造して Game Context を上書きすることは禁止。§17 の実機確認 3 項目は `agy` 経由で実施する。
   例: 「今どこにいる？」「貨物の残量は？」「この惑星で採取できる生物は？」「マップを開いて」「ミッションの目的地に行って」
-- **v2-P5 STT / TTS / VOICEVOX:** STT / TTS は Provider として分離。VOICEVOX はローカル実行前提、外部 TTS API を必須依存にしない。VOICEVOX 未起動でもテキスト表示を継続。完了判定は `PHASE11_VOICE_IO_PHASE_UPDATE.md` の実機 E2E（AI CLI Provider は `agy`）。
+- **v2-P5 STT / TTS / VOICEVOX:** STT / TTS は Provider として分離。VOICEVOX はローカル実行前提、外部 TTS API を必須依存にしない。VOICEVOX 未起動でもテキスト表示を継続。完了判定は `PHASE11_VOICE_IO_PHASE_UPDATE.md` の実機 E2E（AI CLI Provider は `agy`）。**同梱の `ParakeetSTTImpl` を日本語 STT として扱わない**（`tokens.txt` に日本語語彙が無く、原理的に日本語を認識できないことを確認済み、§10）。日本語音声入力には別の STT バックエンドを新規に選定する（ローカルモデルの差し替え・外部 CLI 方式のいずれも候補として検証する）。STT の出力は常に未検証のユーザー入力として扱い（他言語 STT と同様）、そのままコマンドパラメータや DB へ書き込まない。
 - **v2-P6 Game Action / Ship Control:** Action Registry・Input Adapter・キーバインド設定・allowlist・dry-run・実行結果 verification。LLM から直接 OS キーボードイベントを発行することは禁止。
 - **v2-P7 HUD / Overlay / VR:** Assistant と同じ Game Context を表示し、CLI と HUD で別々の状態取得を行わない。
-- **v2-P8 Generic Game Data / Trade Assistant:** commodity / station / where-to-sell / trade route / cargo / 利益計算。
+- **v2-P8 Generic Game Data / Trade Assistant:** commodity / station / where-to-sell / trade route / cargo / 利益計算。**艤装（outfitting）検索コマンドを新設する**（2026-09-15 判明のギャップ、R.3 表参照）。既存は現在地限定の `query_local_outfitting`（LLM に艤装リストを読ませて回答させる）とモジュール画面を開くだけの `ShowModulesPanelCommand` のみで、`find_commodity` のような「範囲 ly 内からモジュールを検索する」コマンドが無い。「アイテム」が商品なのかモジュール／艤装なのかは、まず**ツール選択（LLM が呼ぶコマンド ID）の段階で区別する**——同じ `find_commodity` に両方を混在させない。新設する艤装検索コマンドの実装は `FindCommodityCommand` と同じ形にする: 名前の照合と検索自体は決定的コード（辞書照合 + 既存 `FuzzySearch`/Spansh 相当）が行い、`agy`/LLM は結果の説明・要約のみを担当する（判定・検索ロジックを LLM に持たせない、R.10 の非目標と一致）。
 - **v2-P9 C-CORE 拡張:** 全 species、collection state、expected value、ranking、confidence。判定と価値評価を分離。C-CORE ruleset を EliteIntel 側へコピーせず、LLM は C-CORE 結果を説明・要約するだけとする。
 - **v2-P10 Offline Assistant:** ローカル CLI provider（例: Ollama CLI）+ VOICEVOX でネットワーク無しでも可能な範囲で日本語 Assistant を使える構成。
 - **v2-P11 Installer / Update / Runtime packaging:** Windows runtime package、CLI launcher、`agy` executable 設定、AI Provider / TTS 設定、optional HUD / VR、バージョン情報、更新機構。
@@ -268,6 +302,47 @@ Provider の差し替えで Game Context schema / C-CORE / Journal state / HUD r
 1. **Track J:** v2-P2 の J-1（`gui` 残り 256 キー）からカテゴリ単位で着手する。v2-P0/P1 は完了済みなので再調査しない。
 2. **Track G:** v2-P3 の着手前 read-only 確認（`agy` の非対話実行方式と tool-call JSON 契約の成立可否）を実機で行う。
 3. C-CORE の追加・拡張（v2-P9）はその後。
+
+### R.12 DB 非汚染ルール（2026-09-15 追加）
+
+`agy`（v2-P3）導入を前に、LLM が生成した値が DB へどう届きうるかを洗い出した。結論: **LLM から DB への
+直接の書き込み経路を作らない。** DB へ書き込むのは常に EliteIntel 側の決定的コードであり、LLM/`agy` は
+値の生成・説明までしか行わない。
+
+#### 現状確認（コード読み取りのみ、2026-09-15）
+
+- **VEGA の会話メモリはセッション内のみ。** `SessionMemoryGateway` / `RecentMemory` は DB／DAO／JDBC を
+  一切参照しない（インメモリのみ）。現状、会話履歴が DB を汚染することはない。この状態を維持する
+  （§R.10 の非目標「LLM の回答をゲーム事実の Source of Truth にしない」と一致させる）。
+- **既に「決定的コードが辞書照合してから保存」になっている経路がある。** 例: `FindCommodityCommand`
+  （検索のみで保存はしない）、`AddMiningTargetCommand`（`FuzzySearch.fuzzyCommodityMatch()` で照合した
+  結果だけを `PlayerSession.addMiningTarget()` へ渡す）。LLM が抽出した生の文字列をそのまま保存していない。
+- **一方で、LLM が抽出した自由文をそのまま DB へ保存するコマンドが存在する。** 例: `SetReminderCommand`
+  / `SetTimedReminderCommand` は `key`（"Extract the reminder text the commander dictates, verbatim."）
+  を照合なしで `ReminderManager` 経由で保存する。これは自由文メモという機能の性質上意図的だが、
+  結果として LLM が生成した任意の文字列が無検証で DB に届く経路になっている。
+
+#### ルール
+
+1. LLM/`agy` から DB への直接アクセス経路（DB パス・接続情報・ORM/DAO への参照渡し）を作らない。書き込みは
+   既存の `*Manager`（`ReminderManager` 等）や DAO など、EliteIntel 側の決定的コードのみが行う（§R.6 の
+   `agy` 実行境界と同じ原則）。
+2. LLM が抽出した値が「既知のエンティティ名」（素材・商品・モジュール名など）を指す場合、**既知の辞書／
+   テーブルと照合してから**でなければ検索・保存に使わない。辞書に無ければ `UNKNOWN` として扱い、検索も
+   保存もしない（J-5・R.7 v2-P8 の方針と同じ）。
+3. LLM が抽出した値を**照合なしの自由文として**保存するコマンド（リマインダーのように仕様上自由文が必要な
+   もの）は、個別に許可リスト（allowlist）で管理する。新しいコマンドを自由文保存にする場合は、この
+   許可リストに明示的に追加する（暗黙に許可しない）。
+4. 会話メモリ（`SessionMemoryGateway` 系）はセッション限定を維持し、DB へ永続化しない。
+
+#### 完了条件
+
+- 現時点で DB に書き込む全コマンド（`IntelCommand` 実装のうち `*Manager`/DAO を呼ぶもの）を棚卸しし、
+  「辞書照合後に保存」「自由文保存（許可リスト対象）」「未分類」のいずれかに分類する。
+- 「未分類」が残っている間は許可リストを確定させない。全数監査が完了してから許可リストを固定する。
+- 許可リストに載っていない自由文保存コマンドが存在しないことをコードレビューで確認する。
+- v2-P3（`agy` 導入）は、このルールと R.6 の実行境界の両方を満たすまで、DB にアクセスできる環境では
+  実行しない。
 
 ## 1. Scope
 
