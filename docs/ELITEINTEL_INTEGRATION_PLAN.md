@@ -1,6 +1,7 @@
 # EliteIntel Integration Plan
 
 **Status:** Draft — this is a forward-looking plan, not a record of completed work.
+**Current roadmap:** §R (Roadmap v2, 2026-09-15). §1–§17 below keep the original phase numbering as an execution record.
 **Repo:** `sugr332-cloud/EliteIntel` (fork of `SudoKrondor/EliteIntel`, upstream remote `origin`, fork remote `fork`)
 **Related repo:** `sugr332-cloud/EDpjKinsaku` (C-CORE exobiology species evaluation engine)
 
@@ -13,6 +14,242 @@ earlier session asserted this file existed in `EDpjKinsaku` and described comple
 fact neither the file nor the phases existed anywhere on GitHub. Before citing a phase in this
 document as done, verify it (`git log`, a passing test run, a file that can be `cat`'d) and record
 what was actually checked, not what was proposed.
+
+## R. Roadmap v2 — 統合版（2026-09-15）
+
+**このセクションが現在の優先順位と Phase 番号の正本である。**
+`sugr332-cloud/EDpjKinsaku` の `docs/ELITEINTEL_INTEGRATION_PLAN.md`（`3a5ef93` / `1b320c9`）にあった
+「EDpjKinsaku / EliteIntel 実装ロードマップ」はここへ統合した。EDpjKinsaku 側の同名ファイルは参照先を示すだけのポインタとする。
+
+§1 以降（旧 Phase 0〜12、§3〜§17）は **実行記録として残す**。旧番号と v2 番号が衝突するため、
+今後のコミットメッセージ・文書では v2 の Phase を必ず `v2-P<n>` と書く（例: `docs(v2-P2): ...`）。
+接頭辞のない「Phase n」は旧番号を指す。
+
+### R.1 最優先事項（2026-09-15 決定）
+
+1. **AI 会話は LLM の HTTP API ではなく `agy`（Antigravity CLI）を外部プロセスとして使う。**
+2. **日本語化は「表示」から「指示（音声・テキストのコマンド）」まで行う。**
+
+この 2 つは互いにブロックしない並行トラックとして扱う。
+
+- **Track J（日本語化）:** v2-P1 → v2-P2
+- **Track G（agy CLI）:** v2-P3
+
+C-CORE の追加・拡張（v2-P9）はこの 2 トラックの後に回す。既に完了した C-CORE 接続（旧 Phase 4〜8/12）は壊さず維持する。
+
+### R.2 基本方針
+
+- 現在存在する EliteIntel の機能を先に日本語化する。日本語化のために既存機能を削除・簡略化しない。
+- C-CORE を理由に既存 EliteIntel の UI / Journal / Navigation / Assistant を作り直さない。C-CORE の判定 Source of Truth は維持する。
+- AI は判定エンジンではなく、説明・要約・推薦・自然言語対話・許可済みアクションの選択を担当する。
+- AI Provider は API に固定せず、**CLI プロセスを第一級の実装方式**とし、`agy` を既定実装とする。
+- AI Provider の変更で Game Context や C-CORE の内部構造を変更しない。
+- 実装前に read-only 調査を行い、既存コード・仕様・テストを確認する（§0）。
+- 各 Phase は小さく実装し、fixture/test を先に追加する。
+
+### R.3 v2 Phase 一覧と現状（2026-09-15、`master` = `459750cd` で確認）
+
+| v2 Phase | 内容 | 状態 | 根拠 / 旧番号との対応 |
+|---|---|---|---|
+| v2-P0 | 現状固定 / read-only baseline | **完了** | 旧 Phase 0・1（§5）。build 成功、AI 入力経路を実ファイルで追跡済み |
+| v2-P1 | 日本語化 inventory（表示〜指示） | **完了（数値確定）** | R.4 の件数は `i18n-parity-baseline.txt` と各 `.properties` から計測 |
+| v2-P2 | 既存機能の日本語置換（表示 → 指示） | **進行中** | `Language.JA`（`11907a78`）、P0（`11907a78`）・P1（`5c9716ec`）翻訳済み。残りは R.4 |
+| v2-P3 | AI Provider CLI 化 / `agy` 対応 | **未着手** | `ProviderEnum` は API 系のみ。`PHASE11_AI_PROVIDER_CLI_SPEC.md` の CLI 化方針を `agy` 既定に更新（同文書冒頭の改訂注記） |
+| v2-P4 | 日本語自然言語による問い合わせ・指示（テキスト） | 一部実装 | 旧 Phase 10（§17）: 日本語テキスト入力・日本語応答方針は実装済み。`agy` 経由では未確認 |
+| v2-P5 | 音声入出力（STT / TTS / VOICEVOX） | 一部実装 | Kokoro→日本語フォールバック（`334b35b1`）。実機 E2E は未実施（`PHASE11_VOICE_IO_PHASE_UPDATE.md`） |
+| v2-P6 | Game Action / Ship Control の安全化 | 既存機能あり | 既存 `GameInputStep` / `GameControllerBus` / `KeyProcessor`。System Map 駅選択は未実装（§17） |
+| v2-P7 | HUD / Overlay / VR | 既存機能あり | Aleoida MATCH 表示は実装済み（旧 Phase 6、§13） |
+| v2-P8 | Generic Game Data / Trade Assistant | 既存機能あり | 既存 Spansh / trade 機能。日本語化は v2-P2 の対象 |
+| v2-P9 | C-CORE 統合の拡張（全 species / collection state / value / ranking） | 一部完了・後段 | 旧 Phase 4・5・6・7(§14)・12(§15) 完了。旧 Phase 7（collection state）・8（all species）・10（value/ranking）未着手。旧 Phase 9 は保留（§16） |
+| v2-P10 | Offline Assistant（ローカル CLI provider） | 未着手 | — |
+| v2-P11 | Installer / Update / Runtime packaging | 一部 | C-CORE 同梱（旧 Phase 12、§15）のみ |
+
+### R.4 v2-P1 inventory: 日本語化の残量（2026-09-15 計測）
+
+| バンドル | 役割 | 基準キー数 | `_ja` 翻訳済み | 未翻訳（baseline の `\|ja\|MISSING`） |
+|---|---|---|---|---|
+| `gui` | 画面表示（UI・HUD・設定・ログ・警告） | 779 | 523 | 256 |
+| `responses` | VEGA の定型応答・読み上げ文 | 286 | 0 | 286 |
+| `ed_events` | ゲームイベント通知の文言 | 347 | 0 | 347 |
+| `ai_action_aliases` | **指示**（音声/テキストコマンドの別名） | 198 | 0 | 198 |
+
+コード側の未対応:
+
+- 素材名の日本語別名 DB 列 `name_ja` が未追加（§4）。日本語の指示で素材名を照合するには必要。
+- `PhoneticInputNormalizer`（`ThoughtDispatcher` の既定正規化）の日本語入力に対する挙動は未確認。
+
+### R.5 v2-P2 既存機能の日本語置換【最優先 / Track J】
+
+#### 目的
+
+v2-P1 で確定した残量を、**表示 → 応答 → 通知 → 指示** の順に日本語へ置き換え、既存機能を日本語環境で一通り操作できる状態にする。
+
+#### カテゴリと順序
+
+1. **J-1 表示:** `gui` 残り 256 キー（Navigation / Mission / Ship / Cargo / Exobiology / Codex / Trade / 設定 / エラー・警告・状態表示 / 音声関連表示 / 既存 Assistant 表示）
+2. **J-2 応答:** `responses` 286 キー
+3. **J-3 通知:** `ed_events` 347 キー
+4. **J-4 指示:** `ai_action_aliases` 198 キー（日本語の言い回しでアクションを指示できるようにする）
+5. **J-5 指示の照合:** `name_ja` 列追加と素材名照合、`PhoneticInputNormalizer` の日本語入力確認
+
+J-1〜J-4 はそれぞれ内部をさらに画面・機能単位のサブカテゴリに分けてよいが、コミットはサブカテゴリ単位とする。
+
+#### ルール
+
+- 既存キーを優先して利用する。同じ意味の日本語を複数箇所へ個別実装しない。
+- コード内へ日本語文字列を直接大量に埋め込まない。既存の localization architecture を利用する。
+- UI の意味を変更せず、表示言語だけを置き換える。
+- Elite Dangerous には日本語クライアントがないため、ゲーム内固有名詞（`Language.isGameLocalized()` の対象外）の扱いは既存言語（IT/UK）と揃える。
+
+#### 作業効率化ルール
+
+日本語化の完了をキー単位の細切れ作業にしない。**カテゴリ単位でまとめて置換・検証する。**
+
+- 1キーごとの個別コミットは行わない。
+- 同一カテゴリの翻訳対象をまとめて処理する。
+- 翻訳後はカテゴリ単位でキー欠落・重複・placeholder 不整合を検証する。
+- 画面表示確認もカテゴリ単位でまとめて実施する。
+- 小さな変更であっても、原則としてカテゴリ単位でコミットする。
+- 翻訳対象と無関係なリファクタリングを同時に行わない。
+- C-CORE、AI Provider、HUD/Overlay 等の後段設計へ寄り道せず、v2-P2 の日本語置換を完了させる（Track G の作業は Track J のコミットに混ぜない）。
+- 既存の翻訳済みキーを再調査して同じ作業を繰り返さない。
+- 既に検証済みのカテゴリは再検証せず、未完了カテゴリへ進む。
+- エラーや曖昧な翻訳が発生した場合のみ、そのキー・カテゴリを個別に追加調査する。
+
+#### 機械的検証（カテゴリ単位の完了条件）
+
+- 翻訳したキーに対応する `|ja|MISSING` 行を `app/src/test/resources/i18n-parity-baseline.txt` から削除している。
+- `BundleKeyParityTest` と `BundleQuotingTest` が成功する。
+- `:app:compileJava` が成功する。
+
+#### 推奨サイクル
+
+```text
+未翻訳カテゴリを抽出
+      ↓
+カテゴリ単位で翻訳
+      ↓
+機械的なキー / placeholder 検証（上記）
+      ↓
+必要な画面だけ表示確認
+      ↓
+カテゴリ単位でコミット
+      ↓
+次のカテゴリへ
+```
+
+この Phase では、**「翻訳 → 1キー確認 → 1キーコミット」を繰り返さない。**
+
+#### 完了条件
+
+- `i18n-parity-baseline.txt` に `|ja|` の行が残っていない。
+- `name_ja` 列が追加され、日本語の素材名で指示できる。
+- 現在 EliteIntel に存在する主要機能が日本語 UI で利用でき、未翻訳の英語 UI が意図せず残っていない。
+- localization test が成功し、既存機能の挙動を変更していない。
+- J-1〜J-5 の全カテゴリについて、翻訳・検証・コミットが完了している。
+
+### R.6 v2-P3 AI Provider CLI 化 / `agy` 対応【最優先 / Track G】
+
+#### 目的
+
+AI 会話の LLM 呼び出しを HTTP API から **`agy` の外部プロセス実行**へ置き換え、`agy` を既定の AI Provider にする。
+
+#### 差し込み位置（既存コードで確認済み）
+
+既存の provider 境界は `elite.intel.ai.brain.vega.llm` の次の 2 つである。
+
+- `LlmTransport` — リクエスト本文を送り、生の応答を返す（現状は HTTP）
+- `LlmProviderAdapter` — `LlmRequest` を provider 形式へ変換し、`parse`（tool-calling ターン）と `parseText`（圧縮ターン）で応答を解釈する
+
+provider の登録は `VegaLlmGatewayFactory`、種別は `ProviderEnum`。したがって `agy` 対応は以下で行い、
+`VegaLlmGateway` / `ThoughtDispatcher` / UI は変更しない。
+
+```text
+AiTabPanel / STT → UserInputEvent → VegaSubsystemGate → ThoughtDispatcher
+        ↓
+VegaLlmGateway
+        ↓
+AgyCliProviderAdapter（LlmProviderAdapter）
+        ↓
+AgyCliTransport（LlmTransport, ProcessBuilder）
+        ↓
+agy process（stdin / stdout / stderr / exit code）
+```
+
+#### 着手前の read-only 確認（実機）
+
+- `agy` の非対話実行方式（引数、stdin 入力可否、出力形式、終了コード）
+- VEGA の tool-calling ターンを CLI でどう表現するか。`LlmProviderAdapter.parse` は整形済み tool-call 以外を `INVALID_RESPONSE` にするため、**`agy` に JSON の tool-call 形式で出力させる契約**が成立するかを確認する
+- 既存の `CCoreAdapter`（`ProcessBuilder`）のプロセス実行・タイムアウト処理のうち再利用できる部分（ただし C-CORE と AI Provider の責務は統合しない）
+
+#### 必須仕様
+
+- `agy` の executable path・引数・timeout を設定可能にする。
+- Prompt / Game Context を stdin または定義済みの CLI 引数で渡す。
+- stdout を応答として受け取り、stderr は診断情報として分離する。
+- 非ゼロ終了コード、timeout、プロセス起動失敗、不正出力を共通エラーとして `AiTransportResult` の失敗種別へ変換する。
+- `agy` が存在しない・失敗した場合も UI がフリーズせず、LLM を使わない決定的なコマンド経路は継続する。
+- Provider 固有仕様を Game Context / C-CORE に漏らさない。
+- 既存 API adapter（Gemini / Anthropic / OpenAI など）は削除しないが、AI 会話の既定にはしない。
+
+#### 完了条件
+
+- `ProviderEnum` と `VegaLlmGatewayFactory` から `agy` を選択でき、既定になっている。
+- 固定 fixture（stdin / stdout / stderr / exit code / timeout / 不正出力 / 未インストール）でテストが成功する。
+- 日本語のテキスト指示が `agy` 経由で tool-call に変換され、既存アクションが実行される（v2-P4 の最初の実機確認）。
+- AI 会話が HTTP API の直接呼び出しに依存しない。
+
+### R.7 v2-P4 以降
+
+- **v2-P4 日本語 Assistant / 自然言語:** deterministic command は LLM 不在でも利用可能。ゲームの事実は Journal / Status / Session から取得し、LLM が事実を捏造して Game Context を上書きすることは禁止。§17 の実機確認 3 項目は `agy` 経由で実施する。
+  例: 「今どこにいる？」「貨物の残量は？」「この惑星で採取できる生物は？」「マップを開いて」「ミッションの目的地に行って」
+- **v2-P5 STT / TTS / VOICEVOX:** STT / TTS は Provider として分離。VOICEVOX はローカル実行前提、外部 TTS API を必須依存にしない。VOICEVOX 未起動でもテキスト表示を継続。完了判定は `PHASE11_VOICE_IO_PHASE_UPDATE.md` の実機 E2E（AI CLI Provider は `agy`）。
+- **v2-P6 Game Action / Ship Control:** Action Registry・Input Adapter・キーバインド設定・allowlist・dry-run・実行結果 verification。LLM から直接 OS キーボードイベントを発行することは禁止。
+- **v2-P7 HUD / Overlay / VR:** Assistant と同じ Game Context を表示し、CLI と HUD で別々の状態取得を行わない。
+- **v2-P8 Generic Game Data / Trade Assistant:** commodity / station / where-to-sell / trade route / cargo / 利益計算。
+- **v2-P9 C-CORE 拡張:** 全 species、collection state、expected value、ranking、confidence。判定と価値評価を分離。C-CORE ruleset を EliteIntel 側へコピーせず、LLM は C-CORE 結果を説明・要約するだけとする。
+- **v2-P10 Offline Assistant:** ローカル CLI provider（例: Ollama CLI）+ VOICEVOX でネットワーク無しでも可能な範囲で日本語 Assistant を使える構成。
+- **v2-P11 Installer / Update / Runtime packaging:** Windows runtime package、CLI launcher、`agy` executable 設定、AI Provider / TTS 設定、optional HUD / VR、バージョン情報、更新機構。
+
+### R.8 AI Provider 契約
+
+```text
+AIProvider
+ ├─ AgyCliProvider      （既定）
+ ├─ GeminiCliProvider   （任意）
+ ├─ ClaudeCliProvider   （任意）
+ └─ OllamaCliProvider   （v2-P10）
+```
+
+Provider の差し替えで Game Context schema / C-CORE / Journal state / HUD renderer / Action Registry を変更してはならない。
+
+- 入力: Game Context + user prompt
+- 出力: 日本語 response（tool-calling ターンでは tool-call JSON）
+- エラー: process unavailable / non-zero exit / timeout / malformed output（Assistant Core が共通処理）
+
+### R.9 テスト方針
+
+- **v2-P0〜P2:** 既存 build/test、`BundleKeyParityTest`・`BundleQuotingTest`、日本語 locale test、HUD / menu / settings の表示確認、既存機能の回帰
+- **v2-P3〜P4:** Provider interface test、CLI process test、stdin/stdout fixture、exit code / timeout / malformed output test、`agy` unavailable fallback、日本語 prompt / response test
+- **v2-P5:** STT / TTS provider test、VOICEVOX unavailable fallback、実機 E2E
+- **v2-P6:** allowlist / dry-run / verification / 禁止操作 test
+- **v2-P7〜P8:** Game Context consistency、HUD rendering、Navigation / Mission / Cargo / Trade fixtures
+- **v2-P9〜P10:** BodyContext mapping、C-CORE fixture、SpeciesEvaluation preservation、C-CORE result が AI に改変されないこと、offline provider test
+
+### R.10 非目標
+
+- LLM に Exobiology species 判定をさせない。LLM の回答をゲーム事実の Source of Truth にしない。
+- C-CORE ruleset を EliteIntel 側へコピーしない。
+- LLM から直接 OS キーボードイベントを発行しない。
+- 日本語化・`agy` 対応より先に C-CORE を完成させることを要求しない。
+- AI/LLM を特定の外部 API に固定しない。
+- HUD / VR の実装を CLI の責務へ混在させない。
+
+### R.11 現在の優先作業
+
+1. **Track J:** v2-P2 の J-1（`gui` 残り 256 キー）からカテゴリ単位で着手する。v2-P0/P1 は完了済みなので再調査しない。
+2. **Track G:** v2-P3 の着手前 read-only 確認（`agy` の非対話実行方式と tool-call JSON 契約の成立可否）を実機で行う。
+3. C-CORE の追加・拡張（v2-P9）はその後。
 
 ## 1. Scope
 

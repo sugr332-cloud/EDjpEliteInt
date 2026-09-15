@@ -4,6 +4,10 @@
 **Date:** 2026-09-13  
 **Repo:** `sugr332-cloud/EliteIntel`
 
+> **改訂注記（2026-09-15）:** Roadmap v2（`ELITEINTEL_INTEGRATION_PLAN.md` §R）により、この仕様は **v2-P3** として扱う。
+> AI 会話の既定 CLI Provider は **`agy`（Antigravity CLI）** とし、本文中の Gemini CLI / Claude CLI は同じ Provider 契約に載せる任意の実装とする。
+> 本文の「Gemini CLI または Claude CLI」の記述は、既定の完了判定では「`agy`」と読み替える。差し込み位置（`LlmTransport` / `LlmProviderAdapter` / `VegaLlmGatewayFactory`）と tool-call JSON 契約の確認事項は §R.6 を正とする。
+
 ## 1. Purpose
 
 Phase 11 の AI 会話機能について、LLM をどの方式で実行するかを明文化する。

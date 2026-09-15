@@ -4,6 +4,8 @@
 **Date:** 2026-09-13  
 **Base:** `docs/ELITEINTEL_INTEGRATION_PLAN.md` / Phase 11
 
+> **改訂注記（2026-09-15）:** Roadmap v2（`ELITEINTEL_INTEGRATION_PLAN.md` §R）では本書の内容は **v2-P5** の完了判定とする。E2E 試験で使う AI CLI Provider は既定で `agy` とする。
+
 ## 1. 位置付け
 
 Phase 11 の完了条件に、AI Provider CLI 化だけでなく **日本語音声入出力の実機E2E検証**を追加する。
