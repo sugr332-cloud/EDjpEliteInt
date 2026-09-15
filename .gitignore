@@ -57,3 +57,10 @@ CLAUDE.md
 /code-integrity-review.md
 /code-integrity-review-fr.md
 .idea/
+
+#-- c-core (C-CORE Python) build/test artifacts
+c-core/dist/
+c-core/build/
+c-core/*.egg-info/
+c-core/**/__pycache__/
+c-core/.pytest_cache/

@@ -2,8 +2,9 @@
 
 **Status:** Draft — this is a forward-looking plan, not a record of completed work.
 **Current roadmap:** §R (Roadmap v2, 2026-09-15). §1–§17 below keep the original phase numbering as an execution record.
-**Repo:** `sugr332-cloud/EliteIntel` (fork of `SudoKrondor/EliteIntel`, upstream remote `origin`, fork remote `fork`)
-**Related repo:** `sugr332-cloud/EDpjKinsaku` (C-CORE exobiology species evaluation engine)
+**Repo (2026-09-15〜):** 統合リポジトリ（本リポジトリ）。EliteIntel のコードと履歴をルートに、C-CORE を `c-core/` に置く（§R.0）。
+**Repo (〜2026-09-15, archived):** `sugr332-cloud/EliteIntel` (fork of `SudoKrondor/EliteIntel`, upstream remote `origin`, fork remote `fork`)
+**Related repo (〜2026-09-15, archived):** `sugr332-cloud/EDpjKinsaku` (C-CORE exobiology species evaluation engine)
 
 ## 0. Ground rule
 
@@ -19,7 +20,24 @@ what was actually checked, not what was proposed.
 
 **このセクションが現在の優先順位と Phase 番号の正本である。**
 `sugr332-cloud/EDpjKinsaku` の `docs/ELITEINTEL_INTEGRATION_PLAN.md`（`3a5ef93` / `1b320c9`）にあった
-「EDpjKinsaku / EliteIntel 実装ロードマップ」はここへ統合した。EDpjKinsaku 側の同名ファイルは参照先を示すだけのポインタとする。
+「EDpjKinsaku / EliteIntel 実装ロードマップ」はここへ統合した。
+
+### R.0 統合リポジトリ（2026-09-15）
+
+EliteIntel fork と EDpjKinsaku の 2 リポジトリ運用で、計画書・コミット先・ブランチ名（`master` / `main`）の混線が起きたため、
+1 つのリポジトリへ一本化した。
+
+| パス | 中身 | 取り込み方式 |
+|---|---|---|
+| `/` | EliteIntel（Java / Gradle、install4j、`distribution/`） | `sugr332-cloud/EliteIntel` `master` の履歴を保持 |
+| `/c-core/` | C-CORE（`bio evaluate` CLI、`bio_entry` ビルド、テスト） | `sugr332-cloud/EDpjKinsaku` `main` `1b320c9` から履歴なしでコピー（`c-core/PROVENANCE.md`） |
+| `/docs/` | 本計画書を正本とする | — |
+
+- 既定ブランチは `main`。旧 fork の `master` 履歴をそのまま `main` として引き継ぐ。
+- EliteIntel upstream（`SudoKrondor/EliteIntel`）の更新は `upstream` リモートから取り込む。
+- EDpjKinsaku の Mining / DB / value・ranking / backtest 系は持ち込んでいない。v2-P9 で必要になった時点で判断する。
+- 旧 2 リポジトリはアーカイブし、以後コミットしない。
+- 本文中の「EDpjKinsaku」「`edpj bio evaluate`」は、統合後は `c-core/` を指す。
 
 §1 以降（旧 Phase 0〜12、§3〜§17）は **実行記録として残す**。旧番号と v2 番号が衝突するため、
 今後のコミットメッセージ・文書では v2 の Phase を必ず `v2-P<n>` と書く（例: `docs(v2-P2): ...`）。
@@ -60,9 +78,9 @@ C-CORE の追加・拡張（v2-P9）はこの 2 トラックの後に回す。�
 | v2-P6 | Game Action / Ship Control の安全化 | 既存機能あり | 既存 `GameInputStep` / `GameControllerBus` / `KeyProcessor`。System Map 駅選択は未実装（§17） |
 | v2-P7 | HUD / Overlay / VR | 既存機能あり | Aleoida MATCH 表示は実装済み（旧 Phase 6、§13） |
 | v2-P8 | Generic Game Data / Trade Assistant | 既存機能あり | 既存 Spansh / trade 機能。日本語化は v2-P2 の対象 |
-| v2-P9 | C-CORE 統合の拡張（全 species / collection state / value / ranking） | 一部完了・後段 | 旧 Phase 4・5・6・7(§14)・12(§15) 完了。旧 Phase 7（collection state）・8（all species）・10（value/ranking）未着手。旧 Phase 9 は保留（§16） |
+| v2-P9 | C-CORE 統合の拡張（全 species / collection state / value / ranking） | 一部完了・後段 | C-CORE 本体は `c-core/`（54 tests passed）。旧 Phase 4・5・6・7(§14)・12(§15) 完了。旧 Phase 7（collection state）・8（all species）・10（value/ranking）未着手。旧 Phase 9 は保留（§16） |
 | v2-P10 | Offline Assistant（ローカル CLI provider） | 未着手 | — |
-| v2-P11 | Installer / Update / Runtime packaging | 一部 | C-CORE 同梱（旧 Phase 12、§15）のみ |
+| v2-P11 | Installer / Update / Runtime packaging | 一部 | C-CORE 同梱（旧 Phase 12、§15）のみ。`c-core/` からの `bio_entry` ビルド成果物を `distribution/ccore/windows/` へ置く工程は手動 |
 
 ### R.4 v2-P1 inventory: 日本語化の残量（2026-09-15 計測）
 

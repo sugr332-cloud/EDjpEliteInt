@@ -1,0 +1,31 @@
+[project]
+name = "edpj-ccore"
+version = "0.1.0"
+description = "C-CORE exobiology species evaluation engine (bio evaluate CLI) bundled with EliteIntel"
+requires-python = ">=3.11"
+dependencies = [
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+# Builds the standalone bio_entry binary EliteIntel's CCoreAdapter invokes directly - see
+# app/cli/bio_entry.py and scripts/build_ccore_binary.ps1.
+packaging = [
+    "pyinstaller>=6.0",
+]
+
+[project.scripts]
+edpj = "app.cli.__main__:app"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app", "app.bio", "app.cli"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
