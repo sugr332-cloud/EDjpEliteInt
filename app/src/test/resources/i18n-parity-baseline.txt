@@ -566,14 +566,6 @@ ed_events|ja|MISSING|tts.amount.negative
 ed_events|ja|MISSING|tts.amount.thousands
 ed_events|ja|MISSING|tts.amount.zero
 ed_events|ja|MISSING|tts.bounty.none
-gui|ja|MISSING|app.name
-gui|ja|MISSING|app.title
-gui|ja|MISSING|app.updateAvailable.title
-gui|ja|MISSING|manual.section.document
-gui|ja|MISSING|popup.noSettings
-gui|ja|MISSING|popup.shipOptions
-gui|ja|MISSING|popup.shipSettings
-gui|ja|MISSING|popup.shipSettings.default
 responses|ja|MISSING|carrier.squadronStems
 responses|ja|MISSING|handler.announcements.all
 responses|ja|MISSING|handler.announcements.discovery
