@@ -251,6 +251,47 @@ DB ファイルへ直接アクセスできる経路が生まれてしまう。**
 - 日本語のテキスト指示が `agy` 経由で tool-call に変換され、既存アクションが実行される（v2-P4 の最初の実機確認）。
 - AI 会話が HTTP API の直接呼び出しに依存しない。
 
+### R.6.1 実装計画（サブフェーズ）
+
+#### 実機検証で確立した安全要件（確定事項、2026-09-19 追記）
+
+以下は実機検証で確認済みの事実である。§R.6「`agy` の実行境界（安全要件）」を具体化する。
+
+- `agy` には全ツールを無効化する単一フラグ（`--no-tools` 相当）は存在しない。
+- 実行のたびに空の一時ディレクトリを作成し、その中に隔離用の `settings.json`（`permissions.deny` に
+  `command(*)` / `write_file(*)` / `read_file(*)` を指定）を配置し、環境変数 `USERPROFILE` をその一時
+  ディレクトリへ向けることで、ホスト環境の設定（`toolPermission: always-proceed` 等）に関わらずエージェント
+  機能（シェル実行・ファイル読み書き）を無効化できることを実機で確認済み。
+- `--dangerously-skip-permissions` は使用しない（§R.13.10 の禁止と一致）。
+- `--json-schema` と `--output-format json` を併用することで、tool-call 形式の JSON 出力が得られることを
+  実機で確認済み。ただし `arguments` フィールドは `object` 型ではなく `string` 型（JSON 文字列として
+  シリアライズしたもの）で定義する必要がある。`object` 型で定義した場合、検証したモデル側でスキーマ
+  バリデーションエラーが発生した。
+- 検証に使用した一時ディレクトリと隔離用 `settings.json` は、検証終了後に完全に削除する。実装（G-1）でも
+  このライフサイクル（作成 → 使用 → 完全削除）を踏襲する。
+
+#### サブフェーズ分割
+
+§R.14 の実装台帳（Track J）にならい、v2-P3（Track G）の実装単位をサブフェーズへ分割する。各サブフェーズは
+§R.13 の統制手順（1 サブフェーズ＝1 作業ブランチ＝1 コミット、PLAN CHECK → 承認 → 実装 → TEST GATE →
+DIFF GATE → END REPORT）に従う。
+
+| ID | 内容 | 変更許可ファイル | TEST GATE |
+|---|---|---|---|
+| G-1 | `AgyCliTransport`（`LlmTransport` 実装）: プロセス実行、隔離ライフサイクル管理（一時ディレクトリ＋隔離 `settings.json`＋`USERPROFILE` 差し替え）、二重タイムアウト（既定／絶対上限）、プロセスツリー終了、`CCoreAdapter`（`app/src/main/java/elite/intel/bio/ccore/CCoreAdapter.java`）／`StreamCollector`（`app/src/main/java/elite/intel/bio/ccore/StreamCollector.java`）パターンの再利用 | 新規 `app/src/main/java/elite/intel/ai/brain/vega/llm/AgyCliTransport.java`、新規 `app/src/test/java/elite/intel/ai/brain/vega/llm/AgyCliTransportTest.java` | `./gradlew --no-daemon :app:test --tests '*AgyCliTransportTest'` |
+| G-2 | `AgyCliProviderAdapter`（`LlmProviderAdapter` 実装、`app/src/main/java/elite/intel/ai/brain/vega/llm/LlmProviderAdapter.java` を実装）: プロンプト構築、JSON Schema 生成（`arguments` は string 型）、tool-call 解析、要約ターン（`parseText`）処理 | 新規 `app/src/main/java/elite/intel/ai/brain/vega/llm/AgyCliProviderAdapter.java`、新規 `app/src/test/java/elite/intel/ai/brain/vega/llm/AgyCliProviderAdapterTest.java` | `./gradlew --no-daemon :app:test --tests '*AgyCliProviderAdapterTest'` |
+| G-3 | `ProviderEnum.AGY` の追加と `VegaLlmGatewayFactory` への統合。既存の `SystemSession.useLocalCommandLlm()`（ローカル LM Studio 優先、`VegaLlmGatewayFactory.create()` 内で最初に判定）と `LlmProviderResolver.detectCloudProvider()`（クラウド API キー設定）をそのまま優先し、いずれも未設定の場合にのみ `agy` を既定として選択する設計とする | `app/src/main/java/elite/intel/ai/ProviderEnum.java`、`app/src/main/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactory.java`、既存 `app/src/test/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactoryTest.java` | `./gradlew --no-daemon :app:test --tests '*VegaLlmGatewayFactoryTest'` |
+| G-4 | 固定 fixture によるテスト整備: 正常系、非ゼロ終了コード、タイムアウト、不正出力、`agy` 未インストール、隔離ディレクトリのクリーンアップ検証。新規の fixture 用リソースファイルが必要になった場合の配置場所は G-1/G-2 の PLAN CHECK 時に確定する | G-1/G-2 で作成した `app/src/test/java/elite/intel/ai/brain/vega/llm/AgyCliTransportTest.java`、`app/src/test/java/elite/intel/ai/brain/vega/llm/AgyCliProviderAdapterTest.java`（新規ファイルは作らずケースを追加する） | `./gradlew --no-daemon :app:test --tests '*AgyCliTransportTest' --tests '*AgyCliProviderAdapterTest'` |
+
+#### 完了条件
+
+§R.6 の完了条件をそのまま引き継ぐ。
+
+- `ProviderEnum` と `VegaLlmGatewayFactory` から `agy` を選択でき、既定になっている。
+- 固定 fixture（stdin / stdout / stderr / exit code / timeout / 不正出力 / 未インストール）でテストが成功する。
+- 日本語のテキスト指示が `agy` 経由で tool-call に変換され、既存アクションが実行される（v2-P4 の最初の実機確認）。
+- AI 会話が HTTP API の直接呼び出しに依存しない。
+
 ### R.7 v2-P4 以降
 
 - **v2-P4 日本語 Assistant / 自然言語:** deterministic command は LLM 不在でも利用可能。ゲームの事実は Journal / Status / Session から取得し、LLM が事実を捏造して Game Context を上書きすることは禁止。§17 の実機確認 3 項目は `agy` 経由で実施する。
