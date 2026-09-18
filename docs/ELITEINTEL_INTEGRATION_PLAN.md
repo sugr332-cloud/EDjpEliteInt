@@ -251,9 +251,9 @@ DB ファイルへ直接アクセスできる経路が生まれてしまう。**
 - 日本語のテキスト指示が `agy` 経由で tool-call に変換され、既存アクションが実行される（v2-P4 の最初の実機確認）。
 - AI 会話が HTTP API の直接呼び出しに依存しない。
 
-### R.6.1 実装計画（サブフェーズ）
+#### R.6.1 実装計画（サブフェーズ）
 
-#### 実機検証で確立した安全要件（確定事項、2026-09-19 追記）
+##### 実機検証で確立した安全要件（確定事項、2026-09-19 追記）
 
 以下は実機検証で確認済みの事実である。§R.6「`agy` の実行境界（安全要件）」を具体化する。
 
@@ -270,7 +270,7 @@ DB ファイルへ直接アクセスできる経路が生まれてしまう。**
 - 検証に使用した一時ディレクトリと隔離用 `settings.json` は、検証終了後に完全に削除する。実装（G-1）でも
   このライフサイクル（作成 → 使用 → 完全削除）を踏襲する。
 
-#### サブフェーズ分割
+##### サブフェーズ分割
 
 §R.14 の実装台帳（Track J）にならい、v2-P3（Track G）の実装単位をサブフェーズへ分割する。各サブフェーズは
 §R.13 の統制手順（1 サブフェーズ＝1 作業ブランチ＝1 コミット、PLAN CHECK → 承認 → 実装 → TEST GATE →
@@ -283,7 +283,7 @@ DIFF GATE → END REPORT）に従う。
 | G-3 | `ProviderEnum.AGY` の追加と `VegaLlmGatewayFactory` への統合。既存の `SystemSession.useLocalCommandLlm()`（ローカル LM Studio 優先、`VegaLlmGatewayFactory.create()` 内で最初に判定）と `LlmProviderResolver.detectCloudProvider()`（クラウド API キー設定）をそのまま優先し、いずれも未設定の場合にのみ `agy` を既定として選択する設計とする | `app/src/main/java/elite/intel/ai/ProviderEnum.java`、`app/src/main/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactory.java`、既存 `app/src/test/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactoryTest.java` | `./gradlew --no-daemon :app:test --tests '*VegaLlmGatewayFactoryTest'` |
 | G-4 | 固定 fixture によるテスト整備: 正常系、非ゼロ終了コード、タイムアウト、不正出力、`agy` 未インストール、隔離ディレクトリのクリーンアップ検証。新規の fixture 用リソースファイルが必要になった場合の配置場所は G-1/G-2 の PLAN CHECK 時に確定する | G-1/G-2 で作成した `app/src/test/java/elite/intel/ai/brain/vega/llm/AgyCliTransportTest.java`、`app/src/test/java/elite/intel/ai/brain/vega/llm/AgyCliProviderAdapterTest.java`（新規ファイルは作らずケースを追加する） | `./gradlew --no-daemon :app:test --tests '*AgyCliTransportTest' --tests '*AgyCliProviderAdapterTest'` |
 
-#### 完了条件
+##### 完了条件
 
 §R.6 の完了条件をそのまま引き継ぐ。
 
