@@ -100,25 +100,29 @@ public final class VegaLlmGatewayFactory {
     }
 
     /**
-     * Creates the gateway for the configured provider, or defaults to agy CLI when none is configured.
-     * <p>
-     * Selection order (§R.6, §R.6.1):
-     * <ol>
-     *   <li>Explicit local command LLM (LM Studio) if {@code session.useLocalCommandLlm()} is enabled.</li>
-     *   <li>Detected cloud provider if an API key is configured and supported.</li>
-     *   <li>Default to Antigravity CLI ({@code agy}) if neither is configured or detected as UNKNOWN.</li>
-     * </ol>
+     * Creates the dual-routing gateway for VEGA (§R.6.2):
+     * - Tool-calling turns (!request.tools().isEmpty()) route to the configured command provider (LM Studio or cloud API).
+     * - Chat / summarization turns (request.tools().isEmpty()) route to Antigravity CLI (agy).
      */
     public static LlmGateway create() {
-        SystemSession session = SystemSession.getInstance();
+        return create(SystemSession.getInstance());
+    }
+
+    static LlmGateway create(SystemSession session) {
+        LlmGateway toolGateway = createConfiguredGateway(session);
+        LlmGateway chatGateway = AGY_GATEWAY.builder().apply(session);
+        return new TurnRoutingLlmGateway(toolGateway, chatGateway);
+    }
+
+    /**
+     * Builds the command gateway using the configured local host or cloud provider (without agy fallback).
+     */
+    private static LlmGateway createConfiguredGateway(SystemSession session) {
         if (session.useLocalCommandLlm()) {
             return LOCAL_GATEWAY.builder().apply(session);
         }
         ProviderEnum provider = LlmProviderResolver.detectCloudProvider();
-        if (provider != ProviderEnum.UNKNOWN && CLOUD_GATEWAYS.containsKey(provider)) {
-            return build(CLOUD_GATEWAYS.get(provider), provider, session);
-        }
-        return AGY_GATEWAY.builder().apply(session);
+        return build(CLOUD_GATEWAYS.get(provider), provider, session);
     }
 
     /**

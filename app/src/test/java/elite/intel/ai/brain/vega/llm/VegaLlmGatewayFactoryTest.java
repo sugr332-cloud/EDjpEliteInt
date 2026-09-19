@@ -4,6 +4,7 @@ import elite.intel.ai.ProviderEnum;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -58,5 +59,16 @@ class VegaLlmGatewayFactoryTest {
                 () -> VegaLlmGatewayFactory.create(ProviderEnum.UNKNOWN));
         assertTrue(ex.getMessage().contains("UNKNOWN"), ex.getMessage());
         assertTrue(ex.getMessage().contains("agy"), ex.getMessage());
+    }
+
+    @Test
+    void createReturnsTurnRoutingLlmGateway() {
+        try (LlmGateway gateway = VegaLlmGatewayFactory.create()) {
+            assertNotNull(gateway);
+            assertInstanceOf(TurnRoutingLlmGateway.class, gateway, "create() must return a TurnRoutingLlmGateway");
+            TurnRoutingLlmGateway routing = (TurnRoutingLlmGateway) gateway;
+            assertNotNull(routing.toolGateway(), "toolGateway must be wired");
+            assertNotNull(routing.chatGateway(), "chatGateway must be wired");
+        }
     }
 }
