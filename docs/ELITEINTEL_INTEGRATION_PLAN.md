@@ -292,7 +292,54 @@ DIFF GATE → END REPORT）に従う。
 - 日本語のテキスト指示が `agy` 経由で tool-call に変換され、既存アクションが実行される（v2-P4 の最初の実機確認）。
 - AI 会話が HTTP API の直接呼び出しに依存しない。
 
+#### R.6.2 ターン種別によるプロバイダー振り分け（G-5）
+
+##### 背景（実機確認で判明した事実、確定事項）
+
+G-1〜G-4 の実装後に実機確認を行ったところ、以下が判明した。
+
+- `VegaLlmGatewayFactory.create()`（`app/src/main/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactory.java`）は `SystemSession.useLocalCommandLlm()` を最初に判定し、`true` の場合は無条件に LM Studio 用の Gateway（`LOCAL_GATEWAY`）を返す。`agy` へは、`useLocalCommandLlm()` が `false` かつクラウド API キーが未設定・未検出（`LlmProviderResolver.detectCloudProvider() == ProviderEnum.UNKNOWN`）の場合にのみ到達する。
+- `useLocalCommandLlm` は `game_session` テーブルのカラムであり、`app/src/main/resources/db-migration/00030__schema.sql` で `boolean default true` として定義されている。この既定値は、`agy` 統合より前の 2026-04 のコミット「Fixing on-boarding. Default to LMStudio tulu3.1:8b-supernova etc」に由来する既存の設計判断であり、G-1〜G-4 では変更していない。
+- `AiServicesSettingsPanel`（`app/src/main/java/elite/intel/ui/screen/settings/AiServicesSettingsPanel.java`）の UI は `settings.ai.localSetup`（LM Studio）／`settings.ai.cloudSetup`（クラウド）の2択セグメントコントロールのみを提供し、`agy` に相当する第3の選択肢は存在しない。
+- 以上の結果、初期状態（DB 既定値のまま、設定変更なし）では `VegaLlmGatewayFactory.create()` は常に LM Studio 用 Gateway を返し、`agy` に一度も到達しない。
+- **この既存の仕組み（`useLocalCommandLlm` の既定値・優先順位・UI の2択構成）自体は、今回変更しない。**
+
+##### 新しい設計方針（確定事項）
+
+VEGA への応答要求を、以下の2種類に区別する。
+
+- **tool-calling ターン**: `request.tools()` が空でない。ゲーム内アクションの実行判断が必要な場面。
+- **雑談・要約ターン**: `request.tools()` が空。自由な会話や要約のみを行う場面。
+
+それぞれ次のプロバイダーを使用する。
+
+- tool-calling ターン: 既存の LLM Provider（`SystemSession.useLocalCommandLlm()` およびクラウド API キー設定に基づく、LM Studio／クラウド API）をそのまま使用する。
+- 雑談・要約ターン: `agy`（`AgyCliProviderAdapter` + `AgyCliTransport`）を使用する。
+
+LM Studio／クラウド API が未設定・未導入の環境では、tool-calling ターンは現状どおり接続エラーとなる。これは §R.7.1「ローカル LLM 導入」（次フェーズ）で解消する。
+
+##### G-5 実装計画
+
+§R.14 の実装台帳（Track J）にならい、Track G の実装単位として以下を追加する。
+
+| ID | 内容 | 変更許可ファイル | TEST GATE |
+|---|---|---|---|
+| G-5 | `request.tools()` の有無に基づいて、tool-calling ターンと雑談・要約ターンで異なる `LlmProviderAdapter` / `LlmTransport` のペアを選択するルーティング層を実装する。`VegaLlmGatewayFactory.create()` が、既存の選択ロジック（LM Studio／クラウド、`agy` フォールバックなし）で構築した Gateway と、`agy` 専用の Gateway の2組を保持し、リクエストごとに使い分ける新規クラス（`LlmGateway` 実装、仮称 `TurnRoutingLlmGateway`）を返すよう変更する。既存の `VegaLlmGateway`、`AgyCliTransport`、`AgyCliProviderAdapter` のインターフェース契約（`LlmGateway` / `LlmProviderAdapter` / `LlmTransport`）は変更しない。クラス名の確定、および `submit` / `completePlainText` それぞれの振り分け方法は G-5 の PLAN CHECK 時に確定する。 | 新規 `app/src/main/java/elite/intel/ai/brain/vega/llm/TurnRoutingLlmGateway.java`（仮称、PLAN CHECK 時に確定）、新規 `app/src/test/java/elite/intel/ai/brain/vega/llm/TurnRoutingLlmGatewayTest.java`、既存 `app/src/main/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactory.java`、既存 `app/src/test/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactoryTest.java` | `./gradlew --no-daemon :app:test --tests '*TurnRoutingLlmGatewayTest' --tests '*VegaLlmGatewayFactoryTest'`（新規テストクラス名は PLAN CHECK 時に確定） |
+
+##### 完了条件
+
+- `request.tools()` が空でないリクエストは既存の LLM Provider（LM Studio／クラウド）へ、空のリクエストは `agy` へ到達することが、固定 fixture で確認できる。
+- 既存の `VegaLlmGateway`、`AgyCliTransport`、`AgyCliProviderAdapter` のインターフェース契約に変更がない。
+
 ### R.7 v2-P4 以降
+
+#### R.7.1 ローカル LLM 導入（次フェーズ、未着手）
+
+- **目的**: §R.6.2 で tool-calling ターンに引き続き使用する既存 LLM 経路（LM Studio）に、実際に動作するモデルを導入する。
+- **環境**: RTX 9070 16GB（ユーザー実機）。
+- **候補**: Google の無料の最新モデル（Gemma 系等）を軸に、次フェーズで選定する。
+- **制約**: このフェーズが完了するまでは、tool-calling ターン（ゲーム内アクション実行）は LLM 未設定によりエラーとなる制約が残る。
+- **着手時期**: G-5 完了後に着手する。
 
 - **v2-P4 日本語 Assistant / 自然言語:** deterministic command は LLM 不在でも利用可能。ゲームの事実は Journal / Status / Session から取得し、LLM が事実を捏造して Game Context を上書きすることは禁止。§17 の実機確認 3 項目は `agy` 経由で実施する。
   例: 「今どこにいる？」「貨物の残量は？」「この惑星で採取できる生物は？」「マップを開いて」「ミッションの目的地に行って」
