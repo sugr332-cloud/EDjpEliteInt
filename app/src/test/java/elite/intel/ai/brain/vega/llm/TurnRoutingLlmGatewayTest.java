@@ -6,6 +6,7 @@ import elite.intel.ai.brain.vega.model.llm.LlmRequest;
 import elite.intel.ai.brain.vega.model.llm.LlmResult;
 import elite.intel.ai.brain.vega.model.llm.LlmToolDefinition;
 import elite.intel.ai.brain.vega.model.llm.PromptCacheProfile;
+import elite.intel.ai.brain.vega.tools.SpeakFunction;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -60,6 +61,20 @@ class TurnRoutingLlmGatewayTest {
         );
     }
 
+    /**
+     * Reproduces the actual production shape of a chat turn: {@code ComposedPrompt.tools()} unions in system
+     * functions, so a plain "hello" still carries {@link SpeakFunction} even though the semantic reducer already
+     * reduced game tools to none. A bare {@code request.tools().isEmpty()} check cannot see this.
+     */
+    private static LlmRequest requestWithSpeakOnly() {
+        return new LlmRequest(
+                "req-chat-speak-only",
+                List.of(LlmMessage.of(LlmMessageRole.USER, "hello")),
+                List.of(new LlmToolDefinition(SpeakFunction.ID, "Speak a message to the commander.", "", List.of())),
+                PromptCacheProfile.COMMANDER
+        );
+    }
+
     @Test
     void testSubmitWithToolsRoutesToToolGateway() {
         RecordingGateway toolGateway = new RecordingGateway();
@@ -86,6 +101,21 @@ class TurnRoutingLlmGatewayTest {
         assertSame(chatGateway.submitResult, future);
         assertSame(request, chatGateway.lastSubmit.get());
         assertNull(toolGateway.lastSubmit.get(), "toolGateway must NOT be invoked when tools are empty");
+    }
+
+    @Test
+    void testSubmitWithSpeakOnlyToolRoutesToChatGateway() {
+        RecordingGateway toolGateway = new RecordingGateway();
+        RecordingGateway chatGateway = new RecordingGateway();
+        TurnRoutingLlmGateway router = new TurnRoutingLlmGateway(toolGateway, chatGateway);
+
+        LlmRequest request = requestWithSpeakOnly();
+        CompletableFuture<LlmResult> future = router.submit(request);
+
+        assertSame(chatGateway.submitResult, future);
+        assertSame(request, chatGateway.lastSubmit.get());
+        assertNull(toolGateway.lastSubmit.get(),
+                "toolGateway must NOT be invoked when tools() offers only SpeakFunction (the real chat-turn shape)");
     }
 
     @Test
