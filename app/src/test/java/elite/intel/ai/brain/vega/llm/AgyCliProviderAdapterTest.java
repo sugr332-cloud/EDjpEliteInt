@@ -274,4 +274,129 @@ class AgyCliProviderAdapterTest {
 
         assertNull(adapter.parseText(null));
     }
+
+    @Test
+    void testParseRealWorldFixtureMultipleToolCalls() {
+        String realWorldFixture = """
+                {
+                  "conversation_id": "c7a8b9c0-1234-5678-9abc-def012345678",
+                  "status": "SUCCESS",
+                  "structured_output": {
+                    "tool_calls": [
+                      {
+                        "name": "find_commodity",
+                        "arguments": "{\\"commodity\\":\\"Painite\\",\\"radius\\":50}"
+                      },
+                      {
+                        "name": "speak",
+                        "arguments": "{\\"text\\":\\"パイナイトを検索しています\\"}"
+                      }
+                    ]
+                  },
+                  "response": "something"
+                }
+                """;
+        JsonObject response = JsonParser.parseString(realWorldFixture).getAsJsonObject();
+
+        LlmResult result = adapter.parse(response);
+
+        assertEquals(LlmResult.Status.OK, result.status());
+        assertEquals(2, result.toolInvocations().size());
+
+        LlmToolInvocation first = result.toolInvocations().get(0);
+        assertEquals("find_commodity", first.name());
+        assertEquals("Painite", first.arguments().get("commodity").getAsString());
+        assertEquals(50, first.arguments().get("radius").getAsInt());
+
+        LlmToolInvocation second = result.toolInvocations().get(1);
+        assertEquals("speak", second.name());
+        assertEquals("パイナイトを検索しています", second.arguments().get("text").getAsString());
+        assertNull(result.droppedText());
+    }
+
+    @Test
+    void testParseNonObjectStructuredOutputReturnsInvalidResponse() {
+        // Case 1: structured_output is a string
+        String stringStructured = "{\"status\":\"SUCCESS\",\"structured_output\":\"not an object\"}";
+        JsonObject stringResponse = JsonParser.parseString(stringStructured).getAsJsonObject();
+        assertEquals(LlmResult.Status.INVALID_RESPONSE, adapter.parse(stringResponse).status());
+
+        // Case 2: structured_output is an array
+        String arrayStructured = "{\"status\":\"SUCCESS\",\"structured_output\":[1, 2, 3]}";
+        JsonObject arrayResponse = JsonParser.parseString(arrayStructured).getAsJsonObject();
+        assertEquals(LlmResult.Status.INVALID_RESPONSE, adapter.parse(arrayResponse).status());
+    }
+
+    @Test
+    void testParseToolCallWithMissingNameReturnsInvalidResponse() {
+        // Case 1: missing name property
+        String missingName = """
+                {
+                  "status": "SUCCESS",
+                  "structured_output": {
+                    "tool_calls": [
+                      { "arguments": "{\\"key\\":\\"value\\"}" }
+                    ]
+                  }
+                }
+                """;
+        JsonObject missingResponse = JsonParser.parseString(missingName).getAsJsonObject();
+        assertEquals(LlmResult.Status.INVALID_RESPONSE, adapter.parse(missingResponse).status());
+
+        // Case 2: empty name property
+        String emptyName = """
+                {
+                  "status": "SUCCESS",
+                  "structured_output": {
+                    "tool_calls": [
+                      { "name": "   ", "arguments": "{\\"key\\":\\"value\\"}" }
+                    ]
+                  }
+                }
+                """;
+        JsonObject emptyResponse = JsonParser.parseString(emptyName).getAsJsonObject();
+        assertEquals(LlmResult.Status.INVALID_RESPONSE, adapter.parse(emptyResponse).status());
+    }
+
+    @Test
+    void testParseMalformedJsonInResponseStringFallbackReturnsInvalidResponse() {
+        // response property has malformed JSON where tool_calls cannot be parsed
+        String malformedResponseStr = """
+                {
+                  "status": "SUCCESS",
+                  "response": "Here is the tool call: {\\"tool_calls\\": not valid json"
+                }
+                """;
+        JsonObject response = JsonParser.parseString(malformedResponseStr).getAsJsonObject();
+        LlmResult result = adapter.parse(response);
+        assertEquals(LlmResult.Status.INVALID_RESPONSE, result.status());
+    }
+
+    @Test
+    void testFullFlowFromTransportOutputToAdapterResult() {
+        // Simulates the end-to-end json structure emitted by AgyCliTransport.sendOutcome()
+        String transportSuccessJson = """
+                {
+                  "conversation_id": "conv-999",
+                  "status": "SUCCESS",
+                  "structured_output": {
+                    "tool_calls": [
+                      {
+                        "name": "query_local_outfitting",
+                        "arguments": "{}"
+                      }
+                    ]
+                  },
+                  "response": "{}"
+                }
+                """;
+        JsonObject transportOutput = JsonParser.parseString(transportSuccessJson).getAsJsonObject();
+
+        LlmResult adapterResult = adapter.parse(transportOutput);
+
+        assertEquals(LlmResult.Status.OK, adapterResult.status());
+        assertEquals(1, adapterResult.toolInvocations().size());
+        assertEquals("query_local_outfitting", adapterResult.toolInvocations().get(0).name());
+        assertEquals(0, adapterResult.toolInvocations().get(0).arguments().size());
+    }
 }

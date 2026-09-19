@@ -29,6 +29,7 @@ class AgyCliTransportTest {
         private final byte[] stderr;
         private final boolean simulateTimeout;
         private final AtomicBoolean alive = new AtomicBoolean(true);
+        private final AtomicBoolean destroyedForcibly = new AtomicBoolean(false);
 
         FakeProcess(int exitCode, String stdout, String stderr, boolean simulateTimeout) {
             this.exitCode = exitCode;
@@ -83,7 +84,12 @@ class AgyCliTransportTest {
         @Override
         public Process destroyForcibly() {
             alive.set(false);
+            destroyedForcibly.set(true);
             return this;
+        }
+
+        boolean wasDestroyedForcibly() {
+            return destroyedForcibly.get();
         }
 
         @Override
@@ -234,5 +240,144 @@ class AgyCliTransportTest {
                 "Command line must NEVER contain --dangerously-skip-permissions");
         assertTrue(capturedCommand.contains("--sandbox"), "Command line must include --sandbox");
         assertTrue(capturedCommand.contains("--disable-slash-commands"), "Command line must include --disable-slash-commands");
+    }
+
+    @Test
+    void testCommandLineAndSchemaFileCaptureRequestExactly() {
+        AtomicReference<List<String>> capturedCommand = new AtomicReference<>();
+        AtomicReference<Path> capturedSchemaFile = new AtomicReference<>();
+        AtomicReference<String> capturedSchemaContent = new AtomicReference<>();
+
+        AgyCliTransport transport = new AgyCliTransport("agy", Duration.ofSeconds(5), pb -> {
+            capturedCommand.set(new ArrayList<>(pb.command()));
+            int schemaIndex = pb.command().indexOf("--json-schema");
+            if (schemaIndex != -1 && schemaIndex + 1 < pb.command().size()) {
+                Path p = Path.of(pb.command().get(schemaIndex + 1));
+                capturedSchemaFile.set(p);
+                try {
+                    capturedSchemaContent.set(Files.readString(p, StandardCharsets.UTF_8));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            return new FakeProcess(0, "{\"status\":\"SUCCESS\"}", "", false);
+        });
+
+        String requestWithSchema = "{\"prompt\":\"find nearest station\",\"json_schema\":\"{\\\"type\\\":\\\"object\\\"}\"}";
+        transport.sendOutcome(requestWithSchema);
+
+        assertNotNull(capturedCommand.get());
+        assertTrue(capturedCommand.get().contains("--print"));
+        int printIndex = capturedCommand.get().indexOf("--print");
+        assertEquals("find nearest station", capturedCommand.get().get(printIndex + 1));
+        assertTrue(capturedCommand.get().contains("--json-schema"));
+        assertNotNull(capturedSchemaFile.get());
+        assertEquals("{\"type\":\"object\"}", capturedSchemaContent.get());
+
+        // Test without schema: --json-schema must not be present
+        AtomicReference<List<String>> capturedCommandNoSchema = new AtomicReference<>();
+        AgyCliTransport noSchemaTransport = new AgyCliTransport("agy", Duration.ofSeconds(5), pb -> {
+            capturedCommandNoSchema.set(new ArrayList<>(pb.command()));
+            return new FakeProcess(0, "{\"status\":\"SUCCESS\"}", "", false);
+        });
+
+        noSchemaTransport.sendOutcome("{\"prompt\":\"summarize text\"}");
+        assertNotNull(capturedCommandNoSchema.get());
+        assertTrue(capturedCommandNoSchema.get().contains("--print"));
+        int noSchemaPrintIndex = capturedCommandNoSchema.get().indexOf("--print");
+        assertEquals("summarize text", capturedCommandNoSchema.get().get(noSchemaPrintIndex + 1));
+        assertFalse(capturedCommandNoSchema.get().contains("--json-schema"));
+    }
+
+    @Test
+    void testIsolatedSettingsJsonIsConfiguredCorrectly() {
+        AtomicReference<String> settingsContent = new AtomicReference<>();
+
+        AgyCliTransport transport = new AgyCliTransport("agy", Duration.ofSeconds(5), pb -> {
+            Path settingsPath = pb.directory().toPath().resolve(".gemini").resolve("antigravity-cli").resolve("settings.json");
+            try {
+                if (Files.exists(settingsPath)) {
+                    settingsContent.set(Files.readString(settingsPath, StandardCharsets.UTF_8));
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            return new FakeProcess(0, "{\"status\":\"SUCCESS\"}", "", false);
+        });
+
+        transport.sendOutcome(validRequest("security check"));
+
+        assertNotNull(settingsContent.get(), "settings.json must exist in isolated dir");
+        assertTrue(settingsContent.get().contains("\"command(*)\""));
+        assertTrue(settingsContent.get().contains("\"write_file(*)\""));
+        assertTrue(settingsContent.get().contains("\"read_file(*)\""));
+    }
+
+    @Test
+    void testNonZeroExitCodeWithMultilineStderrDiagnostic() {
+        String multilineStderr = "Error: invalid flag --unknown\nUsage: agy [flags]\nstack trace line 1\nstack trace line 2";
+        AgyCliTransport transport = new AgyCliTransport("agy", Duration.ofSeconds(5),
+                pb -> new FakeProcess(2, "", multilineStderr, false));
+
+        AiTransportResult outcome = transport.sendOutcome(validRequest("syntax error test"));
+
+        assertInstanceOf(AiTransportResult.Failure.class, outcome);
+        AiTransportResult.Failure failure = (AiTransportResult.Failure) outcome;
+        assertEquals(AiTransportResult.FailureKind.PERMANENT, failure.kind());
+        assertEquals(2, failure.statusCode());
+        assertTrue(failure.diagnostic().contains("invalid flag --unknown"));
+        assertTrue(failure.diagnostic().contains("Usage: agy [flags]"));
+        assertTrue(failure.diagnostic().contains("stack trace line 2"));
+    }
+
+    @Test
+    void testTimeoutTriggersProcessDestroyForcibly() {
+        AtomicReference<FakeProcess> processRef = new AtomicReference<>();
+        AgyCliTransport transport = new AgyCliTransport("agy", Duration.ofMillis(100), pb -> {
+            FakeProcess p = new FakeProcess(0, "{}", "", true);
+            processRef.set(p);
+            return p;
+        });
+
+        AiTransportResult outcome = transport.sendOutcome(validRequest("timeout process kill"));
+
+        assertInstanceOf(AiTransportResult.Failure.class, outcome);
+        assertEquals(AiTransportResult.FailureKind.TRANSIENT, ((AiTransportResult.Failure) outcome).kind());
+        assertNotNull(processRef.get());
+        assertTrue(processRef.get().wasDestroyedForcibly(), "Process must be forcibly destroyed on timeout");
+    }
+
+    @Test
+    void testProcessStartIOExceptionCleansUpTempDirectory() {
+        AtomicReference<Path> capturedDir = new AtomicReference<>();
+        AgyCliTransport transport = new AgyCliTransport("nonexistent-agy", Duration.ofSeconds(5), pb -> {
+            capturedDir.set(pb.directory().toPath());
+            assertTrue(Files.exists(capturedDir.get()), "Temp dir must exist before process start fails");
+            throw new IOException("Cannot run program nonexistent-agy: CreateProcess error=2, The system cannot find the file specified");
+        });
+
+        AiTransportResult outcome = transport.sendOutcome(validRequest("missing binary"));
+
+        assertInstanceOf(AiTransportResult.Failure.class, outcome);
+        assertEquals(AiTransportResult.FailureKind.PERMANENT, ((AiTransportResult.Failure) outcome).kind());
+        assertNotNull(capturedDir.get());
+        assertFalse(Files.exists(capturedDir.get()), "Temp dir must be cleaned up even when ProcessBuilder.start() throws IOException");
+    }
+
+    @Test
+    void testNonObjectJsonOutputReturnsMalformedResponseFailure() {
+        // Case 1: JSON array instead of JSON object
+        AgyCliTransport arrayTransport = new AgyCliTransport("agy", Duration.ofSeconds(5),
+                pb -> new FakeProcess(0, "[1, 2, 3]", "", false));
+        AiTransportResult arrayOutcome = arrayTransport.sendOutcome(validRequest("array"));
+        assertInstanceOf(AiTransportResult.Failure.class, arrayOutcome);
+        assertEquals(AiTransportResult.FailureKind.MALFORMED_RESPONSE, ((AiTransportResult.Failure) arrayOutcome).kind());
+
+        // Case 2: JSON primitive string instead of JSON object
+        AgyCliTransport stringTransport = new AgyCliTransport("agy", Duration.ofSeconds(5),
+                pb -> new FakeProcess(0, "\"plain string\"", "", false));
+        AiTransportResult stringOutcome = stringTransport.sendOutcome(validRequest("string"));
+        assertInstanceOf(AiTransportResult.Failure.class, stringOutcome);
+        assertEquals(AiTransportResult.FailureKind.MALFORMED_RESPONSE, ((AiTransportResult.Failure) stringOutcome).kind());
     }
 }
