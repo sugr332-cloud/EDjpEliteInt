@@ -1,14 +1,18 @@
 package elite.intel.ai.brain.vega.llm;
 
+import elite.intel.ai.ProviderEnum;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Verifies the user-facing "unsupported provider" message: it names the configured provider and lists the
- * providers VEGA currently supports, derived dynamically from the wired adapters (so the list
- * stays correct as providers are added one at a time).
+ * Verifies the user-facing "unsupported provider" message and gateway construction:
+ * it names the configured provider and lists the providers VEGA currently supports,
+ * derived dynamically from the wired adapters (so the list stays correct as providers
+ * are added one at a time), and ensures agy is selectable and wired as the default.
  */
 class VegaLlmGatewayFactoryTest {
 
@@ -20,7 +24,8 @@ class VegaLlmGatewayFactoryTest {
 
         // The provider the user actually configured is named, so they know what was rejected.
         assertTrue(message.contains("COHERE"), message);
-        // The currently-wired providers are listed dynamically by their friendly labels (cloud + local).
+        // The currently-wired providers are listed dynamically by their friendly labels (default + cloud + local).
+        assertTrue(message.contains("agy"), message);
         assertTrue(message.contains("Mistral"), message);
         assertTrue(message.contains("OpenAI"), message);
         assertTrue(message.contains("Grok"), message);
@@ -30,5 +35,28 @@ class VegaLlmGatewayFactoryTest {
         assertTrue(message.contains("LM Studio (Gemma 4)"), message);
         // Ollama was dropped; naming it as supported would send commanders back to the host we removed.
         assertFalse(message.contains("Ollama"), message);
+    }
+
+    @Test
+    void createExplicitProviderAgyReturnsGateway() {
+        try (LlmGateway gateway = VegaLlmGatewayFactory.create(ProviderEnum.AGY)) {
+            assertNotNull(gateway, "explicit ProviderEnum.AGY should produce an LlmGateway");
+        }
+    }
+
+    @Test
+    void createExplicitCloudProviderReturnsGateway() {
+        try (LlmGateway gateway = VegaLlmGatewayFactory.create(ProviderEnum.MISTRAL)) {
+            assertNotNull(gateway, "explicit ProviderEnum.MISTRAL should produce an LlmGateway");
+        }
+    }
+
+    @Test
+    void createExplicitUnsupportedProviderThrowsUnsupportedOperationException() {
+        UnsupportedOperationException ex = assertThrows(
+                UnsupportedOperationException.class,
+                () -> VegaLlmGatewayFactory.create(ProviderEnum.UNKNOWN));
+        assertTrue(ex.getMessage().contains("UNKNOWN"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("agy"), ex.getMessage());
     }
 }
