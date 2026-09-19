@@ -331,7 +331,7 @@ LM Studio／クラウド API が未設定・未導入の環境では、tool-call
 - `request.tools()` が空でないリクエストは既存の LLM Provider（LM Studio／クラウド）へ、空のリクエストは `agy` へ到達することが、固定 fixture で確認できる。
 - 既存の `VegaLlmGateway`、`AgyCliTransport`、`AgyCliProviderAdapter` のインターフェース契約に変更がない。
 
-#### R.6.3 短文入力による意味類似度の誤検出対策（G-6）
+#### R.6.3 エイリアス未定義ツールの除外による意味類似度の誤検出対策（G-6）
 
 ##### 背景（実機確認で判明した事実、確定事項）
 
@@ -339,14 +339,16 @@ G-5 実装・merge 後、実機確認を行ったところ、以下の事実が�
 
 - 「こんにちは」のような短い雑談発言でも、常に `toolGateway`（LM Studio／クラウド）にルーティングされ続ける現象が発生した。
 - 診断ログにより、`SemanticActionReducer`（`elite.intel.ai.brain.vega.prompt.SemanticActionReducer`、既存機能、G-5 より前から存在）が、「こんにちは」に対して 8 個の無関係なゲームツール（`toggle_discovery_announcements`, `cycle_next_page`, `exit_close`, `interrupt`, `cycle_next_panel`, `query_current_location`, `cycle_previous_page`, `play_music`）を選定していたことが確認された。
-- 原因は、多言語埋め込みモデル（`multilingual-e5-small`）における短文同士の類似度インフレ現象（Representation Collapse / Anisotropy）である。「こんにちは」のような極めて短い発言と、エイリアス未定義でコマンド ID がそのまま埋め込まれる短い英語 ID（`exit_close`、`play_music` 等）との間で、コサイン類似度が閾値 `SEM_FLOOR=0.85` 付近に不自然に密集し、閾値を誤って超えてしまっていた。
-- これは G-5 のルーティングロジック自体の不具合ではなく、`SemanticActionReducer` という既存機能（G-5 より前から存在）の閾値設計に起因する別の課題である。G-5 は、`SemanticActionReducer` が返した（誤った）結果を正しくルーティングしているだけである。
+- 原因は、これら 8 件中 6 件（`cycle_next_page`, `exit_close`, `cycle_next_panel`, `query_current_location`, `cycle_previous_page`, `play_music`）が、自然言語エイリアスが未定義のツールであり、フォールバックとして英語のコマンド ID（`"exit_close"`, `"play_music"` 等）がそのまま埋め込み文字列として使われていたことである。多言語埋め込みモデル（`multilingual-e5-small`）において、極めて短い発言（「こんにちは」）と、これら意味のない短い英語 ID との間でコサイン類似度が閾値 `SEM_FLOOR=0.85` 付近に不自然に密集（類似度インフレ）し、誤って閾値を超えて選定されてしまっていた。
+- 当初検討した「短文入力を一律スキップする」設計は、調査の結果、「停止」「FSS」「出航」などの正当な短いゲームコマンドまで誤って弾いてしまう重大な副作用があるため採用しない。
+- これは G-5 のルーティングロジック自体の不具合ではなく、`SemanticActionReducer` における候補選定の設計に起因する課題である。G-5 は、`SemanticActionReducer` が返した結果を正しくルーティングしているだけである。
 
 ##### 新しい設計方針（確定事項）
 
-- 極端に短い入力（閾値は実装時に決定。例えば文字数や意味のあるトークン数が一定未満）の場合、`SemanticActionReducer` の意味類似度計算（`semanticSelect`）をスキップし、`gameTools` を空（0件）として扱う早期リターンを追加する。
-- これにより、短文特有の類似度インフレによる誤検出を防ぎ、`SEM_FLOOR=0.85` や `SEM_MARGIN=0.04` などの既存の閾値定数自体は変更しない。
-- 通常の長さの入力（実際にゲームアクションを要求する発言）の意味類似度計算ロジックは変更せず、既存のツール選定能力を維持する。
+- `SemanticActionReducer` が候補として扱うゲームツールのうち、**自然言語のエイリアスが定義されていない（コマンド ID がそのまま埋め込み文字列としてフォールバックされている）ツールを、意味類似度計算（`semanticSelect`）の対象候補から除外**する。
+- これにより、「こんにちは」のような雑談発言が、自然言語トリガーを持たない英語 ID 文字列（`exit_close`、`play_music` 等）と偶然類似すると判定される問題を、原因に近い箇所で根本的に防ぐ。
+- 正当な短いコマンド（「停止」「FSS」「出航」等、エイリアスが定義されているもの）は候補から除外されないため、正当な操作に一切影響を与えない。
+- `SEM_FLOOR=0.85` や `SEM_MARGIN=0.04` などの既存の閾値定数自体は変更しない。
 
 ##### G-6 実装計画
 
@@ -354,12 +356,12 @@ G-5 実装・merge 後、実機確認を行ったところ、以下の事実が�
 
 | ID | 内容 | 変更許可ファイル | TEST GATE |
 |---|---|---|---|
-| G-6 | `SemanticActionReducer` に、短文入力を検出してゲームツール選定をスキップ（空リストを返却）する早期リターンを追加する。閾値の具体的な値（文字数またはトークン数）は PLAN CHECK 時に、既存のゲームコマンドのエイリアスの最短長等を調査した上で決定する。既存の `SEM_FLOOR`、`SEM_MARGIN` 定数は変更しない。 | `app/src/main/java/elite/intel/ai/brain/vega/prompt/SemanticActionReducer.java`、`app/src/test/java/elite/intel/ai/brain/vega/prompt/SemanticActionReducerTest.java` | `./gradlew --no-daemon :app:test --tests '*SemanticActionReducerTest' --tests '*TurnRoutingLlmGatewayTest'` |
+| G-6 | `SemanticActionReducer` において、自然言語エイリアスが未定義のツール（コマンド ID がそのまま埋め込み文字列として使われているツール）を意味類似度計算の候補から除外する。既存のエイリアスを持つ正当なコマンド（短文含む）の選定能力を維持し、既存の `SEM_FLOOR`、`SEM_MARGIN` 定数は変更しない。 | `app/src/main/java/elite/intel/ai/brain/vega/prompt/SemanticActionReducer.java`、`app/src/test/java/elite/intel/ai/brain/vega/prompt/SemanticActionReducerTest.java` | `./gradlew --no-daemon :app:test --tests '*SemanticActionReducerTest' --tests '*TurnRoutingLlmGatewayTest'` |
 
 ##### 完了条件
 
-- 「こんにちは」等の短い雑談発言で、`gameTools` が空（`LlmRequest.tools()` が `SpeakFunction` のみ、または空）になり、`TurnRoutingLlmGateway` によって `chatGateway`（agy）へルーティングされることが実機で確認できる。
-- 通常の長さのゲームアクション要求（例:「フリートキャリアへ移動して」）は、引き続き正しく `gameTools` が選ばれ、`toolGateway` へルーティングされることが既存のテストで確認できる。
+- 「こんにちは」等の短い雑談発言で、エイリアス未定義ツールが誤選定されず、`gameTools` が空（`LlmRequest.tools()` が `SpeakFunction` のみ、または空）になり、`TurnRoutingLlmGateway` によって `chatGateway`（agy）へルーティングされることが実機で確認できる。
+- エイリアスが定義されている正当なコマンド（短文・長文問わず、例:「停止」「フリートキャリアへ移動して」）は、引き続き正しく `gameTools` が選ばれ、`toolGateway` へルーティングされることが既存のテストで確認できる。
 
 ### R.7 v2-P4 以降
 
