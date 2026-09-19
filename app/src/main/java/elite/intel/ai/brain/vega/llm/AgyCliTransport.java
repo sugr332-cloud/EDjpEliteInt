@@ -6,6 +6,7 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 import elite.intel.ai.brain.AiTransportResult;
 import elite.intel.ai.brain.AiTransportResult.FailureKind;
+import elite.intel.ai.brain.vega.diag.VegaDiagnostics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,7 +22,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -105,6 +108,7 @@ public class AgyCliTransport implements LlmTransport {
 
             // 3. Build command line and ProcessBuilder
             ProcessBuilder pb = buildProcess(parsed, tempDir);
+            String maskedCommandLine = String.join(" ", maskSensitiveArgs(pb.command()));
 
             // 4. Start the process
             try {
@@ -116,7 +120,7 @@ public class AgyCliTransport implements LlmTransport {
             }
 
             // 5. Execute and collect output with dual timeout
-            return executeProcess(process);
+            return executeProcess(process, maskedCommandLine);
 
         } catch (IllegalArgumentException e) {
             log.warn("Invalid agy transport request: {}", e.getMessage());
@@ -199,7 +203,28 @@ public class AgyCliTransport implements LlmTransport {
         return pb;
     }
 
-    private AiTransportResult executeProcess(Process process) {
+    /**
+     * Flags whose value is a credential/secret, not currently used by {@link #buildProcess}'s fixed argument
+     * list, but guarded here in case agy ever needs one passed on the command line.
+     */
+    private static final Set<String> SENSITIVE_FLAGS = Set.of(
+            "--api-key", "--apikey", "--key", "--token", "--secret", "--password");
+
+    /**
+     * Returns a copy of {@code command} with the value following any {@link #SENSITIVE_FLAGS} flag replaced, so
+     * a diagnostic log of the invocation never leaks a credential.
+     */
+    private static List<String> maskSensitiveArgs(List<String> command) {
+        List<String> masked = new ArrayList<>(command);
+        for (int i = 0; i < masked.size() - 1; i++) {
+            if (SENSITIVE_FLAGS.contains(masked.get(i).toLowerCase(Locale.ROOT))) {
+                masked.set(i + 1, "***MASKED***");
+            }
+        }
+        return masked;
+    }
+
+    private AiTransportResult executeProcess(Process process, String maskedCommandLine) {
         StreamCollector stdout = StreamCollector.start(process.getInputStream(), "agy-stdout");
         StreamCollector stderr = StreamCollector.start(process.getErrorStream(), "agy-stderr");
 
@@ -221,6 +246,10 @@ public class AgyCliTransport implements LlmTransport {
 
         if (exitCode != 0) {
             log.warn("agy CLI exited with non-zero code {}: {}", exitCode, err.strip());
+            // TEMPORARY diagnostic (v2-p3-g7): surface agy's stderr and exact invocation on the live diagnostics
+            // panel so a non-zero exit is root-causeable without reading the file log. Remove once root-caused.
+            VegaDiagnostics.info(VegaDiagnostics.SYSTEM, "agy-cli",
+                    "exit=" + exitCode + " stderr=" + err.strip() + " command=[" + maskedCommandLine + "]");
             return AiTransportResult.failure(FailureKind.PERMANENT, exitCode,
                     "agy exited with code " + exitCode + ": " + err.strip());
         }
