@@ -41,6 +41,12 @@ class SemanticActionReducerTest {
                 new LlmToolDefinition(id, "desc", localizedAliasGroup, parameters));
     }
 
+    private static GameToolCandidates.Candidate candidateWithoutAlias(String id) {
+        return new GameToolCandidates.Candidate(id, id,
+                new LlmToolDefinition(id, "desc", "", List.of()));
+    }
+
+
     private final List<GameToolCandidates.Candidate> catalog = List.of(
             candidate("navigate", "navigate, plot course"),
             candidate("trade", "open market, sell cargo"),
@@ -292,5 +298,37 @@ class SemanticActionReducerTest {
         SemanticPhraseMatcher matcher = new SemanticPhraseMatcher(throwing);
         SemanticActionReducer r = reducerWith(() -> matcher, (categories, input) -> sentinel);
         assertSame(sentinel, r.selectTools(ALL, "GO_NAV"), "an embed failure degrades to word-overlap for the turn");
+    }
+
+    @Test
+    void excludesCandidatesWithoutNaturalLanguageAliasFromSemanticMatching() {
+        // Reproduces the bug scenario: a short conversational input ("こんにちは") would falsely match
+        // an alias-less command whose raw English ID ("exit_close") was used as embedding fallback.
+        // With the filter, alias-less candidates are never offered to semantic matching, avoiding false positives.
+        List<GameToolCandidates.Candidate> candidatesWithAliasless = List.of(
+                candidateWithoutAlias("exit_close"),
+                candidateWithoutAlias("play_music"),
+                candidate("ship_status", "ship status report"));
+
+        // Synthetic vectors: "こんにちは" and "exit_close" collapse to the same axis vector [1, 0, 0] (cosine 1.0),
+        // while "ship status report" is orthogonal [0, 1, 0] (cosine 0.0 < SEM_FLOOR).
+        // "ship status report" query matches "ship status report" candidate with cosine 1.0.
+        SemanticPhraseMatcher matcher = new SemanticPhraseMatcher(embedder(Map.of(
+                "こんにちは", new float[]{1, 0, 0},
+                "exit_close", new float[]{1, 0, 0},
+                "play_music", new float[]{1, 0, 0},
+                "ship status report", new float[]{0, 1, 0})));
+
+        SemanticActionReducer reducer = new SemanticActionReducer(
+                allowed -> candidatesWithAliasless, () -> matcher, unusedFallback(new AtomicBoolean()));
+
+        // Short input "こんにちは" must NOT select the alias-less "exit_close" or "play_music",
+        // and because "ship_status" is below floor, no tools should be offered.
+        List<LlmToolDefinition> tools = reducer.selectTools(ALL, "こんにちは");
+        assertTrue(tools.isEmpty(), "alias-less tools must be excluded from semantic matching even with high similarity");
+
+        // Legitimate command with an alias is still matched normally
+        List<LlmToolDefinition> validMatch = reducer.selectTools(ALL, "ship status report");
+        assertEquals(List.of("ship_status"), ids(validMatch));
     }
 }

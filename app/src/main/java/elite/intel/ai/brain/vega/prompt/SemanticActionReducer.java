@@ -205,18 +205,30 @@ public final class SemanticActionReducer implements VegaActionReducer {
     /**
      * Scores every candidate by the best cosine of the input against its localized alias phrases, then keeps
      * the relative band above the floor, ranked and capped. Returns empty when the best match is below the floor.
+     * Candidates without natural-language aliases are excluded from semantic matching to prevent short-input
+     * false positives from representation collapse against raw English command IDs.
      */
     private List<LlmToolDefinition> semanticSelect(SemanticPhraseMatcher matcher,
                                                    List<GameToolCandidates.Candidate> candidates, String input,
                                                    SemanticQuery semanticQuery) {
+        List<GameToolCandidates.Candidate> eligible = candidates.stream()
+                .filter(SemanticActionReducer::hasNaturalLanguageAlias)
+                .toList();
+        if (eligible.isEmpty()) {
+            VegaDiagnostics.debugAmbient("reduce", String.format(Locale.ROOT,
+                    "semantic: candidates=%d (eligible=0) -> no game tools (no natural language aliases)",
+                    candidates.size()));
+            return List.of();
+        }
+
         float[] queryVector = semanticQuery == null ? null : semanticQuery.vectorFor(input, matcher);
         if (queryVector == null) {
             queryVector = matcher.embedQuery(input);
         }
-        double[] scores = new double[candidates.size()];
+        double[] scores = new double[eligible.size()];
         double best = -1.0;
-        for (int i = 0; i < candidates.size(); i++) {
-            GameToolCandidates.Candidate candidate = candidates.get(i);
+        for (int i = 0; i < eligible.size(); i++) {
+            GameToolCandidates.Candidate candidate = eligible.get(i);
             List<String> aliases = AliasEmbeddingText.phrases(
                     candidate.localizedAliasGroup(), candidate.tool().parameters());
             scores[i] = matcher.bestSimilarity(queryVector, aliases);
@@ -224,14 +236,14 @@ public final class SemanticActionReducer implements VegaActionReducer {
         }
         if (best < SEM_FLOOR) {
             VegaDiagnostics.debugAmbient("reduce", String.format(Locale.ROOT,
-                    "semantic: candidates=%d best=%.3f < floor %.2f -> no game tools (conversation/recall)",
-                    candidates.size(), best, SEM_FLOOR));
+                    "semantic: candidates=%d (eligible=%d) best=%.3f < floor %.2f -> no game tools (conversation/recall)",
+                    candidates.size(), eligible.size(), best, SEM_FLOOR));
             return List.of();
         }
 
         double cutoff = best - SEM_MARGIN;
         List<Integer> kept = new ArrayList<>();
-        for (int i = 0; i < candidates.size(); i++) {
+        for (int i = 0; i < eligible.size(); i++) {
             if (scores[i] >= cutoff) {
                 kept.add(i);
             }
@@ -245,14 +257,34 @@ public final class SemanticActionReducer implements VegaActionReducer {
             if (result.size() >= SEM_MAX) {
                 break;
             }
-            GameToolCandidates.Candidate candidate = candidates.get(idx);
+            GameToolCandidates.Candidate candidate = eligible.get(idx);
             if (added.add(candidate.id())) {
                 result.add(candidate.tool());
             }
         }
         VegaDiagnostics.debugAmbient("reduce", String.format(Locale.ROOT,
-                "semantic: candidates=%d best=%.3f cutoff=%.3f kept=%d -> %s",
-                candidates.size(), best, cutoff, result.size(), VegaDiagnostics.names(result)));
+                "semantic: candidates=%d (eligible=%d) best=%.3f cutoff=%.3f kept=%d -> %s",
+                candidates.size(), eligible.size(), best, cutoff, result.size(), VegaDiagnostics.names(result)));
         return result;
+    }
+
+    /**
+     * Checks whether a candidate defines a natural-language alias rather than relying on its command id
+     * as an embedding fallback. Tools without localized alias phrases are excluded from semantic similarity
+     * matching to prevent false positives from short-input representation collapse against raw English IDs.
+     */
+    private static boolean hasNaturalLanguageAlias(GameToolCandidates.Candidate candidate) {
+        if (candidate == null) {
+            return false;
+        }
+        String aliasGroup = candidate.localizedAliasGroup();
+        if (aliasGroup == null || aliasGroup.isBlank()) {
+            return false;
+        }
+        String trainingPhrases = candidate.tool() != null ? candidate.tool().localizedTrainingPhrases() : null;
+        if (trainingPhrases == null || trainingPhrases.isBlank()) {
+            return false;
+        }
+        return true;
     }
 }
