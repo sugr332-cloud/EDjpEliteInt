@@ -331,4 +331,24 @@ class SemanticActionReducerTest {
         List<LlmToolDefinition> validMatch = reducer.selectTools(ALL, "ship status report");
         assertEquals(List.of("ship_status"), ids(validMatch));
     }
+
+    @Test
+    void shortInputRequiresHigherSimilarityFloor() {
+        // A 0.90 cosine clears the normal SEM_FLOOR (0.85) but not the raised SHORT_INPUT_SEM_FLOOR (0.93)
+        // that applies when the trimmed input is under SHORT_INPUT_CHAR_THRESHOLD chars (§R.6.3 G-7).
+        List<GameToolCandidates.Candidate> oneCandidate = List.of(candidate("close_ish", "close ish"));
+        SemanticPhraseMatcher matcher = new SemanticPhraseMatcher(embedder(Map.of(
+                "hi", new float[]{1, 0, 0},
+                "long enough input", new float[]{1, 0, 0},
+                "close ish", new float[]{0.9f, 0.43588989f, 0})));
+        SemanticActionReducer reducer = new SemanticActionReducer(
+                allowed -> oneCandidate, () -> matcher, unusedFallback(new AtomicBoolean()));
+
+        // Short input ("hi", 2 chars < SHORT_INPUT_CHAR_THRESHOLD): 0.90 is below the raised floor.
+        assertTrue(reducer.selectTools(ALL, "hi").isEmpty(),
+                "short input must require the raised floor, rejecting a 0.90 match");
+
+        // Same 0.90 similarity, but the input is long enough that the normal SEM_FLOOR (0.85) applies.
+        assertEquals(List.of("close_ish"), ids(reducer.selectTools(ALL, "long enough input")));
+    }
 }
