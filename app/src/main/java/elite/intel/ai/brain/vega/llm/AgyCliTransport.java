@@ -15,6 +15,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -119,6 +120,16 @@ public class AgyCliTransport implements LlmTransport {
                         "Could not start agy binary (" + executable + "): " + e.getMessage());
             }
 
+            // 4b. Write prompt to stdin and close to signal EOF
+            try (OutputStream stdin = process.getOutputStream()) {
+                stdin.write(parsed.prompt().getBytes(StandardCharsets.UTF_8));
+                stdin.flush();
+            } catch (IOException e) {
+                log.warn("Failed to write prompt to agy stdin: {}", e.getMessage());
+                return AiTransportResult.failure(FailureKind.TRANSIENT, null,
+                        "Failed to write prompt to agy stdin: " + e.getMessage());
+            }
+
             // 5. Execute and collect output with dual timeout
             return executeProcess(process, maskedCommandLine);
 
@@ -181,8 +192,6 @@ public class AgyCliTransport implements LlmTransport {
     private ProcessBuilder buildProcess(ParsedRequest parsed, Path tempDir) {
         List<String> command = new ArrayList<>();
         command.add(executable);
-        command.add("--print");
-        command.add(parsed.prompt());
         command.add("--sandbox");
         command.add("--disable-slash-commands");
         command.add("--output-format");
