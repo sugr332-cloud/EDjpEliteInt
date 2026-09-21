@@ -185,9 +185,24 @@ public final class VegaLlmGateway implements LlmGateway {
      */
     @Override
     public void close() {
-        if (executor instanceof ExecutorService service) {
-            service.shutdownNow();
+        try {
+            if (executor instanceof ExecutorService service) {
+                service.shutdownNow();
+            }
+        } finally {
+            if (transport instanceof AutoCloseable closeable) {
+                try {
+                    closeable.close();
+                } catch (Exception e) {
+                    log.warn("Failed to close transport cleanly", e);
+                }
+            }
         }
+    }
+
+    /** Test seam: the injected transport, so a test can reach the concrete provider behind it (e.g. agy's resident process manager) without reflection. */
+    LlmTransport transport() {
+        return transport;
     }
 
     /**
