@@ -72,7 +72,7 @@ C-CORE の追加・拡張（v2-P9）はこの 2 トラックの後に回す。�
 | v2-P0 | 現状固定 / read-only baseline | **完了** | 旧 Phase 0・1（§5）。build 成功、AI 入力経路を実ファイルで追跡済み |
 | v2-P1 | 日本語化 inventory（表示〜指示） | **完了（数値確定）** | R.4 の件数は `i18n-parity-baseline.txt` と各 `.properties` から計測 |
 | v2-P2 | 既存機能の日本語置換（表示 → 指示） | **進行中** | `Language.JA`（`11907a78`）、P0（`11907a78`）・P1（`5c9716ec`）翻訳済み。残りは R.4 |
-| v2-P3 | AI Provider CLI 化 / `agy` 対応 | **未着手** | `ProviderEnum` は API 系のみ。`PHASE11_AI_PROVIDER_CLI_SPEC.md` の CLI 化方針を `agy` 既定に更新（同文書冒頭の改訂注記）。**着手前に R.6「agy の実行境界（安全要件）」を満たすこと** |
+| v2-P3 | AI Provider CLI 化 / `agy` 対応 | **完了（DONE）** | G-1〜G-7、stdin 化（PR #10）、resident agy 化（PR #11）完了。`AgyResidentProcessManager` による常駐プロセス通信（stream-json）、15s/20s 二重タイムアウト、自動復旧、固定 Speak スキーマ、TurnRouting による二重ルーティング（非 speak ツール判定）を実機で実証済み |
 | v2-P4 | 日本語自然言語による問い合わせ・指示（テキスト） | 一部実装 | 旧 Phase 10（§17）: 日本語テキスト入力・日本語応答方針は実装済み。`agy` 経由では未確認 |
 | v2-P5 | 音声入出力（STT / TTS / VOICEVOX） | 一部実装 | Kokoro→日本語フォールバック（`334b35b1`）。実機 E2E は未実施（`PHASE11_VOICE_IO_PHASE_UPDATE.md`）。**同梱 STT（`ParakeetSTTImpl`）は日本語語彙を持たず日本語音声を認識できない（§10 で確認済み）。日本語 STT は別バックエンドを新規に選定する（CLI 方式を含めて検証、R.7）** |
 | v2-P6 | Game Action / Ship Control の安全化 | 既存機能あり | 既存 `GameInputStep` / `GameControllerBus` / `KeyProcessor`。System Map 駅選択は未実装（§17） |
@@ -308,8 +308,11 @@ G-1〜G-4 の実装後に実機確認を行ったところ、以下が判明し�
 
 VEGA への応答要求を、以下の2種類に区別する。
 
-- **tool-calling ターン**: `request.tools()` が空でない。ゲーム内アクションの実行判断が必要な場面。
-- **雑談・要約ターン**: `request.tools()` が空。自由な会話や要約のみを行う場面。
+- **tool-calling ターン**: `request.tools()` に `SpeakFunction`（`speak`）以外のゲーム内アクションツールが含まれている（`TurnRoutingLlmGateway.isToolCallingTurn` が `true`）。ゲーム内アクションの実行判断が必要な場面。
+- **雑談・要約ターン**: `request.tools()` が空、または `SpeakFunction` のみを含む（`TurnRoutingLlmGateway.isToolCallingTurn` が `false`）。自由な会話や要約のみを行う場面。
+
+> **判定ロジックの確定経緯（2026-09-19、コミット `201b0ad2`）:**  
+> 当初は「`request.tools().isEmpty()`」での判定を予定していたが、`ComposedPrompt.tools()` が COMMANDER ターンにおいて常にシステム関数 `SpeakFunction` をリストに結合（union）するため、`SemanticActionReducer` がゲームツールをゼロ件に絞り込んだ「こんにちは」等の純粋な雑談であっても `request.tools()` には必ず `speak` が含まれることが判明した。その結果、単純な `isEmpty()` 判定では全ターンが tool-calling ターンと判定されてしまう不具合が生じたため、現行の実装では「`SpeakFunction` 以外のツール（非 speak ツール）が存在するか否か（`request.tools().stream().anyMatch(tool -> !SpeakFunction.ID.equals(tool.name()))`）」を厳格な判定条件として採用している。
 
 それぞれ次のプロバイダーを使用する。
 
@@ -324,11 +327,11 @@ LM Studio／クラウド API が未設定・未導入の環境では、tool-call
 
 | ID | 内容 | 変更許可ファイル | TEST GATE |
 |---|---|---|---|
-| G-5 | `request.tools()` の有無に基づいて、tool-calling ターンと雑談・要約ターンで異なる `LlmProviderAdapter` / `LlmTransport` のペアを選択するルーティング層を実装する。`VegaLlmGatewayFactory.create()` が、既存の選択ロジック（LM Studio／クラウド、`agy` フォールバックなし）で構築した Gateway と、`agy` 専用の Gateway の2組を保持し、リクエストごとに使い分ける新規クラス（`LlmGateway` 実装、仮称 `TurnRoutingLlmGateway`）を返すよう変更する。既存の `VegaLlmGateway`、`AgyCliTransport`、`AgyCliProviderAdapter` のインターフェース契約（`LlmGateway` / `LlmProviderAdapter` / `LlmTransport`）は変更しない。クラス名の確定、および `submit` / `completePlainText` それぞれの振り分け方法は G-5 の PLAN CHECK 時に確定する。 | 新規 `app/src/main/java/elite/intel/ai/brain/vega/llm/TurnRoutingLlmGateway.java`（仮称、PLAN CHECK 時に確定）、新規 `app/src/test/java/elite/intel/ai/brain/vega/llm/TurnRoutingLlmGatewayTest.java`、既存 `app/src/main/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactory.java`、既存 `app/src/test/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactoryTest.java` | `./gradlew --no-daemon :app:test --tests '*TurnRoutingLlmGatewayTest' --tests '*VegaLlmGatewayFactoryTest'`（新規テストクラス名は PLAN CHECK 時に確定） |
+| G-5 | 非 speak ツールの有無に基づいて、tool-calling ターンと雑談・要約ターンで異なる `LlmProviderAdapter` / `LlmTransport` のペアを選択するルーティング層を実装する。`VegaLlmGatewayFactory.create()` が、既存の選択ロジック（LM Studio／クラウド、`agy` フォールバックなし）で構築した Gateway と、`agy` 専用の Gateway の2組を保持し、リクエストごとに使い分ける新規クラス `TurnRoutingLlmGateway`（`LlmGateway` 実装）を返すよう変更する。既存の `VegaLlmGateway`、`AgyCliTransport`、`AgyCliProviderAdapter` のインターフェース契約（`LlmGateway` / `LlmProviderAdapter` / `LlmTransport`）は変更しない。 | 新規 `app/src/main/java/elite/intel/ai/brain/vega/llm/TurnRoutingLlmGateway.java`、新規 `app/src/test/java/elite/intel/ai/brain/vega/llm/TurnRoutingLlmGatewayTest.java`、既存 `app/src/main/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactory.java`、既存 `app/src/test/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactoryTest.java` | `./gradlew --no-daemon :app:test --tests '*TurnRoutingLlmGatewayTest' --tests '*VegaLlmGatewayFactoryTest'` |
 
 ##### 完了条件
 
-- `request.tools()` が空でないリクエストは既存の LLM Provider（LM Studio／クラウド）へ、空のリクエストは `agy` へ到達することが、固定 fixture で確認できる。
+- `request.tools()` に非 speak ツールが含まれるリクエストは既存の LLM Provider（LM Studio／クラウド）へ、空または `speak` のみのリクエストは `agy` へ到達することが、固定 fixture で確認できる。
 - 既存の `VegaLlmGateway`、`AgyCliTransport`、`AgyCliProviderAdapter` のインターフェース契約に変更がない。
 
 #### R.6.3 エイリアス未定義ツールの除外による意味類似度の誤検出対策（G-6）
@@ -392,6 +395,25 @@ G-6 merge 後、実機ログで再検証したところ、`hasNaturalLanguageAli
 
 - 短い入力（`SHORT_INPUT_CHAR_THRESHOLD` 未満）に対しては `SHORT_INPUT_SEM_FLOOR` が適用され、エイリアスリスト内の短いフレーズとの偶発一致（`exit_close`、`play_music` 等の再現シナリオ）が、固定 fixture で選定されないことを確認できる。
 - 通常の長さの入力に対する既存の意味類似度マッチング能力（`SEM_FLOOR`、`SEM_MARGIN`、`SEM_MAX`）に変化がないことを、既存テストで確認できる。
+
+#### R.6.4 stdin 化と Resident 常駐プロセスの本番導入（PR #10、PR #11）
+
+##### 1. プロンプト入力の stdin 化（PR #10、確定事項）
+
+- **背景と課題**: 初期実装（G-1）では `--print <prompt>` CLI 引数を用いてプロンプトを渡していたが、会話履歴やツール指示が蓄積した際に Windows OS のコマンドライン長制限（`CreateProcess` 32,767 文字制限）に達するリスク、および `CommandLineToArgvW` による引数パース時のダブルクォート・改行・マルチバイト文字（日本語）のトークン破損・エスケープ破損リスクが存在した。
+- **設計決定**: CLI 引数から `--print` を完全撤廃し、プロンプトを標準入力（`process.getOutputStream()`、UTF-8）へパイプ送信する方式に完全移行した。
+- **該当実装**: `AgyCliTransport.java`（L133-138、L189-204）
+
+##### 2. Resident agy 常駐プロセス管理（PR #11、確定事項）
+
+- **背景と課題**: ターンごとに `agy` プロセスを起動・終了するワンショット方式では、プロセス初期化に伴うレイテンシ（毎ターン 3〜6 秒）が累積し、会話の即応性が損なわれていた。また、プロセス毎の初期化に伴いスキーマ制約の解釈が不安定になるリスクがあった。
+- **本番アーキテクチャ**: `AgyResidentProcessManager` を導入し、常駐プロセスとの入出力ストリームを維持する常駐実行を **VEGA の本番既定経路** とした。
+  - **実行モード**: `agy` を `--effort low`、`--json-schema`（固定 SpeakFunction スキーマ、`arguments: string`）、`--print-timeout 15s` で起動し、`stream-json` 形式で双方向通信を行う。
+  - **二重タイムアウト境界**: agy CLI 内部の 15s タイムアウトと、Java 側の 20s watchdog（`cliTimeout + 5s`）の二重構造。タイムアウト時にプロセスが生存していればプロセス状態を `READY` に戻し、`TRANSIENT` failure を返却して次ターンでの再利用を可能とする。
+  - **透過的自動復旧（Auto-Recovery）**: 外部からの強制終了（taskkill 等）やパイプ切断（Broken pipe）を検知した場合、次回リクエスト時に透過的に新規プロセスを起動して復旧する（`test4`、`test5` で実証済み）。
+  - **ライフサイクル伝搬**: `AgyCliTransport` が `AutoCloseable` を実装し、`VegaRuntimeGraph.close()` → `VegaLlmGateway.close()` → `AgyCliTransport.close()` → `AgyResidentProcessManager.close()` を経由して、OS プロセスツリー（子孫プロセス含む）を強制終了し隔離一時ディレクトリを完全削除する（`test6`、`test7` で実証済み）。
+  - **ワンショット実行の扱い**: 従来のワンショット実行（`AgyCliTransport.sendOneShotOutcome`）は本番経路から切り離され、モック/フェイクプロセスを注入するユニットテスト用シーム（`ProcessStarter`）としてのみ保持される。
+- **該当実装**: `AgyResidentProcessManager.java`（新規）、`AgyCliTransport.java`、`VegaLlmGateway.java`、`AgyResidentProductionVerificationTest.java`（実機統合テスト、`@Tag("local-integration")` により CI 除外）
 
 ### R.7 v2-P4 以降
 
@@ -699,9 +721,25 @@ Plan commit: <SHA>
 
 P2-J1〜P2-J16 がすべて DONE になった時点で §R.5 の完了条件を確認し、§R.3 の v2-P2 の状態を更新する（計画書の更新はユーザーが行う）。
 
-#### v2-P3 以降の台帳
+#### v2-P3（AI Provider CLI化 / agy対応）実装台帳
 
-v2-P3 以降は、§R.6 の着手前 read-only 確認の結果を踏まえて、同じ形式（ID・変更許可ファイル・TEST GATE）で本節に追加する。追加されるまで `agy` に実装させない。
+v2-P3 の実装は、G-1〜G-7、stdin 化（PR #10）、および resident agy 常駐化（PR #11）を経て完了した。
+
+| ID | 内容 | 変更許可ファイル | TEST GATE / 検証 | 状態 |
+|---|---|---|---|---|
+| G-1 | `AgyCliTransport` の one-shot プロセス実行基礎実装。`--print` 引数およびモック用 `ProcessStarter` の導入。 | `app/src/main/java/elite/intel/ai/brain/vega/llm/AgyCliTransport.java` 等 | 単体テスト | DONE |
+| G-2 | `SpeakFunction` の引数型契約整合。`arguments` を `string` 型で統一し、CLI/スキーマとの不整合を解消。 | `app/src/main/java/elite/intel/ai/brain/vega/SpeakFunction.java` 等 | 単体テスト | DONE |
+| G-3 | `AgyCliProviderAdapter` のレスポンス契約整合。空応答や不正形式に対する例外ハンドリングおよびフォールバック定義。 | `app/src/main/java/elite/intel/ai/brain/vega/llm/AgyCliProviderAdapter.java` 等 | 単体テスト | DONE |
+| G-4 | `SemanticActionReducer` の日本語正規化および境界値強化。空文字・句読点・特殊文字の誤認識防止。 | `app/src/main/java/elite/intel/ai/brain/vega/SemanticActionReducer.java` 等 | 単体テスト | DONE |
+| G-5 | `TurnRoutingLlmGateway` による二重ルーティング層。非 speak ツールを含む場合は既存プロバイダー（LM Studio/クラウド）、非 speak ツールを含まない場合（雑談/要約/speakのみ）は `agy` へ振り分け。 | `TurnRoutingLlmGateway.java`、`VegaLlmGatewayFactory.java` 等 | 単体・結合テスト | DONE |
+| G-6 | エイリアス未定義ツールの除外による意味類似度の誤検出防止。自然言語エイリアスを持たない内部ツールの誤選定を遮断。 | `SemanticActionReducer.java` 等 | 単体テスト | DONE |
+| G-7 | 短文入力に対する意味類似度フロア引き上げ（`SHORT_INPUT_SEM_FLOOR`）。偶発的な短フレーズ一致を抑制。 | `SemanticActionReducer.java` 等 | 単体テスト | DONE |
+| PR #10 | プロンプト入力の stdin 化。Windows CLI コマンドライン長制限（32,767文字）およびエスケープ破損リスクを解消。 | `AgyCliTransport.java` | 単体テスト | DONE |
+| PR #11 | `AgyResidentProcessManager` による resident agy 常駐化。`stream-json` 双方向通信、二重タイムアウト（15s/20s）、透過的自動復旧、およびライフサイクル管理の実装。 | `AgyResidentProcessManager.java`、`AgyCliTransport.java`、`VegaLlmGateway.java`、`AgyResidentProductionVerificationTest.java` | 実機実測テスト（Test 1〜7 ALL PASS、Strict Schema 100%） | DONE |
+
+#### v2-P4 以降の台帳
+
+v2-P4 以降は、着手前 read-only 確認の結果を踏まえて、同じ形式（ID・変更許可ファイル・TEST GATE）で本節に追加する。追加されるまで `agy` に実装させない。
 
 ## 1. Scope
 
