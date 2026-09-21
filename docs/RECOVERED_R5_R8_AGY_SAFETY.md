@@ -20,13 +20,16 @@ J-5 commodity matching must use the existing multilingual commodity database arc
 
 This supersedes the older wording that described J-5 as a separate static/generic commodity dictionary.
 
-## 2. R.6 — AI conversation is agy-only
+## 2. R.6 — AI conversation hybrid routing and agy role
 
 > **改訂注記（2026-09-20 / G-5 二重ルーティング改訂）:**  
-> 本節は 2026-09-15 時点で「すべての AI 会話を `agy` で実行する」方針として記録されたが、その後の G-5（PR #9）の実装および本番検証を経て、**非 speak ツールを含むターンは既存 LLM Provider（LM Studio / クラウド API）、非 speak ツールを含まないターン（雑談・要約・speak のみ）は `agy`** へ振り分ける二重ルーティング（`TurnRoutingLlmGateway`）に改訂された。  
+> 本節は 2026-09-15 時点で「すべての AI 会話を `agy` で実行する」方針として記録されたが、その後の G-5 実装（`201b0ad2`、PR #9 は G-7）および本番検証を経て、**非 speak ツールを含むターンは既存 LLM Provider（LM Studio / クラウド API）、非 speak ツールを含まないターン（雑談・要約・speak のみ）は `agy`** へ振り分ける二重ルーティング（`TurnRoutingLlmGateway`）に改訂された。  
 > 現在の本番構成、ルーティング判定境界、および常駐プロセス（resident agy）の仕様については `docs/ELITEINTEL_INTEGRATION_PLAN.md` §R.6.2 および §R.6.4 を参照すること。
 
-The AI conversation execution path is `agy` (Antigravity CLI) as an external process.
+Under the G-5 architecture (`201b0ad2`), AI conversation turns are routed by `TurnRoutingLlmGateway` based on the presence of non-speak tools:
+
+- **Tool-calling turns (requests containing non-speak tools):** Routed to the configured LLM provider (LM Studio / Cloud API).
+- **Chat turns (requests with no non-speak tools, i.e. chat, summarization, or speak-only):** Routed to `agy` (Antigravity CLI resident process via `AgyResidentProcessManager`).
 
 ```text
 Japanese text / STT
@@ -35,27 +38,31 @@ UserInputEvent
       ↓
 ThoughtDispatcher
       ↓
-VegaLlmGateway
-      ↓
-AgyCliProviderAdapter
-      ↓
-AgyCliTransport / ProcessBuilder
-      ↓
-agy
+TurnRoutingLlmGateway
+      ├─[non-speak tools present]──→ Configured LLM (LM Studio / Cloud)
+      │                                    ↓
+      │                              Tool-call execution
+      │
+      └─[speak-only / no tools]─────→ VegaLlmGateway (agy)
+                                           ↓
+                                     AgyCliProviderAdapter
+                                           ↓
+                                     AgyCliTransport
+                                           ↓
+                                     AgyResidentProcessManager
+                                           ↓
+                                     agy (resident stream-json)
 ```
 
-`agy` is responsible for AI conversation generation:
+In this architecture, `agy` is responsible for natural-language response generation in chat turns:
 
-- natural-language response generation
-- tool-call generation
-- response generation after deterministic tool execution
+- natural-language response generation (chat / conversational speak)
+- summary / conversational formatting under strict schema
 
-`agy` does **not** execute EliteIntel tools itself.
-
-Tool calls follow this boundary:
+`agy` does **not** execute EliteIntel tools itself. Tool calls and system actions remain strictly bounded by EliteIntel:
 
 ```text
-agy JSON
+LLM tool call (LM Studio / Cloud)
    ↓
 JSON/schema validation
    ↓
@@ -68,23 +75,19 @@ existing IntelCommand / CommandRegistry
 deterministic execution
    ↓
 structured result
-   ↓
-agy
-   ↓
-Japanese response
 ```
 
-### AI provider selection
+### AI provider selection and routing
 
-- `AgyCliProvider` is the only AI conversation provider in the selected architecture.
-- Gemini / Claude / OpenAI API providers are not selectable AI conversation providers.
-- There is no automatic fallback from `agy` to another LLM provider when `agy` fails.
-- Existing legacy provider code may remain in the repository only where it is required for historical/build compatibility; it must not become an alternative AI conversation path.
+- `TurnRoutingLlmGateway` performs static, turn-based routing based on whether the prompt requires non-speak tools.
+- Chat turns (speak-only) are handled exclusively by `AgyCliProvider` backed by `AgyResidentProcessManager`.
+- Tool-calling turns (requiring internal game actions) are handled by the configured LLM provider (LM Studio / Cloud API).
+- There is no automatic runtime fallback from `agy` to another LLM provider when `agy` fails (failures are explicit and fail-fast).
 - STT and TTS are separate concerns and are not implemented as `agy` features.
 
 ### Runtime failure behavior
 
-`agy` startup failure, non-zero exit, timeout, malformed output, and unavailable executable must become explicit AI transport failures. The UI must remain responsive. Deterministic commands that do not require AI remain available.
+`agy` startup failure, non-zero exit, timeout, malformed output, and process disconnection are handled explicitly by `AgyResidentProcessManager` (reporting `TRANSIENT` or `MALFORMED_RESPONSE` failures and performing transparent auto-recovery on subsequent turns). The UI must remain responsive at all times. Deterministic commands that do not require AI remain available.
 
 ## 3. R.6 — runtime agy safety boundary
 
