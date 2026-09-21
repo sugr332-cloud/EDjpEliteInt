@@ -257,6 +257,8 @@ public class AgyCliTransport implements LlmTransport, AutoCloseable {
         command.add("--disable-slash-commands");
         command.add("--output-format");
         command.add("json");
+        command.add("--effort");
+        command.add("low");
 
         if (parsed.schemaFile() != null) {
             command.add("--json-schema");
