@@ -116,6 +116,13 @@ public class AgyResidentBenchmarkTest {
         return GsonFactory.getGson().toJson(obj);
     }
 
+    /**
+     * Verifies that the JSON response structurally conforms to the speak tool output envelope.
+     * <p>
+     * Note: This method only verifies the presence of {@code tool_calls}, that the first tool call
+     * name is {@code "speak"}, and the existence of an {@code arguments} field (or top-level speak name).
+     * It does not perform comprehensive schema constraint validation (e.g. types, required properties).
+     */
     private static boolean verifyStrictSchema(JsonObject json) {
         if (json == null) return false;
         if (json.has("structured_output") && json.get("structured_output").isJsonObject()) {
@@ -383,14 +390,14 @@ public class AgyResidentBenchmarkTest {
         System.out.printf("- Resident Initial PID: %d, Final PID: %d, Restarts: %d%n",
                 residentInitialPid, residentPids.get(residentPids.size() - 1),
                 residentPids.stream().distinct().count() - 1);
-        System.out.printf("- Resident Success: %d/%d, Strict Schema: %d/%d (%.1f%%)%n",
+        System.out.printf("- Resident Success: %d/%d, Strict Schema (speak tool envelope): %d/%d (%.1f%%)%n",
                 residentSuccessCount, totalTurns, residentStrictOk, totalTurns, (double) residentStrictOk / totalTurns * 100.0);
         System.out.printf("- Resident Timeouts: %d, Errors: %d, InternalTool: %d%n",
                 residentTimeoutCount, residentErrorCount, residentInternalToolCount);
 
         System.out.printf("- One-shot Actual Launches: %d / %d (match: %b)%n",
                 actualLaunches, totalTurns, actualLaunches == totalTurns);
-        System.out.printf("- One-shot Success: %d/%d, Strict Schema: %d/%d (%.1f%%)%n",
+        System.out.printf("- One-shot Success: %d/%d, Strict Schema (speak tool envelope): %d/%d (%.1f%%)%n",
                 oneshotSuccessCount, totalTurns, oneshotStrictOk, totalTurns, (double) oneshotStrictOk / totalTurns * 100.0);
         System.out.printf("- One-shot Timeouts: %d, Errors: %d, InternalTool: %d%n",
                 oneshotTimeoutCount, oneshotErrorCount, oneshotInternalToolCount);
