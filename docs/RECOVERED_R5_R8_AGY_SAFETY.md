@@ -22,6 +22,10 @@ This supersedes the older wording that described J-5 as a separate static/generi
 
 ## 2. R.6 — AI conversation is agy-only
 
+> **改訂注記（2026-09-20 / G-5 二重ルーティング改訂）:**  
+> 本節は 2026-09-15 時点で「すべての AI 会話を `agy` で実行する」方針として記録されたが、その後の G-5（PR #9）の実装および本番検証を経て、**非 speak ツールを含むターンは既存 LLM Provider（LM Studio / クラウド API）、非 speak ツールを含まないターン（雑談・要約・speak のみ）は `agy`** へ振り分ける二重ルーティング（`TurnRoutingLlmGateway`）に改訂された。  
+> 現在の本番構成、ルーティング判定境界、および常駐プロセス（resident agy）の仕様については `docs/ELITEINTEL_INTEGRATION_PLAN.md` §R.6.2 および §R.6.4 を参照すること。
+
 The AI conversation execution path is `agy` (Antigravity CLI) as an external process.
 
 ```text

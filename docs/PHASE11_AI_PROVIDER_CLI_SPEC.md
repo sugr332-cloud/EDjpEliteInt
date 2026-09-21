@@ -1,12 +1,12 @@
 # Phase 11 — AI Provider CLI Specification
 
-**Status:** Planned / not implemented  
-**Date:** 2026-09-13  
+**Status:** Completed (v2-P3 integrated)  
+**Date:** 2026-09-13 (Last Updated: 2026-09-21)  
 **Repo:** `sugr332-cloud/EliteIntel`
 
-> **改訂注記（2026-09-15）:** Roadmap v2（`ELITEINTEL_INTEGRATION_PLAN.md` §R）により、この仕様は **v2-P3** として扱う。
+> **改訂注記（2026-09-15 / 2026-09-21）:** Roadmap v2（`ELITEINTEL_INTEGRATION_PLAN.md` §R）により、この仕様は **v2-P3** として扱う。
 > AI 会話の既定 CLI Provider は **`agy`（Antigravity CLI）** とし、本文中の Gemini CLI / Claude CLI は同じ Provider 契約に載せる任意の実装とする。
-> 本文の「Gemini CLI または Claude CLI」の記述は、既定の完了判定では「`agy`」と読み替える。差し込み位置（`LlmTransport` / `LlmProviderAdapter` / `VegaLlmGatewayFactory`）と tool-call JSON 契約の確認事項は §R.6 を正とする。
+> 2026-09-21 に v2-P3（G-1〜G-7、PR #10 stdin 化、PR #11 resident agy 常駐化）が main へ統合完了した。最新の本番構成・二重ルーティング契約（非 speak ツール判定）については `docs/ELITEINTEL_INTEGRATION_PLAN.md` §R.6 を正とする。
 
 ## 1. Purpose
 
@@ -170,14 +170,14 @@ TtsProvider
 - PASS / FAIL と失敗時の原因
 
 ## 8. 現在の実装との差分
-
-2026-09-13 の read-only 調査時点では、EliteIntel の AI 会話経路は `LlmGateway` を経由して既存の LLM Provider を呼び出す構成であり、Gemini CLI / Claude CLI を起動する AI Provider 実装は確認されていない。
-
-したがって、現在の状態は **CLI Provider 未実装** とする。
-
-C-CORE の CLI (`CCoreAdapter` → `ProcessBuilder` → `bio_entry.exe`) は別途実装済みであり、本項の未実装判定には含めない。
-
-日本語音声入出力についても、コード上のフォールバックや Provider 定義だけでは完了扱いにせず、上記の実機E2E試験を完了条件とする。
+ 
+2026-09-13 の read-only 調査時点では CLI Provider は未実装であったが、**2026-09-21 の v2-P3 完了（PR #9〜#11）により、`agy` CLI Provider（常駐プロセス管理 `AgyResidentProcessManager`、双方向 stdin/stdout `stream-json` 通信、二重タイムアウト制御、自動復旧機構）が本番経路として統合完了した。**
+ 
+また、G-5 により `TurnRoutingLlmGateway` が導入され、非 speak ツールを要求するターンは既存の LLM Provider（LM Studio / クラウド）、雑談・要約・speak のみのターンは `agy` CLI Provider へ振り分けるハイブリッドルーティングが確立されている。
+ 
+C-CORE の CLI (`CCoreAdapter` → `ProcessBuilder` → `bio_entry.exe`) も別途実装済みである。
+ 
+日本語音声入出力（STT / TTS 実機連携）については後続のサブフェーズにて実機検証を継続する。
 
 ## 9. Phase 11 CLI Provider 完了条件
 
