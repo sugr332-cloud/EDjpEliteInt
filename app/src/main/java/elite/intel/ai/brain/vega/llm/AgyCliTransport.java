@@ -26,20 +26,21 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Executes the Antigravity CLI ({@code agy}) as a one-shot external process to serve as an LLM transport.
+ * Executes the Antigravity CLI ({@code agy}) as an LLM transport.
  * <p>
- * Strict runtime security and process isolation boundaries (§R.6, §R.6.1):
+ * In production runtime (§R.6, §R.6.1), delegates to {@link AgyResidentProcessManager} to maintain a persistent,
+ * resident {@code agy} process running in {@code stream-json} mode with low reasoning effort, fixed SpeakFunction schema,
+ * 15s print-timeout, 20s Java watchdog, and transparent recovery.
+ * <p>
+ * Strict runtime security and process isolation boundaries are preserved:
  * <ul>
- *   <li>Runs in an ephemeral, isolated temporary working directory per request.</li>
- *   <li>Configures an isolated {@code settings.json} with strict {@code permissions.deny} rules
- *       ({@code command(*)}, {@code write_file(*)}, {@code read_file(*)}) to completely disable agent tools.</li>
- *   <li>Redirects {@code USERPROFILE} to the temporary directory so host settings are never inherited.</li>
+ *   <li>Runs in an isolated temporary working directory.</li>
+ *   <li>Configures strict {@code permissions.deny} rules ({@code command(*)}, {@code write_file(*)}, {@code read_file(*)}).</li>
+ *   <li>Redirects {@code USERPROFILE} to the temporary directory.</li>
  *   <li><b>NEVER</b> passes {@code --dangerously-skip-permissions}.</li>
- *   <li>Applies dual timeouts: CLI internal ({@code --print-timeout}) and Java-side process watchdog.</li>
- *   <li>Terminates the entire process tree on timeout/error and guarantees multi-layered cleanup in {@code finally}.</li>
  * </ul>
  */
-public class AgyCliTransport implements LlmTransport {
+public class AgyCliTransport implements LlmTransport, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(AgyCliTransport.class);
 
@@ -58,28 +59,40 @@ public class AgyCliTransport implements LlmTransport {
     private final String executable;
     private final Duration cliTimeout;
     private final ProcessStarter processStarter;
+    private final AgyResidentProcessManager residentManager;
 
     /**
-     * Production constructor using default {@code agy} executable on PATH and standard ProcessBuilder.
+     * Production constructor using default {@code agy} executable on PATH and resident process manager.
      */
     public AgyCliTransport() {
-        this(DEFAULT_EXECUTABLE, DEFAULT_CLI_TIMEOUT, ProcessBuilder::start);
+        this(new AgyResidentProcessManager(DEFAULT_EXECUTABLE, DEFAULT_CLI_TIMEOUT));
     }
 
     /**
-     * Configurable constructor for custom binary path and timeouts.
+     * Configurable constructor for custom binary path and timeouts using resident process manager.
      */
     public AgyCliTransport(String executable, Duration cliTimeout) {
-        this(executable, cliTimeout, ProcessBuilder::start);
+        this(new AgyResidentProcessManager(executable, cliTimeout));
     }
 
     /**
-     * Test seam constructor allowing injection of mock/fake process starter.
+     * Direct injection of resident process manager.
+     */
+    public AgyCliTransport(AgyResidentProcessManager residentManager) {
+        this.residentManager = Objects.requireNonNull(residentManager, "residentManager");
+        this.executable = DEFAULT_EXECUTABLE;
+        this.cliTimeout = DEFAULT_CLI_TIMEOUT;
+        this.processStarter = null;
+    }
+
+    /**
+     * Test seam constructor allowing injection of mock/fake process starter (legacy one-shot mode for tests).
      */
     AgyCliTransport(String executable, Duration cliTimeout, ProcessStarter processStarter) {
         this.executable = Objects.requireNonNull(executable, "executable");
         this.cliTimeout = Objects.requireNonNull(cliTimeout, "cliTimeout");
         this.processStarter = Objects.requireNonNull(processStarter, "processStarter");
+        this.residentManager = null;
     }
 
     @Override
@@ -94,6 +107,59 @@ public class AgyCliTransport implements LlmTransport {
 
     @Override
     public AiTransportResult sendOutcome(String requestBody) {
+        if (residentManager != null) {
+            return sendResidentOutcome(requestBody);
+        }
+        return sendOneShotOutcome(requestBody);
+    }
+
+    private AiTransportResult sendResidentOutcome(String requestBody) {
+        String prompt;
+        try {
+            prompt = parsePrompt(requestBody);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid agy transport request: {}", e.getMessage());
+            return AiTransportResult.failure(FailureKind.PERMANENT, null, "Invalid request: " + e.getMessage());
+        } catch (Throwable t) {
+            log.error("Unexpected failure parsing agy transport request: {}", t.getMessage(), t);
+            return AiTransportResult.failure(FailureKind.PERMANENT, null, "Agy transport error: " + t.getMessage());
+        }
+
+        return residentManager.send(prompt);
+    }
+
+    private String parsePrompt(String requestBody) {
+        if (requestBody == null || requestBody.isBlank()) {
+            throw new IllegalArgumentException("requestBody must not be null or blank");
+        }
+        try {
+            JsonElement element = JsonParser.parseString(requestBody);
+            if (element.isJsonObject()) {
+                JsonObject obj = element.getAsJsonObject();
+                if (!obj.has("prompt") || obj.get("prompt").isJsonNull()) {
+                    throw new IllegalArgumentException("requestBody JSON must contain a non-null 'prompt' property");
+                }
+                return obj.get("prompt").getAsString();
+            }
+        } catch (JsonSyntaxException ignored) {
+            return requestBody;
+        }
+        throw new IllegalArgumentException("Unsupported requestBody format: " + requestBody);
+    }
+
+    @Override
+    public void close() {
+        if (residentManager != null) {
+            residentManager.close();
+        }
+    }
+
+    AgyResidentProcessManager residentManager() {
+        return residentManager;
+    }
+
+    // --- Legacy one-shot execution (retained for testing seam compatibility) ---
+    private AiTransportResult sendOneShotOutcome(String requestBody) {
         Path tempDir = null;
         Process process = null;
         try {
