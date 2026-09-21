@@ -30,17 +30,36 @@ class AgyCliTransportTest {
         private final boolean simulateTimeout;
         private final AtomicBoolean alive = new AtomicBoolean(true);
         private final AtomicBoolean destroyedForcibly = new AtomicBoolean(false);
+        private final ByteArrayOutputStream stdin = new ByteArrayOutputStream();
+        private final boolean failOnStdinWrite;
 
         FakeProcess(int exitCode, String stdout, String stderr, boolean simulateTimeout) {
+            this(exitCode, stdout, stderr, simulateTimeout, false);
+        }
+
+        FakeProcess(int exitCode, String stdout, String stderr, boolean simulateTimeout, boolean failOnStdinWrite) {
             this.exitCode = exitCode;
             this.stdout = (stdout != null ? stdout : "").getBytes(StandardCharsets.UTF_8);
             this.stderr = (stderr != null ? stderr : "").getBytes(StandardCharsets.UTF_8);
             this.simulateTimeout = simulateTimeout;
+            this.failOnStdinWrite = failOnStdinWrite;
         }
 
         @Override
         public OutputStream getOutputStream() {
-            return new ByteArrayOutputStream();
+            if (failOnStdinWrite) {
+                return new OutputStream() {
+                    @Override
+                    public void write(int b) throws IOException {
+                        throw new IOException("Simulated broken pipe on stdin write");
+                    }
+                };
+            }
+            return stdin;
+        }
+
+        String capturedStdin() {
+            return stdin.toString(StandardCharsets.UTF_8);
         }
 
         @Override
@@ -247,6 +266,7 @@ class AgyCliTransportTest {
         AtomicReference<List<String>> capturedCommand = new AtomicReference<>();
         AtomicReference<Path> capturedSchemaFile = new AtomicReference<>();
         AtomicReference<String> capturedSchemaContent = new AtomicReference<>();
+        AtomicReference<FakeProcess> capturedProcess = new AtomicReference<>();
 
         AgyCliTransport transport = new AgyCliTransport("agy", Duration.ofSeconds(5), pb -> {
             capturedCommand.set(new ArrayList<>(pb.command()));
@@ -260,32 +280,37 @@ class AgyCliTransportTest {
                     throw new RuntimeException(e);
                 }
             }
-            return new FakeProcess(0, "{\"status\":\"SUCCESS\"}", "", false);
+            FakeProcess proc = new FakeProcess(0, "{\"status\":\"SUCCESS\"}", "", false);
+            capturedProcess.set(proc);
+            return proc;
         });
 
         String requestWithSchema = "{\"prompt\":\"find nearest station\",\"json_schema\":\"{\\\"type\\\":\\\"object\\\"}\"}";
         transport.sendOutcome(requestWithSchema);
 
         assertNotNull(capturedCommand.get());
-        assertTrue(capturedCommand.get().contains("--print"));
-        int printIndex = capturedCommand.get().indexOf("--print");
-        assertEquals("find nearest station", capturedCommand.get().get(printIndex + 1));
+        assertFalse(capturedCommand.get().contains("--print"), "Command line must not contain --print flag");
+        assertNotNull(capturedProcess.get());
+        assertEquals("find nearest station", capturedProcess.get().capturedStdin(), "Prompt must be delivered via stdin");
         assertTrue(capturedCommand.get().contains("--json-schema"));
         assertNotNull(capturedSchemaFile.get());
         assertEquals("{\"type\":\"object\"}", capturedSchemaContent.get());
 
         // Test without schema: --json-schema must not be present
         AtomicReference<List<String>> capturedCommandNoSchema = new AtomicReference<>();
+        AtomicReference<FakeProcess> capturedProcessNoSchema = new AtomicReference<>();
         AgyCliTransport noSchemaTransport = new AgyCliTransport("agy", Duration.ofSeconds(5), pb -> {
             capturedCommandNoSchema.set(new ArrayList<>(pb.command()));
-            return new FakeProcess(0, "{\"status\":\"SUCCESS\"}", "", false);
+            FakeProcess proc = new FakeProcess(0, "{\"status\":\"SUCCESS\"}", "", false);
+            capturedProcessNoSchema.set(proc);
+            return proc;
         });
 
         noSchemaTransport.sendOutcome("{\"prompt\":\"summarize text\"}");
         assertNotNull(capturedCommandNoSchema.get());
-        assertTrue(capturedCommandNoSchema.get().contains("--print"));
-        int noSchemaPrintIndex = capturedCommandNoSchema.get().indexOf("--print");
-        assertEquals("summarize text", capturedCommandNoSchema.get().get(noSchemaPrintIndex + 1));
+        assertFalse(capturedCommandNoSchema.get().contains("--print"), "Command line must not contain --print flag");
+        assertNotNull(capturedProcessNoSchema.get());
+        assertEquals("summarize text", capturedProcessNoSchema.get().capturedStdin(), "Prompt must be delivered via stdin");
         assertFalse(capturedCommandNoSchema.get().contains("--json-schema"));
     }
 
@@ -379,5 +404,49 @@ class AgyCliTransportTest {
         AiTransportResult stringOutcome = stringTransport.sendOutcome(validRequest("string"));
         assertInstanceOf(AiTransportResult.Failure.class, stringOutcome);
         assertEquals(AiTransportResult.FailureKind.MALFORMED_RESPONSE, ((AiTransportResult.Failure) stringOutcome).kind());
+    }
+
+    @Test
+    void testPromptWithDoubleQuotesAndNewlinesIsDeliveredViaStdinIntact() {
+        String trickyPrompt = "Line 1: filler words like \"Well\", \"Oh\", \"Look at us\".\nLine 2: \"quoted text\"\nLine 3: 日本語";
+        AtomicReference<FakeProcess> capturedProcess = new AtomicReference<>();
+        AtomicReference<List<String>> capturedCommand = new AtomicReference<>();
+
+        AgyCliTransport transport = new AgyCliTransport("agy", Duration.ofSeconds(5), pb -> {
+            capturedCommand.set(new ArrayList<>(pb.command()));
+            FakeProcess proc = new FakeProcess(0, "{\"status\":\"SUCCESS\"}", "", false);
+            capturedProcess.set(proc);
+            return proc;
+        });
+
+        JsonObject req = new JsonObject();
+        req.addProperty("prompt", trickyPrompt);
+        AiTransportResult outcome = transport.sendOutcome(req.toString());
+
+        assertInstanceOf(AiTransportResult.Success.class, outcome);
+        assertNotNull(capturedCommand.get());
+        assertFalse(capturedCommand.get().contains("--print"), "Command line must not contain --print");
+        assertNotNull(capturedProcess.get());
+        assertEquals(trickyPrompt, capturedProcess.get().capturedStdin(),
+                "Prompt containing double quotes, newlines, and unicode must arrive via stdin completely intact");
+    }
+
+    @Test
+    void testStdinWriteIOExceptionReturnsTransientFailure() {
+        AtomicReference<Path> capturedDir = new AtomicReference<>();
+        AgyCliTransport transport = new AgyCliTransport("agy", Duration.ofSeconds(5), pb -> {
+            capturedDir.set(pb.directory().toPath());
+            assertTrue(Files.exists(capturedDir.get()), "Temp dir must exist when process starts");
+            return new FakeProcess(0, "{\"status\":\"SUCCESS\"}", "", false, true);
+        });
+
+        AiTransportResult outcome = transport.sendOutcome(validRequest("write failure test"));
+
+        assertInstanceOf(AiTransportResult.Failure.class, outcome);
+        AiTransportResult.Failure failure = (AiTransportResult.Failure) outcome;
+        assertEquals(AiTransportResult.FailureKind.TRANSIENT, failure.kind());
+        assertTrue(failure.diagnostic().contains("Failed to write prompt to agy stdin"));
+        assertNotNull(capturedDir.get());
+        assertFalse(Files.exists(capturedDir.get()), "Temp dir must be cleaned up on stdin write failure");
     }
 }
