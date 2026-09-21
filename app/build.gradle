@@ -215,6 +215,7 @@ test {
     useJUnitPlatform {
         excludeTags 'local-integration'
         excludeTags 'embedding-manual'
+        excludeTags 'benchmark'
     }
     systemProperty 'elite.intel.db.url', 'jdbc:sqlite:file:testdb?mode=memory&cache=shared&busy_timeout=5000'
     systemProperty 'elite.intel.db.pool.size', '1'
@@ -302,6 +303,22 @@ tasks.register('embeddingTest', Test) {
         events 'passed', 'failed', 'skipped'
         exceptionFormat 'full'
         showStandardStreams = true // surface the printed cosine matrix
+    }
+}
+
+// Run with: ./gradlew benchmarkTest
+// 50-turn A/B benchmark comparing resident vs one-shot agy transport. Long-running (~8 min). Excluded from CI.
+tasks.register('benchmarkTest', Test) {
+    description = '50-turn A/B benchmark comparing resident vs one-shot agy transport. Not for CI.'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'benchmark'
+    }
+    maxParallelForks = 1
+    testLogging {
+        events 'passed', 'failed', 'skipped'
+        exceptionFormat 'full'
+        showStandardStreams = true
     }
 }
 
