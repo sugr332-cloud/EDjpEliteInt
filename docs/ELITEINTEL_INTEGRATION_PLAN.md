@@ -363,6 +363,36 @@ G-5 実装・merge 後、実機確認を行ったところ、以下の事実が�
 - 「こんにちは」等の短い雑談発言で、エイリアス未定義ツールが誤選定されず、`gameTools` が空（`LlmRequest.tools()` が `SpeakFunction` のみ、または空）になり、`TurnRoutingLlmGateway` によって `chatGateway`（agy）へルーティングされることが実機で確認できる。
 - エイリアスが定義されている正当なコマンド（短文・長文問わず、例:「停止」「フリートキャリアへ移動して」）は、引き続き正しく `gameTools` が選ばれ、`toolGateway` へルーティングされることが既存のテストで確認できる。
 
+##### G-6 の実効性についての追記（実機確認で判明、確定事項、2026-09-20）
+
+G-6 merge 後、実機ログで再検証したところ、`hasNaturalLanguageAlias()` フィルタは**一件も候補を除外できていなかった**（`candidates=114, eligible=114` と完全一致）ことが判明した。原因を READ-ONLY で再調査した結果、上記「背景」で述べた「8件中6件がエイリアス未定義」という診断が**誤りであった**ことが確認された。
+
+- 報告のあった8ツール（`toggle_discovery_announcements`, `cycle_next_page`, `exit_close`, `interrupt`, `cycle_next_panel`, `query_current_location`, `cycle_previous_page`, `play_music`）はすべて、英語版・日本語版のエイリアス定義ファイル（`app/src/main/resources/i18n/ai_action_aliases.properties`、`ai_action_aliases_ja.properties`）に正規の自然言語エイリアスを持っていた（例: `exit_close=close panel, exit panel, close map, ..., close, exit, back out`）。コマンド ID へのフォールバックは発生していなかった。
+- `hasNaturalLanguageAlias()` は与えられたデータに対して正しく `true` を返しており、実装自体にバグはない。誤っていたのは「これらのツールはエイリアス未定義である」という当初の事実認定である。
+- 真因は、`AliasEmbeddingText.phrases()`（`app/src/main/java/elite/intel/ai/brain/vega/prompt/AliasEmbeddingText.java`）がエイリアス文字列をカンマ区切りで個々のフレーズに分割し、`semanticSelect` の `bestSimilarity` がそのうち最も類似度が高い1フレーズを採用する設計にある。`exit_close` のエイリアスリスト末尾には `close`、`exit`、`back out` のような単語単位の短いフレーズが含まれており、`play_music` にも `music on` のような短いフレーズが含まれる。短い入力（「こんにちは」）が、エイリアスリスト全体ではなく、その中の**個々の短いフレーズ**とだけ偶然高いコサイン類似度を示してしまうことが実際の原因であった（多言語埋め込みモデルの短文同士の類似度インフレ現象自体は、当初の診断通り存在する）。
+- したがって、「ツールにエイリアスが定義されているか否か」という粒度のフィルタ（G-6）では、この問題を検出できない。問題はクエリ（入力）側の短さに起因するため、対策もクエリ側の短さを基準にすべきである。
+- G-6 の `hasNaturalLanguageAlias` フィルタは無害（誤動作はしない）だが、この問題の解決には効果がない。削除は今回のスコープ外とし、そのまま残す。
+
+##### 新しい設計方針（G-7、確定事項）
+
+- 入力（`currentInput`、前後トリム後）の文字数が一定の閾値（`SHORT_INPUT_CHAR_THRESHOLD`、暫定値 6）未満の場合、`semanticSelect` が採用する類似度の基準値を、通常の `SEM_FLOOR`（0.85）ではなく、より高い `SHORT_INPUT_SEM_FLOOR`（暫定値 0.93）に引き上げる。
+- 通常の長さの入力に対する既存ロジック（`SEM_FLOOR`、`SEM_MARGIN`、`SEM_MAX`）は一切変更しない。
+- これにより、「こんにちは」のような短い雑談発言と、エイリアスリスト内の短いフレーズとの偶発的な高スコア一致を防ぎつつ、「停止」「FSS」等の正当な短いゲームコマンド（真に高い類似度で一致する場合）は、引き上げた基準値を満たせば引き続き選定される。
+- 当初 G-6 の検討時に不採用とした「短文入力を一律スキップする」設計（§R.6.3 背景）とは異なり、本方針は短文入力を完全に遮断せず、採用基準を引き上げるだけなので、正当な短いコマンドを誤って弾く副作用を避けられる。
+
+##### G-7 実装計画
+
+§R.14 の実装台帳（Track J）にならい、Track G の実装単位として以下を追加する。
+
+| ID | 内容 | 変更許可ファイル | TEST GATE |
+|---|---|---|---|
+| G-7 | `SemanticActionReducer` に `SHORT_INPUT_CHAR_THRESHOLD`（暫定値6）・`SHORT_INPUT_SEM_FLOOR`（暫定値0.93）の定数を追加する。`currentInput`（トリム後）の文字数がこの閾値未満の場合、`semanticSelect` が `best` と比較する基準値として `SEM_FLOOR` の代わりに `SHORT_INPUT_SEM_FLOOR` を使う。既存の `SEM_FLOOR`、`SEM_MARGIN`、`SEM_MAX` は変更しない。G-6 の `hasNaturalLanguageAlias` フィルタはそのまま残す。 | `app/src/main/java/elite/intel/ai/brain/vega/prompt/SemanticActionReducer.java`、`app/src/test/java/elite/intel/ai/brain/vega/prompt/SemanticActionReducerTest.java` | `./gradlew --no-daemon :app:test --tests '*SemanticActionReducerTest' --tests '*TurnRoutingLlmGatewayTest'` |
+
+##### 完了条件（G-7）
+
+- 短い入力（`SHORT_INPUT_CHAR_THRESHOLD` 未満）に対しては `SHORT_INPUT_SEM_FLOOR` が適用され、エイリアスリスト内の短いフレーズとの偶発一致（`exit_close`、`play_music` 等の再現シナリオ）が、固定 fixture で選定されないことを確認できる。
+- 通常の長さの入力に対する既存の意味類似度マッチング能力（`SEM_FLOOR`、`SEM_MARGIN`、`SEM_MAX`）に変化がないことを、既存テストで確認できる。
+
 ### R.7 v2-P4 以降
 
 #### R.7.1 ローカル LLM 導入（次フェーズ、未着手）

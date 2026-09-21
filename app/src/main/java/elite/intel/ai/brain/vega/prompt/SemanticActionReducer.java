@@ -32,6 +32,14 @@ public final class SemanticActionReducer implements VegaActionReducer {
     private static final double SEM_MARGIN = 0.04;
     /** Maximum number of game tools exposed to one turn. */
     private static final int SEM_MAX = 8;
+    /**
+     * Trimmed input shorter than this (chars) is short enough for embedding representation collapse to inflate
+     * similarity against an individual short alias phrase (e.g. "close", "exit"), so {@link #SHORT_INPUT_SEM_FLOOR}
+     * applies instead of {@link #SEM_FLOOR} (§R.6.3 G-7).
+     */
+    private static final int SHORT_INPUT_CHAR_THRESHOLD = 6;
+    /** Raised floor for short input (§R.6.3 G-7), provisional pending real-machine tuning. */
+    private static final double SHORT_INPUT_SEM_FLOOR = 0.93;
 
     private final BiFunction<Set<IntelActionCategory>, GameStateSnapshot,
             List<GameToolCandidates.Candidate>> candidateSource;
@@ -205,8 +213,12 @@ public final class SemanticActionReducer implements VegaActionReducer {
     /**
      * Scores every candidate by the best cosine of the input against its localized alias phrases, then keeps
      * the relative band above the floor, ranked and capped. Returns empty when the best match is below the floor.
-     * Candidates without natural-language aliases are excluded from semantic matching to prevent short-input
-     * false positives from representation collapse against raw English command IDs.
+     * Candidates without natural-language aliases are excluded from semantic matching (§R.6.3 G-6; harmless but,
+     * per real-machine verification, ineffective against the actual false-positive mechanism below). A short
+     * trimmed input raises the floor to {@link #SHORT_INPUT_SEM_FLOOR} (§R.6.3 G-7): representation collapse can
+     * inflate similarity between a short input and one short individual alias phrase inside an otherwise long,
+     * legitimate alias list (e.g. "close"/"exit" trailing {@code exit_close}'s aliases), which the G-6 alias-
+     * presence filter cannot catch since those tools do have real aliases.
      */
     private List<LlmToolDefinition> semanticSelect(SemanticPhraseMatcher matcher,
                                                    List<GameToolCandidates.Candidate> candidates, String input,
@@ -234,10 +246,11 @@ public final class SemanticActionReducer implements VegaActionReducer {
             scores[i] = matcher.bestSimilarity(queryVector, aliases);
             best = Math.max(best, scores[i]);
         }
-        if (best < SEM_FLOOR) {
+        double floor = input.strip().length() < SHORT_INPUT_CHAR_THRESHOLD ? SHORT_INPUT_SEM_FLOOR : SEM_FLOOR;
+        if (best < floor) {
             VegaDiagnostics.debugAmbient("reduce", String.format(Locale.ROOT,
                     "semantic: candidates=%d (eligible=%d) best=%.3f < floor %.2f -> no game tools (conversation/recall)",
-                    candidates.size(), eligible.size(), best, SEM_FLOOR));
+                    candidates.size(), eligible.size(), best, floor));
             return List.of();
         }
 
