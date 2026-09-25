@@ -34,12 +34,7 @@ class DisplayNumeralsTest {
     void everythingTheAppSpellsOutCanBeReadBack() {
         for (Language language : Language.values()) {
             // DisplayNumerals finds a spelled figure by scanning for space-delimited alphabetic word
-            // boundaries (see startsAWord()/couldBeANumber()), a premise Japanese does not share: it is
-            // written without spaces between words. ICU spells a Japanese figure out correctly (NumberWords
-            // produces "百" for 100), but nothing here can find that span inside surrounding Japanese text,
-            // so the round-trip this test asserts does not hold yet. Revisit when Japanese TTS narration
-            // (VOICEVOX, not yet implemented) makes this a real path rather than a currently-unused one.
-            if (language == Language.JA) continue;
+            // boundaries for European languages, and uses dedicated kanji parsing for Japanese (P2-J17).
             for (long value : new long[]{100, 999, 1224, 8450, 343_000, 45_132_120, 1_020_000_000L}) {
                 String spoken = NumberWords.of(value, language);
                 assertEquals(LocalizedNumbers.grouped(value, language), DisplayNumerals.digits(spoken, language),
@@ -157,5 +152,44 @@ class DisplayNumeralsTest {
         assertEquals(null, DisplayNumerals.digits(null, Language.EN));
         assertEquals("", DisplayNumerals.digits("", Language.EN));
         assertEquals("ok", DisplayNumerals.digits("ok", Language.EN));
+        assertEquals(null, DisplayNumerals.digits(null, Language.JA));
+        assertEquals("", DisplayNumerals.digits("", Language.JA));
+    }
+
+    @Test
+    void japaneseDisplayNumeralsConvertsFiguresAboveHundredAndDecimals() {
+        // Spec §R.14 P2-J17 requirements
+        assertEquals("5,103,950クレジット",
+                DisplayNumerals.digits("五百十万三千九百五十クレジット", Language.JA));
+        assertEquals("12.61光年",
+                DisplayNumerals.digits("十二点六一光年", Language.JA));
+        assertEquals("473光秒",
+                DisplayNumerals.digits("四百七十三光秒", Language.JA));
+        assertEquals("2,026年",
+                DisplayNumerals.digits("二千二十六年", Language.JA));
+
+        // Figures below 100 stay words to prevent false conversions in ordinary prose
+        assertEquals("一番近いステーション",
+                DisplayNumerals.digits("一番近いステーション", Language.JA));
+        assertEquals("十分です",
+                DisplayNumerals.digits("十分です", Language.JA));
+        assertEquals("三つ",
+                DisplayNumerals.digits("三つ", Language.JA));
+
+        // Existing Arabic numerals and system names are untouched
+        assertEquals("Col 285 Sector",
+                DisplayNumerals.digits("Col 285 Sector", Language.JA));
+        assertEquals("HIP 22460",
+                DisplayNumerals.digits("HIP 22460", Language.JA));
+        assertEquals("100クレジット",
+                DisplayNumerals.digits("100クレジット", Language.JA));
+
+        // Decimal edge cases
+        assertEquals("0.5",
+                DisplayNumerals.digits("〇点五", Language.JA));
+        assertEquals("1.02",
+                DisplayNumerals.digits("一・〇二", Language.JA));
+        assertEquals("要点を説明します",
+                DisplayNumerals.digits("要点を説明します", Language.JA));
     }
 }

@@ -14,6 +14,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Puts the digits back into a line the commander <em>reads</em>, after it was spelled out for the voice.
@@ -98,7 +100,11 @@ public final class DisplayNumerals {
     }
 
     static String digits(String text, Language language) {
-        if (text == null || text.length() < 3) return text;
+        if (text == null || text.isEmpty()) return text;
+        if (language == Language.JA) {
+            return convertJapaneseNumerals(text);
+        }
+        if (text.length() < 3) return text;
         RuleBasedNumberFormat reader = readerFor(language);
         StringBuilder out = new StringBuilder(text.length());
         int index = 0;
@@ -187,5 +193,171 @@ public final class DisplayNumerals {
             reader.setLenientParseMode(true);
             return reader;
         });
+    }
+
+    // --- Japanese numeral conversion (P2-J17) ---
+
+    private static final Pattern JAPANESE_NUMERAL_PATTERN = Pattern.compile(
+            "([〇零一二三四五六七八九十百千万億兆]+(?:[点・][〇零一二三四五六七八九]+)?|[点・][〇零一二三四五六七八九]+)"
+    );
+
+    static String convertJapaneseNumerals(String text) {
+        if (text == null || text.isEmpty()) return text;
+        Matcher matcher = JAPANESE_NUMERAL_PATTERN.matcher(text);
+        StringBuilder sb = new StringBuilder(text.length());
+        int lastEnd = 0;
+        while (matcher.find()) {
+            sb.append(text, lastEnd, matcher.start());
+            String match = matcher.group(1);
+            String converted = convertJapaneseFigure(match);
+            if (converted != null) {
+                sb.append(converted);
+            } else {
+                sb.append(match);
+            }
+            lastEnd = matcher.end();
+        }
+        sb.append(text, lastEnd, text.length());
+        return sb.toString();
+    }
+
+    private static String convertJapaneseFigure(String match) {
+        if (match == null || match.isEmpty()) return null;
+        int dotIdx = -1;
+        for (int i = 0; i < match.length(); i++) {
+            char c = match.charAt(i);
+            if (c == '点' || c == '・') {
+                dotIdx = i;
+                break;
+            }
+        }
+
+        if (dotIdx >= 0) {
+            String intStr = match.substring(0, dotIdx);
+            String fracStr = match.substring(dotIdx + 1);
+            if (fracStr.isEmpty()) {
+                return null;
+            }
+            long intVal = intStr.isEmpty() ? 0L : parseKanjiInteger(intStr);
+            String formattedInt = LocalizedNumbers.grouped(intVal, Language.JA);
+            StringBuilder fracDigits = new StringBuilder();
+            for (int i = 0; i < fracStr.length(); i++) {
+                int d = kanjiDigitValue(fracStr.charAt(i));
+                if (d < 0) return null;
+                fracDigits.append(d);
+            }
+            return formattedInt + "." + fracDigits;
+        } else {
+            long val = parseKanjiInteger(match);
+            // Values below SMALLEST_CONVERTED (100) stay words to prevent misconverting ordinary phrases
+            // like "一番", "十分", "三つ".
+            if (val < SMALLEST_CONVERTED) {
+                return null;
+            }
+            return LocalizedNumbers.grouped(val, Language.JA);
+        }
+    }
+
+    static long parseKanjiInteger(String s) {
+        if (s == null || s.isEmpty()) return 0L;
+
+        int chouIdx = s.indexOf('兆');
+        if (chouIdx > 0) {
+            String left = s.substring(0, chouIdx);
+            String right = s.substring(chouIdx + 1);
+            long leftVal = parseKanjiInteger(left);
+            if (leftVal > 0) {
+                return leftVal * 1_000_000_000_000L + parseKanjiInteger(right);
+            }
+        }
+
+        int okuIdx = s.indexOf('億');
+        if (okuIdx > 0) {
+            String left = s.substring(0, okuIdx);
+            String right = s.substring(okuIdx + 1);
+            long leftVal = parseSmallSection(left);
+            if (leftVal > 0) {
+                return leftVal * 100_000_000L + parseKanjiInteger(right);
+            }
+        }
+
+        int manIdx = s.indexOf('万');
+        if (manIdx > 0) {
+            String left = s.substring(0, manIdx);
+            String right = s.substring(manIdx + 1);
+            long leftVal = parseSmallSection(left);
+            if (leftVal > 0) {
+                return leftVal * 10_000L + parseSmallSection(right);
+            }
+        }
+
+        return parseSmallSection(s);
+    }
+
+    private static long parseSmallSection(String s) {
+        if (s == null || s.isEmpty()) return 0L;
+
+        boolean hasUnits = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '十' || c == '百' || c == '千') {
+                hasUnits = true;
+                break;
+            }
+        }
+
+        if (!hasUnits) {
+            long val = 0;
+            for (int i = 0; i < s.length(); i++) {
+                int d = kanjiDigitValue(s.charAt(i));
+                if (d < 0) return 0L;
+                val = val * 10 + d;
+            }
+            return val;
+        }
+
+        long total = 0;
+        long currentDigit = 0;
+        boolean hasDigit = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            int digit = kanjiDigitValue(c);
+            if (digit >= 0) {
+                currentDigit = digit;
+                hasDigit = true;
+            } else if (c == '千') {
+                total += (hasDigit ? currentDigit : 1L) * 1000L;
+                currentDigit = 0;
+                hasDigit = false;
+            } else if (c == '百') {
+                total += (hasDigit ? currentDigit : 1L) * 100L;
+                currentDigit = 0;
+                hasDigit = false;
+            } else if (c == '十') {
+                total += (hasDigit ? currentDigit : 1L) * 10L;
+                currentDigit = 0;
+                hasDigit = false;
+            }
+        }
+        if (hasDigit) {
+            total += currentDigit;
+        }
+        return total;
+    }
+
+    private static int kanjiDigitValue(char c) {
+        return switch (c) {
+            case '〇', '零' -> 0;
+            case '一' -> 1;
+            case '二' -> 2;
+            case '三' -> 3;
+            case '四' -> 4;
+            case '五' -> 5;
+            case '六' -> 6;
+            case '七' -> 7;
+            case '八' -> 8;
+            case '九' -> 9;
+            default -> -1;
+        };
     }
 }
