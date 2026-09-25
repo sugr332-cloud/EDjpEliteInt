@@ -1,5 +1,6 @@
 package elite.intel.ai.brain.actions.handlers.queries;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import elite.intel.ai.brain.actions.ActionParameterSpec;
 import elite.intel.ai.brain.actions.handlers.queries.struct.AiDataStruct;
@@ -71,7 +72,7 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                 ),
                 new ActionParameterSpec(
                         PARAM_RADIUS,
-                        "integer",
+                        "number",
                         false,
                         "Search radius in light years (1-50 ly, default 30 ly)",
                         List.of("30", "50"),
@@ -151,11 +152,17 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
         return PRIORITY_PROFIT;
     }
 
-    private int extractRadiusParam(JsonObject params) {
+    int extractRadiusParam(JsonObject params) {
         if (params != null && params.has(PARAM_RADIUS)) {
             try {
-                int r = params.get(PARAM_RADIUS).getAsInt();
-                return normalizeRadius(r);
+                JsonElement elem = params.get(PARAM_RADIUS);
+                if (elem != null && !elem.isJsonNull()) {
+                    double val = elem.getAsDouble();
+                    if (!Double.isNaN(val) && !Double.isInfinite(val)) {
+                        int rounded = (int) Math.round(val);
+                        return normalizeRadius(rounded);
+                    }
+                }
             } catch (Exception e) {
                 // fall through to default
             }
