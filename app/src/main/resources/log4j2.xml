@@ -119,6 +119,8 @@
         <Logger name="elite.intel.db" level="error"/>
         <Logger name="elite.intel.db.managers.SubSystemsManager" level="error"/>
         <Logger name="elite.intel.ai.brain.handlers" level="debug"/>
+        <Logger name="elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery" level="info"/>
+        <Logger name="elite.intel.ai.brain.actions.handlers.queries.NearestOutfittingQuery" level="info"/>
         <Logger name="elite.intel.ws" level="error"/>
         <!-- warn, on purpose: the two lines under here are "that panel's key is unbound" and
              "the panel did not open, retrying", which is the visible half of a binding problem -
