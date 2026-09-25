@@ -327,6 +327,18 @@ public class TradeCandidateCalculatorTest {
         assertEquals(1, result.candidates().size());
     }
 
+    @Test
+    void testIsMarketFreshWithPlusZeroZeroTimezone() {
+        Instant now = Instant.parse("2026-09-25T12:00:00Z");
+        // Within 10 hours with +00 format
+        assertTrue(TradeCandidateCalculator.isMarketFresh("2026-09-25 11:00:00+00", now));
+        // More than 10 hours ago
+        assertFalse(TradeCandidateCalculator.isMarketFresh("2026-09-25 01:00:00+00", now));
+        // Future tolerance (5 minutes)
+        assertTrue(TradeCandidateCalculator.isMarketFresh("2026-09-25 12:04:00+00", now));
+        assertFalse(TradeCandidateCalculator.isMarketFresh("2026-09-25 12:10:00+00", now));
+    }
+
     private static StationResult createStation(
             String id, String systemName, String stationName, Double distFromCurrent, Double distLs,
             String marketUpdatedAt, Double x, Double y, Double z,

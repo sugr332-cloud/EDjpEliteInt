@@ -8,6 +8,7 @@ import elite.intel.gameapi.search.spansh.outfitting.MatchedModule;
 import elite.intel.gameapi.search.spansh.outfitting.ModuleDictionary;
 import elite.intel.gameapi.search.spansh.outfitting.OutfittingStationSearchClient;
 import elite.intel.gameapi.search.spansh.outfitting.OutfittingStationSearchCriteria;
+import elite.intel.gameapi.search.spansh.SpanshTimestamps;
 import elite.intel.gameapi.search.spansh.station.marketstation.TradeStationSearchResultDto;
 import elite.intel.gameapi.search.spansh.traderoute.TradeRouteSearchCriteria;
 import elite.intel.session.PlayerSession;
@@ -155,8 +156,10 @@ public class NearestOutfittingQuery extends BaseQueryAnalyzer implements IntelQu
             return null;
         }
         try {
-            // Spansh outfitting_updated_at is ISO-8601 (e.g. 2026-09-24T12:00:00Z)
-            Instant updated = Instant.parse(isoTimestamp.replace(" ", "T"));
+            Instant updated = SpanshTimestamps.parse(isoTimestamp);
+            if (updated == null) {
+                return null;
+            }
             return ChronoUnit.HOURS.between(updated, Instant.now());
         } catch (Exception e) {
             return null;
@@ -211,7 +214,7 @@ public class NearestOutfittingQuery extends BaseQueryAnalyzer implements IntelQu
                 - If status is "no_result": inform the commander in their language that no station matching their trade profile and search criteria was found selling this module.
                 - If status is "found": report the star system, station name, distance in light years, and arrival distance in light seconds clearly. Mention the price if available.
                 - When status is "found" and stale is true: warn the commander that the outfitting data is over 7 days old and availability may have changed. If stale is false, do not warn about data age.
-                - Use the pre-formatted display string fields (*Display) for all numbers, prices, distances, and data age. Present numbers verbatim with Western Arabic numerals (e.g. 5,103,950, 12.61 ly, 473 Ls). Never convert numbers into kanji numerals (漢数字 like 一, 十, 百, 千, 万) or kana, and never re-round them.
+                - Use the pre-formatted display string fields (*Display) as the source of truth for all numbers, prices, distances, and data age. Never recalculate or re-round them.
                 - Light seconds (Ls) measure distance from the system arrival star to the station, NOT travel time. Never describe Ls as time (do NOT say 'takes X seconds' or '〜秒かかる').
                 - Never invent star systems, stations, or prices not in the data.
                 - Always reply in the commander's language (e.g. Japanese).

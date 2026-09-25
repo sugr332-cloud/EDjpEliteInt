@@ -4,6 +4,7 @@ import elite.intel.gameapi.search.spansh.station.marketstation.TradeStationSearc
 import elite.intel.gameapi.search.spansh.station.marketstation.TradeStationSearchResultDto.StationResult;
 import elite.intel.gameapi.search.spansh.station.marketstation.TradeStationSearchResultDto.StationResult.Commodity;
 import elite.intel.gameapi.search.spansh.station.marketstation.TradeStationSearchResultDto.StationResult.MarketEntry;
+import elite.intel.gameapi.search.spansh.SpanshTimestamps;
 import elite.intel.gameapi.search.spansh.traderoute.TradeRouteSearchCriteria;
 
 import java.time.Duration;
@@ -249,7 +250,10 @@ public class TradeCandidateCalculator {
             return false;
         }
         try {
-            Instant updated = Instant.parse(marketUpdatedAt.replace(" ", "T"));
+            Instant updated = SpanshTimestamps.parse(marketUpdatedAt);
+            if (updated == null) {
+                return false;
+            }
             long ageSeconds = Duration.between(updated, now).toSeconds();
             // Fresh if age is not further in the future than tolerance (-300s) and not older than 10h (36000s)
             return ageSeconds >= -MAX_FUTURE_TOLERANCE_SECONDS && ageSeconds <= MAX_MARKET_AGE_SECONDS;
