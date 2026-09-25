@@ -43,8 +43,14 @@ public class TradeCandidateCalculator {
 
     public record TradeCandidatesResult(
             String status,
-            List<TradeCandidate> candidates
-    ) {}
+            List<TradeCandidate> candidates,
+            int freshStationsCount,
+            int routePairsCount
+    ) {
+        public TradeCandidatesResult(String status, List<TradeCandidate> candidates) {
+            this(status, candidates, 0, 0);
+        }
+    }
 
     public static TradeCandidatesResult calculate(
             List<StationResult> stations,
@@ -53,7 +59,7 @@ public class TradeCandidateCalculator {
             Instant now
     ) {
         if (stations == null || stations.isEmpty() || profile == null || profile.getMaxCargo() <= 0) {
-            return new TradeCandidatesResult("no_result", Collections.emptyList());
+            return new TradeCandidatesResult("no_result", Collections.emptyList(), 0, 0);
         }
 
         // 1. Filter stations with fresh market data (market_updated_at <= 10 hours, allowing up to 5 min clock skew)
@@ -66,7 +72,7 @@ public class TradeCandidateCalculator {
 
         if (freshStations.size() < 2) {
             // Cannot form a 1-hop pair with fewer than 2 fresh stations
-            return new TradeCandidatesResult("no_result", Collections.emptyList());
+            return new TradeCandidatesResult("no_result", Collections.emptyList(), freshStations.size(), 0);
         }
 
         int maxCargo = profile.getMaxCargo();
@@ -183,7 +189,7 @@ public class TradeCandidateCalculator {
         }
 
         if (bestTradePerRoute.isEmpty()) {
-            return new TradeCandidatesResult("no_result", Collections.emptyList());
+            return new TradeCandidatesResult("no_result", Collections.emptyList(), freshStations.size(), 0);
         }
 
         List<TradeCandidate> candidates = new ArrayList<>(bestTradePerRoute.values());
@@ -235,7 +241,7 @@ public class TradeCandidateCalculator {
         }
 
         String status = topCandidates.size() >= 3 ? "ok" : "insufficient_fresh_data";
-        return new TradeCandidatesResult(status, topCandidates);
+        return new TradeCandidatesResult(status, topCandidates, freshStations.size(), bestTradePerRoute.size());
     }
 
     public static boolean isMarketFresh(String marketUpdatedAt, Instant now) {
