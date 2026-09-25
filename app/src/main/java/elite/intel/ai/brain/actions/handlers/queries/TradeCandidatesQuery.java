@@ -32,6 +32,7 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
     private static final Logger log = LogManager.getLogger(TradeCandidatesQuery.class);
 
     public static final String ID = "query_trade_candidates";
+    public static final String PARAM_REFERENCE_SYSTEM = "referenceSystem";
     public static final String PARAM_PRIORITY = "priority";
     public static final String PARAM_RADIUS = "radius";
 
@@ -68,6 +69,14 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
     public List<ActionParameterSpec> parameters() {
         return List.of(
                 new ActionParameterSpec(
+                        PARAM_REFERENCE_SYSTEM,
+                        "string",
+                        false,
+                        "Optional star system name to search trade candidates around (defaults to current system if omitted)",
+                        null,
+                        null
+                ),
+                new ActionParameterSpec(
                         PARAM_PRIORITY,
                         "string",
                         false,
@@ -88,37 +97,53 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
 
     @Override
     public JsonObject handle(String action, JsonObject params, String originalUserInput) throws Exception {
+        String referenceSystemParam = extractReferenceSystemParam(params);
         String priority = extractPriorityParam(params);
         int radiusLy = extractRadiusParam(params);
 
-        // 1. Obtain current system
-        String currentSystem = PlayerSession.getInstance().getPrimaryStarName();
-        if (currentSystem == null || currentSystem.isBlank()) {
-            log.info("Trade candidates query: system=unknown, radius={}ly, priority={}", radiusLy, priority);
+        // 1. Obtain reference system: explicit parameter takes precedence, fallback to current primary star
+        String rawCurrentSystem = PlayerSession.getInstance().getPrimaryStarName();
+        String currentSystem = (rawCurrentSystem != null && !rawCurrentSystem.isBlank()) ? rawCurrentSystem.trim() : null;
+        String searchedFromSystem;
+        String referenceSource;
+        if (referenceSystemParam != null) {
+            searchedFromSystem = referenceSystemParam;
+            referenceSource = "specified";
+        } else if (currentSystem != null) {
+            searchedFromSystem = currentSystem;
+            referenceSource = "current";
+        } else {
+            searchedFromSystem = null;
+            referenceSource = null;
+        }
+
+        if (searchedFromSystem == null) {
+            log.info("Trade candidates query: referenceSystem=unknown, referenceSource=none, radius={}ly, priority={}", radiusLy, priority);
             log.info("Trade candidates result: status=location_unknown, stations=0, freshStations=0, pairs=0, candidates=0 (search: 0ms, calc: 0ms)");
-            TradeCandidatesDataDto locUnknownDto = TradeCandidatesDataDto.locationUnknown(priority, radiusLy);
+            TradeCandidatesDataDto locUnknownDto = TradeCandidatesDataDto.locationUnknown(currentSystem, priority, radiusLy);
             return process(new AiDataStruct(buildInstructions(), locUnknownDto), originalUserInput);
         }
 
         // 2. Obtain trade profile; profile and cargo capacity must be available
         TradeRouteSearchCriteria profile = getTradeProfile();
         if (profile == null || profile.getMaxCargo() <= 0) {
-            log.info("Trade candidates query: system={}, radius={}ly, priority={}, profile={}",
-                    currentSystem, radiusLy, priority,
+            log.info("Trade candidates query: referenceSystem={}, referenceSource={}, radius={}ly, priority={}, profile={}",
+                    searchedFromSystem, referenceSource, radiusLy, priority,
                     profile == null ? "null" : "[maxCargo=" + profile.getMaxCargo() + "]");
             log.info("Trade candidates result: status=profile_unavailable, stations=0, freshStations=0, pairs=0, candidates=0 (search: 0ms, calc: 0ms)");
-            TradeCandidatesDataDto profileUnavailableDto = TradeCandidatesDataDto.profileUnavailable(currentSystem, priority, radiusLy);
+            TradeCandidatesDataDto profileUnavailableDto = TradeCandidatesDataDto.profileUnavailable(
+                    currentSystem, searchedFromSystem, referenceSource, priority, radiusLy);
             return process(new AiDataStruct(buildInstructions(), profileUnavailableDto), originalUserInput);
         }
 
-        log.info("Trade candidates query: system={}, radius={}ly, priority={}, profile=[requiresLargePad={}, maxLs={}, allowPlanetary={}, allowFleetCarriers={}, allowProhibited={}]",
-                currentSystem, radiusLy, priority,
+        log.info("Trade candidates query: referenceSystem={}, referenceSource={}, radius={}ly, priority={}, profile=[requiresLargePad={}, maxLs={}, allowPlanetary={}, allowFleetCarriers={}, allowProhibited={}]",
+                searchedFromSystem, referenceSource, radiusLy, priority,
                 profile.isRequiresLargePad(), profile.getMaxLsFromArrival(),
                 profile.isAllowPlanetary(), profile.isAllowFleetCarriers(), profile.isAllowProhibited());
 
         // 3. Execute search via Spansh API
         long searchStart = System.currentTimeMillis();
-        TradeCandidatesSearchCriteria criteria = TradeCandidatesSearchCriteria.create(currentSystem, radiusLy, profile, Instant.now());
+        TradeCandidatesSearchCriteria criteria = TradeCandidatesSearchCriteria.create(searchedFromSystem, radiusLy, profile, Instant.now());
         TradeStationSearchResultDto searchResult = searchClient.searchTradeStations(criteria);
         long searchDurationMs = System.currentTimeMillis() - searchStart;
 
@@ -127,10 +152,11 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                 : 0;
 
         if (searchResult == null || searchResult.getResults() == null || searchResult.getResults().isEmpty()) {
-            log.info("Trade candidates result: status=no_result, stations=0, freshStations=0, pairs=0, candidates=0 (search: {}ms, calc: 0ms)",
+            log.info("Trade candidates result: status=too_few_stations, stations=0, freshStations=0, pairs=0, candidates=0 (search: {}ms, calc: 0ms)",
                     searchDurationMs);
-            TradeCandidatesDataDto noResultDto = TradeCandidatesDataDto.noResult(currentSystem, priority, radiusLy);
-            return process(new AiDataStruct(buildInstructions(), noResultDto), originalUserInput);
+            TradeCandidatesDataDto tooFewDto = TradeCandidatesDataDto.tooFewStations(
+                    currentSystem, searchedFromSystem, referenceSource, priority, radiusLy, 0);
+            return process(new AiDataStruct(buildInstructions(), tooFewDto), originalUserInput);
         }
 
         // 4. Calculate top trade candidates
@@ -155,6 +181,9 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
         TradeCandidatesDataDto dataDto = TradeCandidatesDataDto.create(
                 calcResult.status(),
                 currentSystem,
+                searchedFromSystem,
+                referenceSource,
+                calcResult.freshStationsCount(),
                 priority,
                 radiusLy,
                 calcResult.candidates()
@@ -175,6 +204,23 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
             return OUT_OF_BOUNDS_RADIUS;
         }
         return rawRadius;
+    }
+
+    String extractReferenceSystemParam(JsonObject params) {
+        if (params != null && params.has(PARAM_REFERENCE_SYSTEM)) {
+            try {
+                JsonElement elem = params.get(PARAM_REFERENCE_SYSTEM);
+                if (elem != null && !elem.isJsonNull()) {
+                    String val = elem.getAsString();
+                    if (val != null && !val.isBlank()) {
+                        return val.trim();
+                    }
+                }
+            } catch (Exception e) {
+                // fall through
+            }
+        }
+        return null;
     }
 
     private String extractPriorityParam(JsonObject params) {
@@ -225,8 +271,11 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                 Answer the commander's request for trade candidate recommendations based strictly on the provided data fields below.
                 
                 Data fields:
-                - status: "ok" (trade candidates found), "insufficient_fresh_data" (fewer candidates found than requested due to freshness constraint), "no_result" (no profitable trade found), "profile_unavailable" (trade profile or cargo capacity is unavailable), or "location_unknown" (commander's current location is unknown)
+                - status: "ok" (trade candidates found), "insufficient_fresh_data" (fewer candidates found than requested due to freshness constraint), "too_few_stations" (fewer than 2 stations with fresh market data found in range to form trade routes), "no_result" (no profitable trade found), "profile_unavailable" (trade profile or cargo capacity is unavailable), or "location_unknown" (commander's reference location is unknown)
                 - currentSystem: commander's current star system
+                - searchedFromSystem: star system used as the center reference for this search
+                - referenceSource: "specified" (commander explicitly requested this reference system) or "current" (commander's current star system was used as default)
+                - freshStationCount: number of stations with fresh market data found in range (relevant when status is "too_few_stations")
                 - priority: sorting priority applied ("profit" or "nearest")
                 - searchRadiusLy / searchRadiusLyDisplay: effective search radius in light years
                 - candidates: list of candidate trades, ranked 1 to 3, already sorted and calculated:
@@ -237,15 +286,18 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                   - unitProfit / unitProfitDisplay: profit per ton (sellPrice - buyPrice)
                   - units / unitsDisplay: cargo units to carry based on cargo capacity, capital, and supply/demand
                   - tripProfit / tripProfitDisplay: total profit for one run (unitProfit * units)
-                  - distanceFromCurrentLy / distanceFromCurrentLyDisplay: distance from commander to buy system
+                  - distanceFromCurrentLy / distanceFromCurrentLyDisplay: distance from searchedFromSystem to buy system
                   - routeDistanceLy / routeDistanceLyDisplay: distance from buy system to sell system
                 
                 Rules:
                 - If status is "profile_unavailable": inform the commander in their language that trade candidate search cannot be performed because trade profile or cargo capacity is not available.
-                - If status is "location_unknown": inform the commander in their language that trade candidate search cannot be performed because their current location is unknown.
+                - If status is "location_unknown": inform the commander in their language that trade candidate search cannot be performed because their reference location is unknown.
+                - If status is "too_few_stations": inform the commander in their language that trade candidates cannot be generated because there are only freshStationCount station(s) (mention the exact count) with fresh market data matching the criteria within searchRadiusLy ly of searchedFromSystem.
                 - If status is "no_result": inform the commander in their language that no profitable trade candidates matching their criteria were found within range.
                 - If status is "insufficient_fresh_data": inform the commander in their language that fewer trade candidates than usual (mention the exact count found) were found within the 10-hour fresh market data window, and present the available candidate(s).
                 - If status is "ok": present the trade candidates clearly in the given order.
+                - Distances (distanceFromCurrentLy) are measured from searchedFromSystem.
+                - When referenceSource is "specified", present the results as candidates around searchedFromSystem rather than commander's current position.
                 - For each candidate: report the commodity, buy station and system, sell station and system, cargo units, unit profit, total trip profit, distance to buy station, and route distance.
                 - Use the pre-formatted display string fields (*Display) as the source of truth for all numbers, prices, profits, quantities, and distances. Never recalculate or re-round them.
                 - Light seconds (Ls) measure distance from the star to the station, NOT travel time. Never describe Ls as time (do NOT say 'takes X seconds' or '〜秒かかる').
@@ -328,6 +380,9 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
     public record TradeCandidatesDataDto(
             String status,
             String currentSystem,
+            String searchedFromSystem,
+            String referenceSource,
+            Integer freshStationCount,
             String priority,
             Integer searchRadiusLy,
             String searchRadiusLyDisplay,
@@ -337,28 +392,60 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
         public TradeCandidatesDataDto(
                 String status,
                 String currentSystem,
+                String searchedFromSystem,
+                String referenceSource,
+                Integer freshStationCount,
                 String priority,
                 Integer searchRadiusLy,
                 List<TradeCandidateDto> candidates
         ) {
-            this(status, currentSystem, priority, searchRadiusLy, formatInteger(searchRadiusLy), candidates);
+            this(status, currentSystem, searchedFromSystem, referenceSource, freshStationCount, priority, searchRadiusLy, formatInteger(searchRadiusLy), candidates);
+        }
+
+        public TradeCandidatesDataDto(
+                String status,
+                String currentSystem,
+                String priority,
+                Integer searchRadiusLy,
+                List<TradeCandidateDto> candidates
+        ) {
+            this(status, currentSystem, currentSystem, "current", 0, priority, searchRadiusLy, formatInteger(searchRadiusLy), candidates);
+        }
+
+        public static TradeCandidatesDataDto locationUnknown(String currentSystem, String priority, int radiusLy) {
+            return new TradeCandidatesDataDto("location_unknown", currentSystem, null, null, 0, priority, radiusLy, formatInteger(radiusLy), Collections.emptyList());
         }
 
         public static TradeCandidatesDataDto locationUnknown(String priority, int radiusLy) {
-            return new TradeCandidatesDataDto("location_unknown", null, priority, radiusLy, formatInteger(radiusLy), Collections.emptyList());
+            return locationUnknown(null, priority, radiusLy);
+        }
+
+        public static TradeCandidatesDataDto profileUnavailable(String currentSystem, String searchedFromSystem, String referenceSource, String priority, int radiusLy) {
+            return new TradeCandidatesDataDto("profile_unavailable", currentSystem, searchedFromSystem, referenceSource, 0, priority, radiusLy, formatInteger(radiusLy), Collections.emptyList());
         }
 
         public static TradeCandidatesDataDto profileUnavailable(String currentSystem, String priority, int radiusLy) {
-            return new TradeCandidatesDataDto("profile_unavailable", currentSystem, priority, radiusLy, formatInteger(radiusLy), Collections.emptyList());
+            return profileUnavailable(currentSystem, currentSystem, "current", priority, radiusLy);
+        }
+
+        public static TradeCandidatesDataDto tooFewStations(String currentSystem, String searchedFromSystem, String referenceSource, String priority, int radiusLy, int freshStationCount) {
+            return new TradeCandidatesDataDto("too_few_stations", currentSystem, searchedFromSystem, referenceSource, freshStationCount, priority, radiusLy, formatInteger(radiusLy), Collections.emptyList());
+        }
+
+        public static TradeCandidatesDataDto noResult(String currentSystem, String searchedFromSystem, String referenceSource, String priority, int radiusLy) {
+            return new TradeCandidatesDataDto("no_result", currentSystem, searchedFromSystem, referenceSource, 0, priority, radiusLy, formatInteger(radiusLy), Collections.emptyList());
         }
 
         public static TradeCandidatesDataDto noResult(String currentSystem, String priority, int radiusLy) {
-            return new TradeCandidatesDataDto("no_result", currentSystem, priority, radiusLy, formatInteger(radiusLy), Collections.emptyList());
+            return noResult(currentSystem, currentSystem, "current", priority, radiusLy);
         }
 
         public static TradeCandidatesDataDto create(
                 String status,
                 String currentSystem,
+                String searchedFromSystem,
+                String referenceSource,
+                int freshStationCount,
                 String priority,
                 int radiusLy,
                 List<TradeCandidate> rawCandidates
@@ -369,11 +456,24 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
             return new TradeCandidatesDataDto(
                     status,
                     currentSystem,
+                    searchedFromSystem,
+                    referenceSource,
+                    freshStationCount,
                     priority,
                     radiusLy,
                     formatInteger(radiusLy),
                     candidateDtos
             );
+        }
+
+        public static TradeCandidatesDataDto create(
+                String status,
+                String currentSystem,
+                String priority,
+                int radiusLy,
+                List<TradeCandidate> rawCandidates
+        ) {
+            return create(status, currentSystem, currentSystem, "current", 0, priority, radiusLy, rawCandidates);
         }
 
         @Override

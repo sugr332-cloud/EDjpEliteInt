@@ -239,6 +239,9 @@ public class TradeCandidatesQueryTest {
             assertNotNull(capturedDto[0]);
             assertEquals("insufficient_fresh_data", capturedDto[0].status()); // 1 candidate found
             assertEquals("Shinrarta Dezhra", capturedDto[0].currentSystem());
+            assertEquals("Shinrarta Dezhra", capturedDto[0].searchedFromSystem());
+            assertEquals("current", capturedDto[0].referenceSource());
+            assertEquals(2, capturedDto[0].freshStationCount());
             assertEquals("nearest", capturedDto[0].priority());
             assertEquals(50, capturedDto[0].searchRadiusLy()); // 0 normalized to 50
             assertEquals(1, capturedDto[0].candidates().size());
@@ -426,6 +429,281 @@ public class TradeCandidatesQueryTest {
         assertEquals("12.61", c.distanceFromCurrentLyDisplay());
         assertEquals("30.50", c.routeDistanceLyDisplay());
         assertNotNull(dto.toYaml());
+    }
+
+    @Test
+    void testExtractReferenceSystemParam() {
+        TradeCandidatesQuery query = new TradeCandidatesQuery();
+
+        JsonObject p1 = new JsonObject();
+        p1.addProperty("referenceSystem", "Sol");
+        assertEquals("Sol", query.extractReferenceSystemParam(p1));
+
+        JsonObject p2 = new JsonObject();
+        p2.addProperty("referenceSystem", "  Achenar  ");
+        assertEquals("Achenar", query.extractReferenceSystemParam(p2));
+
+        JsonObject p3 = new JsonObject();
+        p3.addProperty("referenceSystem", "");
+        assertNull(query.extractReferenceSystemParam(p3));
+
+        JsonObject p4 = new JsonObject();
+        p4.addProperty("referenceSystem", "   ");
+        assertNull(query.extractReferenceSystemParam(p4));
+
+        assertNull(query.extractReferenceSystemParam(new JsonObject()));
+        assertNull(query.extractReferenceSystemParam(null));
+    }
+
+    @Test
+    void testReferenceSystemExplicitUsageSetsCriteriaAndReferenceSource() throws Exception {
+        String[] capturedCriteriaSystem = {null};
+        TradeCandidatesSearchClient mockClient = new TradeCandidatesSearchClient() {
+            @Override
+            public TradeStationSearchResultDto searchTradeStations(TradeCandidatesSearchCriteria criteria) {
+                capturedCriteriaSystem[0] = criteria.getReferenceSystem();
+                return new TradeStationSearchResultDto();
+            }
+        };
+
+        TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+        profile.setMaxCargo(100);
+
+        TradeCandidatesDataDto[] capturedDto = {null};
+        TradeCandidatesQuery query = new TradeCandidatesQuery(mockClient) {
+            @Override
+            TradeRouteSearchCriteria getTradeProfile() {
+                return profile;
+            }
+
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                if (struct.getData() instanceof TradeCandidatesDataDto dto) {
+                    capturedDto[0] = dto;
+                }
+                return new JsonObject();
+            }
+        };
+
+        String prevStar = PlayerSession.getInstance().getPrimaryStarName();
+        try {
+            PlayerSession.getInstance().setCurrentPrimaryStarName("Shinrarta Dezhra");
+
+            JsonObject params = new JsonObject();
+            params.addProperty("referenceSystem", "Sol");
+            query.handle("query_trade_candidates", params, "Sol 周辺の交易候補");
+
+            assertEquals("Sol", capturedCriteriaSystem[0], "Spansh criteria must use explicit reference system");
+            assertNotNull(capturedDto[0]);
+            assertEquals("Sol", capturedDto[0].searchedFromSystem());
+            assertEquals("specified", capturedDto[0].referenceSource());
+            assertEquals("Shinrarta Dezhra", capturedDto[0].currentSystem());
+        } finally {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
+        }
+    }
+
+    @Test
+    void testReferenceSystemOmittedDefaultsToCurrentLocation() throws Exception {
+        String[] capturedCriteriaSystem = {null};
+        TradeCandidatesSearchClient mockClient = new TradeCandidatesSearchClient() {
+            @Override
+            public TradeStationSearchResultDto searchTradeStations(TradeCandidatesSearchCriteria criteria) {
+                capturedCriteriaSystem[0] = criteria.getReferenceSystem();
+                return new TradeStationSearchResultDto();
+            }
+        };
+
+        TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+        profile.setMaxCargo(100);
+
+        TradeCandidatesDataDto[] capturedDto = {null};
+        TradeCandidatesQuery query = new TradeCandidatesQuery(mockClient) {
+            @Override
+            TradeRouteSearchCriteria getTradeProfile() {
+                return profile;
+            }
+
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                if (struct.getData() instanceof TradeCandidatesDataDto dto) {
+                    capturedDto[0] = dto;
+                }
+                return new JsonObject();
+            }
+        };
+
+        String prevStar = PlayerSession.getInstance().getPrimaryStarName();
+        try {
+            PlayerSession.getInstance().setCurrentPrimaryStarName("Shinrarta Dezhra");
+
+            JsonObject params = new JsonObject();
+            query.handle("query_trade_candidates", params, "交易候補を探して");
+
+            assertEquals("Shinrarta Dezhra", capturedCriteriaSystem[0], "Spansh criteria must default to current primary star");
+            assertNotNull(capturedDto[0]);
+            assertEquals("Shinrarta Dezhra", capturedDto[0].searchedFromSystem());
+            assertEquals("current", capturedDto[0].referenceSource());
+            assertEquals("Shinrarta Dezhra", capturedDto[0].currentSystem());
+        } finally {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
+        }
+    }
+
+    @Test
+    void testLocationUnknownWhenBothReferenceSystemAndCurrentLocationMissing() throws Exception {
+        boolean[] searchCalled = {false};
+        TradeCandidatesSearchClient mockClient = new TradeCandidatesSearchClient() {
+            @Override
+            public TradeStationSearchResultDto searchTradeStations(TradeCandidatesSearchCriteria criteria) {
+                searchCalled[0] = true;
+                return new TradeStationSearchResultDto();
+            }
+        };
+
+        TradeCandidatesDataDto[] capturedDto = {null};
+        TradeCandidatesQuery query = new TradeCandidatesQuery(mockClient) {
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                if (struct.getData() instanceof TradeCandidatesDataDto dto) {
+                    capturedDto[0] = dto;
+                }
+                return new JsonObject();
+            }
+        };
+
+        String prevStar = PlayerSession.getInstance().getPrimaryStarName();
+        try {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(null);
+
+            JsonObject params = new JsonObject();
+            query.handle("query_trade_candidates", params, "交易候補を探して");
+
+            assertFalse(searchCalled[0], "External search must not be called when location is unknown");
+            assertNotNull(capturedDto[0]);
+            assertEquals("location_unknown", capturedDto[0].status());
+            assertNull(capturedDto[0].searchedFromSystem());
+            assertNull(capturedDto[0].referenceSource());
+        } finally {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
+        }
+    }
+
+    @Test
+    void testReferenceSystemSpecifiedWorksEvenWhenCurrentLocationIsNull() throws Exception {
+        String[] capturedCriteriaSystem = {null};
+        TradeCandidatesSearchClient mockClient = new TradeCandidatesSearchClient() {
+            @Override
+            public TradeStationSearchResultDto searchTradeStations(TradeCandidatesSearchCriteria criteria) {
+                capturedCriteriaSystem[0] = criteria.getReferenceSystem();
+                return new TradeStationSearchResultDto();
+            }
+        };
+
+        TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+        profile.setMaxCargo(100);
+
+        TradeCandidatesDataDto[] capturedDto = {null};
+        TradeCandidatesQuery query = new TradeCandidatesQuery(mockClient) {
+            @Override
+            TradeRouteSearchCriteria getTradeProfile() {
+                return profile;
+            }
+
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                if (struct.getData() instanceof TradeCandidatesDataDto dto) {
+                    capturedDto[0] = dto;
+                }
+                return new JsonObject();
+            }
+        };
+
+        String prevStar = PlayerSession.getInstance().getPrimaryStarName();
+        try {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(null);
+
+            JsonObject params = new JsonObject();
+            params.addProperty("referenceSystem", "Sol");
+            query.handle("query_trade_candidates", params, "Sol 周辺の交易候補");
+
+            assertEquals("Sol", capturedCriteriaSystem[0]);
+            assertNotNull(capturedDto[0]);
+            assertEquals("Sol", capturedDto[0].searchedFromSystem());
+            assertEquals("specified", capturedDto[0].referenceSource());
+            assertNull(capturedDto[0].currentSystem());
+        } finally {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
+        }
+    }
+
+    @Test
+    void testTooFewStationsWhenSpanshReturnsZeroOrOneStation() throws Exception {
+        TradeStationSearchResultDto emptyDto = new TradeStationSearchResultDto();
+        emptyDto.setResults(List.of());
+
+        TradeStationSearchResultDto[] toReturn = {emptyDto};
+        TradeCandidatesSearchClient mockClient = new TradeCandidatesSearchClient() {
+            @Override
+            public TradeStationSearchResultDto searchTradeStations(TradeCandidatesSearchCriteria criteria) {
+                return toReturn[0];
+            }
+        };
+
+        TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+        profile.setMaxCargo(100);
+
+        TradeCandidatesDataDto[] capturedDto = {null};
+        TradeCandidatesQuery query = new TradeCandidatesQuery(mockClient) {
+            @Override
+            TradeRouteSearchCriteria getTradeProfile() {
+                return profile;
+            }
+
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                if (struct.getData() instanceof TradeCandidatesDataDto dto) {
+                    capturedDto[0] = dto;
+                }
+                return new JsonObject();
+            }
+        };
+
+        String prevStar = PlayerSession.getInstance().getPrimaryStarName();
+        try {
+            PlayerSession.getInstance().setCurrentPrimaryStarName("Shinrarta Dezhra");
+
+            // Case 1: 0 stations returned (or unknown system) -> status=too_few_stations, freshStationCount=0
+            toReturn[0] = emptyDto;
+            query.handle("query_trade_candidates", new JsonObject(), "交易候補");
+            assertNotNull(capturedDto[0]);
+            assertEquals("too_few_stations", capturedDto[0].status());
+            assertEquals(0, capturedDto[0].freshStationCount());
+
+            // Case 2: 1 station returned -> status=too_few_stations, freshStationCount=1
+            String s1Json = """
+                    {
+                      "id": "s1",
+                      "system_name": "Shinrarta Dezhra",
+                      "name": "Jameson Memorial",
+                      "distance": 0.0,
+                      "distance_to_arrival": 300.0,
+                      "market_updated_at": "%s"
+                    }
+                    """.formatted(Instant.now().minus(1, ChronoUnit.HOURS).toString());
+            StationResult s1 = GsonFactory.getGson().fromJson(s1Json, StationResult.class);
+            TradeStationSearchResultDto singleDto = new TradeStationSearchResultDto();
+            singleDto.setResults(List.of(s1));
+
+            toReturn[0] = singleDto;
+            capturedDto[0] = null;
+            query.handle("query_trade_candidates", new JsonObject(), "交易候補");
+            assertNotNull(capturedDto[0]);
+            assertEquals("too_few_stations", capturedDto[0].status());
+            assertEquals(1, capturedDto[0].freshStationCount());
+        } finally {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
+        }
     }
 }
 
