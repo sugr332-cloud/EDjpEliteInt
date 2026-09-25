@@ -1,6 +1,7 @@
 package elite.intel.ai.brain.actions.handlers.queries;
 
 import com.google.gson.JsonObject;
+import elite.intel.ai.brain.actions.ActionParameterSpec;
 import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeCandidatesDataDto;
 import elite.intel.gameapi.search.spansh.station.marketstation.TradeStationSearchResultDto;
 import elite.intel.gameapi.search.spansh.station.marketstation.TradeStationSearchResultDto.StationResult;
@@ -257,4 +258,88 @@ public class TradeCandidatesQueryTest {
             PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
         }
     }
+
+    @Test
+    void testAllActionParameterSpecsPassValidate() {
+        TradeCandidatesQuery query = new TradeCandidatesQuery();
+        List<ActionParameterSpec> specs = query.parameters();
+        assertNotNull(specs);
+        assertFalse(specs.isEmpty());
+        for (ActionParameterSpec spec : specs) {
+            assertDoesNotThrow(spec::validate, "ActionParameterSpec '" + spec.getName() + "' must be valid");
+        }
+    }
+
+    @Test
+    void testExtractRadiusParam() {
+        TradeCandidatesQuery query = new TradeCandidatesQuery();
+
+        // 40 (integer) -> 40
+        JsonObject p40 = new JsonObject();
+        p40.addProperty("radius", 40);
+        assertEquals(40, query.extractRadiusParam(p40));
+
+        // 40.0 (double) -> 40
+        JsonObject p40Double = new JsonObject();
+        p40Double.addProperty("radius", 40.0);
+        assertEquals(40, query.extractRadiusParam(p40Double));
+
+        // "abc" (non-numeric string) -> default 30
+        JsonObject pAbc = new JsonObject();
+        pAbc.addProperty("radius", "abc");
+        assertEquals(30, query.extractRadiusParam(pAbc));
+
+        // 40.4 -> 40, 40.6 -> 41 (rounding check)
+        JsonObject p404 = new JsonObject();
+        p404.addProperty("radius", 40.4);
+        assertEquals(40, query.extractRadiusParam(p404));
+
+        JsonObject p406 = new JsonObject();
+        p406.addProperty("radius", 40.6);
+        assertEquals(41, query.extractRadiusParam(p406));
+
+        // null or empty -> default 30
+        assertEquals(30, query.extractRadiusParam(new JsonObject()));
+        assertEquals(30, query.extractRadiusParam(null));
+    }
+
+    @Test
+    void testRadiusVariantsInHandle() throws Exception {
+        TradeCandidatesDataDto[] capturedDto = {null};
+        TradeCandidatesQuery query = new TradeCandidatesQuery(null) {
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                if (struct.getData() instanceof TradeCandidatesDataDto dto) {
+                    capturedDto[0] = dto;
+                }
+                return new JsonObject();
+            }
+        };
+
+        String prevStar = PlayerSession.getInstance().getPrimaryStarName();
+        try {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(null);
+
+            // 40
+            JsonObject p40 = new JsonObject();
+            p40.addProperty("radius", 40);
+            query.handle("query_trade_candidates", p40, "query");
+            assertEquals(40, capturedDto[0].searchRadiusLy());
+
+            // 40.0
+            JsonObject p40Double = new JsonObject();
+            p40Double.addProperty("radius", 40.0);
+            query.handle("query_trade_candidates", p40Double, "query");
+            assertEquals(40, capturedDto[0].searchRadiusLy());
+
+            // "abc" -> default 30
+            JsonObject pAbc = new JsonObject();
+            pAbc.addProperty("radius", "abc");
+            query.handle("query_trade_candidates", pAbc, "query");
+            assertEquals(30, capturedDto[0].searchRadiusLy());
+        } finally {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
+        }
+    }
 }
+
