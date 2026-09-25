@@ -87,6 +87,10 @@ For v2-P3 and later:
 9. `--dangerously-skip-permissions` MUST NOT be used for project implementation.
 10. Development-time agy controls in §R.13 and runtime agy controls in §R.6 are separate requirements and MUST remain separate.
 
+> **Revision note (2026-09-25 / LLM unification):** Runtime AI conversation is unified on the LLM path (LM Studio + Gemma 4 E4B) and runtime `agy` is retired and archived as unused under `archive/agy-runtime/` (`ELITEINTEL_INTEGRATION_PLAN.md` §R.6). Development-time `agy` use continues. Items 1–8 above therefore no longer describe a runtime path; items 3, 7 and 8 apply equally to the LLM provider (LLM output MUST NOT directly execute DB writes or game actions; DB paths/credentials MUST NOT be placed in prompts; raw LLM responses MUST NOT be blindly persisted to repository files). Item 9 and the development-time controls (§6) remain in force for development-time `agy` use.
+>
+> If the upstream cloud LLM paths are ever configured, their API keys (item "API keys and access tokens" in §2) MUST be supplied only through local configuration/environment and MUST NOT be committed or included in logs/diagnostic dumps.
+
 ## 6. Development-time implementation control
 
 The implementation plan is the source of truth for agy-assisted development.

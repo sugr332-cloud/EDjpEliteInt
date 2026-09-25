@@ -1,7 +1,7 @@
 # c-core — C-CORE exobiology species evaluation
 
 EliteIntel の `elite.intel.bio.ccore.CCoreAdapter` が呼び出す、生物種判定エンジン（C-CORE）です。
-判定の Source of Truth であり、AI（`agy` など）はこの結果を説明・要約するだけです（`docs/ELITEINTEL_INTEGRATION_PLAN.md` §R）。
+判定の Source of Truth であり、AI（LLM）はこの結果を説明・要約するだけです（`docs/ELITEINTEL_INTEGRATION_PLAN.md` §R）。
 
 ## 由来
 

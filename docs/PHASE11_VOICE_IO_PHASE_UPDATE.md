@@ -5,6 +5,9 @@
 **Base:** `docs/ELITEINTEL_INTEGRATION_PLAN.md` / Phase 11
 
 > **改訂注記（2026-09-15）:** Roadmap v2（`ELITEINTEL_INTEGRATION_PLAN.md` §R）では本書の内容は **v2-P5** の完了判定とする。E2E 試験で使う AI CLI Provider は既定で `agy` とする。
+>
+> **改訂注記（2026-09-25 / LLM 一本化）:** 上記の「AI CLI Provider は既定で `agy`」は廃止。E2E 試験で使う AI Provider は `ELITEINTEL_INTEGRATION_PLAN.md` §R.6 の LLM（LM Studio + Gemma 4 E4B）とする。
+> 本文中の「Gemini CLI / Claude CLI」「AI CLI Provider」は「LLM Provider（LM Studio + Gemma 4 E4B）」と読み替える。§4 の完了判定 1.「AI CLI Provider」は「LLM Provider」とする。
 
 ## 1. 位置付け
 

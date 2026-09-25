@@ -45,13 +45,17 @@ EliteIntel fork と EDpjKinsaku の 2 リポジトリ運用で、計画書・コ
 
 ### R.1 最優先事項（2026-09-15 決定）
 
-1. **AI 会話は LLM の HTTP API ではなく `agy`（Antigravity CLI）を外部プロセスとして使う。**
+1. **アプリケーションの AI 会話は LLM（LM Studio + Gemma 4 E4B）へ一本化する。実行時の AI 会話に CLI プロセス（`agy` を含む）は使わない。開発作業には `agy` を使う（§R.13）。**（2026-09-25 改訂、§R.6）
 2. **日本語化は「表示」から「指示（音声・テキストのコマンド）」まで行う。**
+
+> **改訂注記（2026-09-25）:** 2026-09-15 時点の 1. は「AI 会話は LLM の HTTP API ではなく `agy`（Antigravity CLI）を外部プロセスとして使う」であった。
+> その後 G-5 で「tool-calling ターン = LLM / 雑談・要約ターン = `agy`」の二重ルーティングになり、2026-09-25 に **全ターンを LLM へ一本化し、実行時の `agy` 経路を廃止する** と決定した（§R.6）。
+> 旧 §R.6〜§R.6.4 の実行時 `agy` 関連記述（実装・テスト結果を含む）は、未運用として `archive/agy-runtime/` へ移した。
 
 この 2 つは互いにブロックしない並行トラックとして扱う。
 
 - **Track J（日本語化）:** v2-P1 → v2-P2
-- **Track G（agy CLI）:** v2-P3
+- **Track G（AI Provider）:** v2-P3（`agy` 対応、完了）→ v2-P3b（LLM 一本化、§R.6）
 
 C-CORE の追加・拡張（v2-P9）はこの 2 トラックの後に回す。既に完了した C-CORE 接続（旧 Phase 4〜8/12）は壊さず維持する。
 
@@ -60,7 +64,8 @@ C-CORE の追加・拡張（v2-P9）はこの 2 トラックの後に回す。�
 - 現在存在する EliteIntel の機能を先に日本語化する。日本語化のために既存機能を削除・簡略化しない。
 - C-CORE を理由に既存 EliteIntel の UI / Journal / Navigation / Assistant を作り直さない。C-CORE の判定 Source of Truth は維持する。
 - AI は判定エンジンではなく、説明・要約・推薦・自然言語対話・許可済みアクションの選択を担当する。
-- AI Provider は API に固定せず、**CLI プロセスを第一級の実装方式**とし、`agy` を既定実装とする。
+- AI Provider は **LLM（`LlmGateway` → `LlmProviderAdapter` → HTTP `LlmTransport`）に一本化**する。使用モデルは LM Studio 上の Gemma 4 E4B（既存実装）。クラウド API の既存コード（`CLOUD_GATEWAYS`）は削除しないが既定・検証対象ではない。選択は既存の `SystemSession.useLocalCommandLlm()` と `LlmProviderResolver.detectCloudProvider()` に従う。実行時の AI 会話に CLI プロセス（`agy` 等）を使わない（2026-09-25 改訂。旧: 「CLI プロセスを第一級の実装方式とし、`agy` を既定実装とする」）。
+- LLM は唯一の AI 判断層として、雑談・質問応答・ツール選択・引数生成・ツール結果の解釈・日本語応答を担当する。ツールの実行（DB 検索・ゲーム操作など）は EliteIntel の決定的コード（`IntelCommand` / `CommandRegistry`）が行い、LLM には実行権限を渡さない（§R.12、§R.10）。
 - AI Provider の変更で Game Context や C-CORE の内部構造を変更しない。
 - 実装前に read-only 調査を行い、既存コード・仕様・テストを確認する（§0）。
 - 各 Phase は小さく実装し、fixture/test を先に追加する。
@@ -72,14 +77,15 @@ C-CORE の追加・拡張（v2-P9）はこの 2 トラックの後に回す。�
 | v2-P0 | 現状固定 / read-only baseline | **完了** | 旧 Phase 0・1（§5）。build 成功、AI 入力経路を実ファイルで追跡済み |
 | v2-P1 | 日本語化 inventory（表示〜指示） | **完了（数値確定）** | R.4 の件数は `i18n-parity-baseline.txt` と各 `.properties` から計測 |
 | v2-P2 | 既存機能の日本語置換（表示 → 指示） | **進行中** | `Language.JA`（`11907a78`）、P0（`11907a78`）・P1（`5c9716ec`）翻訳済み。残りは R.4 |
-| v2-P3 | AI Provider CLI 化 / `agy` 対応 | **完了（DONE）** | G-1〜G-7、stdin 化（PR #10）、resident agy 化（PR #11）完了。`AgyResidentProcessManager` による常駐プロセス通信（stream-json）、15s/20s 二重タイムアウト、自動復旧、固定 Speak スキーマ、TurnRouting による二重ルーティング（非 speak ツール判定）を実機で実証済み |
-| v2-P4 | 日本語自然言語による問い合わせ・指示（テキスト） | 一部実装 | 旧 Phase 10（§17）: 日本語テキスト入力・日本語応答方針は実装済み。`agy` 経由では未確認 |
+| v2-P3 | AI Provider CLI 化 / `agy` 対応 | **完了（DONE）** | G-1〜G-7、stdin 化（PR #10）、resident agy 化（PR #11）完了。`AgyResidentProcessManager` による常駐プロセス通信（stream-json）、15s/20s 二重タイムアウト、自動復旧、固定 Speak スキーマ、TurnRouting による二重ルーティング（非 speak ツール判定）を実機で実証済み。**2026-09-25、LLM 一本化により実行時の `agy` 経路は廃止。記録は `archive/agy-runtime/`（未運用）へ移動（§R.6、G-8/G-9）** |
+| v2-P3b | LLM 一本化（全ターンを LM Studio + Gemma 4 E4B へ、実行時 `agy` を archive へ移動） | 未着手（2026-09-25 決定） | §R.6。G-8（経路切替）→ G-9（`archive/agy-runtime/` へ移動） |
+| v2-P4 | 日本語自然言語による問い合わせ・指示（テキスト） | 一部実装 | 旧 Phase 10（§17）: 日本語テキスト入力・日本語応答方針は実装済み。LLM 一本化後の経路（§R.6）では未確認 |
 | v2-P5 | 音声入出力（STT / TTS / VOICEVOX） | 一部実装 | Kokoro→日本語フォールバック（`334b35b1`）。実機 E2E は未実施（`PHASE11_VOICE_IO_PHASE_UPDATE.md`）。**同梱 STT（`ParakeetSTTImpl`）は日本語語彙を持たず日本語音声を認識できない（§10 で確認済み）。日本語 STT は別バックエンドを新規に選定する（CLI 方式を含めて検証、R.7）** |
 | v2-P6 | Game Action / Ship Control の安全化 | 既存機能あり | 既存 `GameInputStep` / `GameControllerBus` / `KeyProcessor`。System Map 駅選択は未実装（§17） |
 | v2-P7 | HUD / Overlay / VR | 既存機能あり | Aleoida MATCH 表示は実装済み（旧 Phase 6、§13） |
 | v2-P8 | Generic Game Data / Trade Assistant | 既存機能あり（艤装検索は欠落） | 既存 Spansh / trade 機能（`FindCommodityCommand` 等）。日本語化は v2-P2 の対象。**艤装（モジュール）をギャラクシー内で検索するコマンドは存在しない**（`ShowModulesPanelCommand` はモジュール画面を開くだけ、`query_local_outfitting` は現在地の艤装を LLM に読ませるだけで、`find_commodity` のような「範囲 ly 内から探す」経路がない）。新規コマンドが必要（R.7） |
 | v2-P9 | C-CORE 統合の拡張（全 species / collection state / value / ranking） | 一部完了・後段 | C-CORE 本体は `c-core/`（54 tests passed）。旧 Phase 4・5・6・7(§14)・12(§15) 完了。旧 Phase 7（collection state）・8（all species）・10（value/ranking）未着手。旧 Phase 9 は保留（§16） |
-| v2-P10 | Offline Assistant（ローカル CLI provider） | 未着手 | — |
+| v2-P10 | Offline Assistant（ローカル LLM: LM Studio + Gemma 4 E4B） | 未着手 | 2026-09-25 改訂（旧: ローカル CLI provider）。§R.6 の LLM 一本化と §R.7.1 の実機確認が前提 |
 | v2-P11 | Installer / Update / Runtime packaging | 一部 | C-CORE 同梱（旧 Phase 12、§15）のみ。`c-core/` からの `bio_entry` ビルド成果物を `distribution/ccore/windows/` へ置く工程は手動 |
 
 ### R.4 v2-P1 inventory: 日本語化の残量（2026-09-15 計測）
@@ -180,161 +186,84 @@ Spansh 検索や DB 書き込みに渡さない。R.12 の DB 非汚染ルール
 - localization test が成功し、既存機能の挙動を変更していない。
 - J-1〜J-5 の全カテゴリについて、翻訳・検証・コミットが完了している。
 
-### R.6 v2-P3 AI Provider CLI 化 / `agy` 対応【最優先 / Track G】
+### R.6 v2-P3b AI 会話アーキテクチャ: LLM 一本化【最優先 / Track G】（2026-09-25 決定）
 
-#### 目的
+**この節が AI 会話アーキテクチャの現行の正本である。**
+旧 §R.6〜§R.6.4（v2-P3: 実行時 `agy` 対応、二重ルーティング、resident agy）は `archive/agy-runtime/docs/ELITEINTEL_PLAN_R6_AGY_RUNTIME.md` へ移した（未運用）。
+archive の内容は、ユーザーから明示的に求められた場合を除き、実装時に参照しない（`archive/agy-runtime/README.md`）。
 
-AI 会話の LLM 呼び出しを HTTP API から **`agy` の外部プロセス実行**へ置き換え、`agy` を既定の AI Provider にする。
+#### 決定事項
 
-#### 差し込み位置（既存コードで確認済み）
+- **アプリケーション（実行時）の AI は LLM のみを使う。** 使用モデルは **Gemma 4 E4B**（`google/gemma-4-e4b`）を LM Studio で動かす構成とする。
+  これは既存実装である: `VegaLlmGatewayFactory.LOCAL_GATEWAY`（ラベル `LM Studio (Gemma 4)`）、`LmStudioLlmAdapter`、`LocalLlmModelCheck.SUPPORTED_LOCAL_MODEL_ROOT = "gemma-4-e4b"`、`AiServicesSettingsPanel.DEFAULT_MODEL = "google/gemma-4-e4b"`。
+- AI 会話の全ターン（tool-calling ターン、雑談・要約ターン、`completePlainText` による圧縮・要約）を、**1 つの LLM Gateway** へ送る。
+- LLM Gateway は既存の選択ロジック（`VegaLlmGatewayFactory.createConfiguredGateway`）で決まる。
+  - `SystemSession.useLocalCommandLlm() == true`（既定）→ LM Studio + Gemma 4 E4B（`LOCAL_GATEWAY`）
+  - それ以外 → `LlmProviderResolver.detectCloudProvider()` で検出したクラウド Provider（`CLOUD_GATEWAYS`）。upstream 由来の既存コードとして削除はしないが、本プロジェクトの検証対象・既定ではない。
+- **実行時の AI 会話に CLI プロセス（`agy` を含む）を使わない。** `agy` への自動フォールバックも設けない。
+- 既存の `useLocalCommandLlm` 既定値（`00030__schema.sql` の `default true`）・UI の2択（ローカル／クラウド）は変更しない。
+- **開発作業には引き続き `agy` を使う**（§R.13）。実行時の `agy` 廃止は開発時の `agy` 利用に影響しない。
 
-既存の provider 境界は `elite.intel.ai.brain.vega.llm` の次の 2 つである。
-
-- `LlmTransport` — リクエスト本文を送り、生の応答を返す（現状は HTTP）
-- `LlmProviderAdapter` — `LlmRequest` を provider 形式へ変換し、`parse`（tool-calling ターン）と `parseText`（圧縮ターン）で応答を解釈する
-
-provider の登録は `VegaLlmGatewayFactory`、種別は `ProviderEnum`。したがって `agy` 対応は以下で行い、
-`VegaLlmGateway` / `ThoughtDispatcher` / UI は変更しない。
+#### 責務の分担
 
 ```text
-AiTabPanel / STT → UserInputEvent → VegaSubsystemGate → ThoughtDispatcher
-        ↓
-VegaLlmGateway
-        ↓
-AgyCliProviderAdapter（LlmProviderAdapter）
-        ↓
-AgyCliTransport（LlmTransport, ProcessBuilder）
-        ↓
-agy process（stdin / stdout / stderr / exit code）
+ユーザー（日本語テキスト / 日本語 STT）
+   ↓
+EliteIntel 入力経路（UserInputEvent → ThoughtDispatcher → SemanticActionReducer）
+   ↓
+LLM（LM Studio + Gemma 4 E4B）      ← 唯一の AI 判断層
+   ├─ 自然言語理解・意図判断
+   ├─ ツール選択（speak を含む）と引数生成
+   ├─ 複数ツールの組み合わせ
+   └─ ツール結果の解釈と日本語応答
+   ↓ tool-call
+ToolCallValidator（未知ツール拒否・引数スキーマ検証）
+   ↓
+IntelCommand / CommandRegistry（決定的コード）   ← 唯一の実行層
+   ├─ DB 検索・保存（§R.12 のルールに従う）
+   ├─ 商品・艤装・交易検索（v2-P8）
+   ├─ Journal / Status / Session のゲーム状態
+   └─ ゲーム操作（v2-P6 の allowlist 経由）
 ```
 
-#### 着手前の read-only 確認（実機）
+- 雑談（例:「こんにちは」）も、検索（例:「5A FSD を売っている最寄りのステーション」）も、同じ LLM 経路を通る。検索が必要かどうかは LLM のツール選択で決まり、検索そのものは EliteIntel のコマンドが行う。
+- 艤装検索・交易検索（v2-P8）は「LLM が呼び出すツール」として追加する。LLM と検索機能は競合しない。
 
-- `agy` の非対話実行方式（引数、stdin 入力可否、出力形式、終了コード）
-- VEGA の tool-calling ターンを CLI でどう表現するか。`LlmProviderAdapter.parse` は整形済み tool-call 以外を `INVALID_RESPONSE` にするため、**`agy` に JSON の tool-call 形式で出力させる契約**が成立するかを確認する
-- 既存の `CCoreAdapter`（`ProcessBuilder`）のプロセス実行・タイムアウト処理のうち再利用できる部分（ただし C-CORE と AI Provider の責務は統合しない）
-- **`agy` のエージェント機能（シェル実行・ファイル操作）を無効化または制限して起動できるか。** できない場合は下記「`agy` の実行境界（安全要件）」に従う
+#### 維持する安全境界（変更しない）
 
-#### 必須仕様
+- LLM に SQL 実行・DB ファイル操作・シェル・OS キーボード・リポジトリ操作・ゲームプロセス直接操作の経路を与えない。
+- LLM が返した tool-call は、未知ツール ID の拒否と引数検証を経てから既存コマンドへ渡す。
+- §R.12（DB 非汚染ルール）、§R.10（非目標）はそのまま適用する。LLM 一本化は「AI 判断層の一本化」であり、実行権限を LLM に渡すことではない。
+- LLM 未設定・接続失敗時も UI をフリーズさせず、LLM を使わない決定的なコマンド経路は継続する。
 
-- `agy` の executable path・引数・timeout を設定可能にする。
-- Prompt / Game Context を stdin または定義済みの CLI 引数で渡す。
-- stdout を応答として受け取り、stderr は診断情報として分離する。
-- 非ゼロ終了コード、timeout、プロセス起動失敗、不正出力を共通エラーとして `AiTransportResult` の失敗種別へ変換する。
-- `agy` が存在しない・失敗した場合も UI がフリーズせず、LLM を使わない決定的なコマンド経路は継続する。
-- Provider 固有仕様を Game Context / C-CORE に漏らさない。
-- 既存 API adapter（Gemini / Anthropic / OpenAI など）は削除しないが、AI 会話の既定にはしない。
+#### 影響と前提条件
 
-#### `agy` の実行境界（安全要件、2026-09-15 追加）
+- `agy` 経路が無くなるため、**LM Studio（Gemma 4 E4B）が起動・設定されていない環境では、雑談ターンも含めて AI 会話が使えない。**
+- 雑談・要約ターンも Gemma 4 E4B が担当するため、日本語の雑談・要約品質と応答レイテンシを §R.7.1 の実機確認項目に含める。
+- G-6（`hasNaturalLanguageAlias` フィルタ）・G-7（`SHORT_INPUT_SEM_FLOOR`）は、ルーティング判定のためではなく「無関係なツールを LLM に渡さない」目的で引き続き有効なため、変更しない（§R.6.1）。
 
-`agy`（Antigravity CLI）はエージェント型 CLI であり、単なる HTTP API クライアントとは異なる。
-CLI 自身がシェル実行やファイル編集を行う機能を持つ可能性があるため、何も制限せずに起動すると、
-DB ファイルへ直接アクセスできる経路が生まれてしまう。**このリスクは §R.12（DB 非汚染ルール）の
-「LLM から DB への直接経路」の中で最大のものである。** v2-P3 の実装（着手前確認を含む）は次を満たすこと。
+#### 実装計画
 
-- **`agy` は tool-call JSON を生成する生成器としてのみ使う。** 生成された tool-call の実行（DB 書き込み・
-  ゲーム操作）は、既存の `IntelCommand` / `CommandRegistry` 経由の決定的コードが行う。`agy` プロセス自身に
-  実行させない。
-- **`agy` のエージェント機能（シェル実行・ファイル編集など）は、無効化または制限できることを実機で確認して
-  から採用を決める。** 「着手前の read-only 確認」（本節の上）にこの確認項目を追加する。
-- **無効化・制限できることが確認できない場合、DB にアクセスできる環境では `agy` を実行しない。** 確認が
-  取れるまでは v2-P3 の実装を進めない。
-- **`agy` の作業ディレクトリは空の一時ディレクトリにする。** リポジトリのチェックアウトや DB ファイルが
-  置かれたディレクトリを作業ディレクトリにしない。
-- **DB のパス・接続情報・その他の秘密情報を `agy` に渡さない。** プロンプトや環境変数、CLI 引数のいずれ
-  にも含めない。`agy` の出力（stdout/stderr）をそのままファイルへ保存する処理も行わない。
+§R.13 の統制手順（1 サブフェーズ＝1 作業ブランチ＝1 コミット、PLAN CHECK → 承認 → 実装 → TEST GATE → DIFF GATE → END REPORT）に従う。G-9 は G-8 の merge 後に着手する（G-8 前に移動すると `VegaLlmGatewayFactory` がコンパイルできない）。
+
+| ID | 内容 | 変更許可ファイル | TEST GATE |
+|---|---|---|---|
+| G-8 | 経路の切替。`VegaLlmGatewayFactory.create(SystemSession)` が `TurnRoutingLlmGateway` ではなく `createConfiguredGateway(session)` の結果をそのまま返すよう変更する。`AGY_GATEWAY`、`create(ProviderEnum)` の `ProviderEnum.AGY` 分岐、`unsupportedMessage` の「default: agy」表記を除去する。`VegaLlmGatewayFactoryTest` から agy 前提のテスト（`createExplicitProviderAgyReturnsGateway`、`createReturnsTurnRoutingLlmGateway`、メッセージに `agy` を含むことの検証）を除き、「`create()` が `TurnRoutingLlmGateway` ではない単一の LLM Gateway を返す」テストへ置き換える。**それ以外のファイル・クラスは変更しない**（agy 関連クラスは G-9 で移動するまで参照されないまま残る）。 | `app/src/main/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactory.java`、`app/src/test/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactoryTest.java` | `./gradlew --no-daemon :app:test --tests '*VegaLlmGatewayFactoryTest' --tests '*VegaLlmGatewayTest' --tests '*LmStudioLlmAdapterTest'` |
+| G-9 | 実行時 `agy` コードを本筋から外し、未運用として `archive/agy-runtime/src/` へ移動する。**削除ではなく `git mv` で移動**し、パス構造（`src/main/java/...`、`src/test/java/...`）を保つ。移動先は Gradle のソースセット外なのでビルド・テスト対象にならない。<br>移動対象（main）: `AgyCliTransport.java`、`AgyCliProviderAdapter.java`、`AgyResidentProcessManager.java`、`TurnRoutingLlmGateway.java`<br>移動対象（test）: `AgyCliTransportTest.java`、`AgyCliProviderAdapterTest.java`、`AgyResidentBenchmarkTest.java`、`AgyResidentProductionVerificationTest.java`、`TurnRoutingLlmGatewayTest.java`<br>併せて: `ProviderEnum.AGY("LLM"),` の 1 行を削除する。`app/build.gradle` の `benchmarkTest` タスク（agy A/B ベンチマーク専用）を削除し、その原文を `archive/agy-runtime/build/benchmarkTest.gradle` に保存する。`test` タスクの `excludeTags 'benchmark'` は変更しない。<br>変更しない: `VegaLlmGateway.java`（`close()` ライフサイクルと `transport()` テストシームは汎用のため残す）。 | 上記の移動元・移動先（`app/src/main/java/elite/intel/ai/brain/vega/llm/` と `app/src/test/java/elite/intel/ai/brain/vega/llm/` の各ファイル、`archive/agy-runtime/src/**`）、`app/src/main/java/elite/intel/ai/ProviderEnum.java`、`app/build.gradle`、新規 `archive/agy-runtime/build/benchmarkTest.gradle` | `./gradlew --no-daemon :app:compileJava :app:compileTestJava` と `./gradlew --no-daemon :app:test`（全体。移動によってコンパイルエラー・参照切れが無いこと）。加えて `git grep -n -i "agy" -- app/` の結果が 0 件、または残存箇所を END REPORT に列挙 |
 
 #### 完了条件
 
-- `ProviderEnum` と `VegaLlmGatewayFactory` から `agy` を選択でき、既定になっている。
-- 固定 fixture（stdin / stdout / stderr / exit code / timeout / 不正出力 / 未インストール）でテストが成功する。
-- 日本語のテキスト指示が `agy` 経由で tool-call に変換され、既存アクションが実行される（v2-P4 の最初の実機確認）。
-- AI 会話が HTTP API の直接呼び出しに依存しない。
+- `VegaLlmGatewayFactory.create()` が返す Gateway が、非 speak ツールの有無に関係なく同じ LLM Gateway（LM Studio + Gemma 4 E4B）であることを固定 fixture で確認できる。
+- `completePlainText`（要約・圧縮ターン）も同じ LLM Gateway へ到達することを確認できる。
+- `app/` 配下に実行時 `agy` のコード・テストが残っていない（G-9）。`:app:test` 全体が PASS する。
+- 実機で、LM Studio + Gemma 4 E4B 設定時に「こんにちは」（雑談）と「停止」等の既存コマンド（tool-calling）の両方が同じ経路で応答・実行される（v2-P4 の最初の実機確認）。
 
-#### R.6.1 実装計画（サブフェーズ）
+#### R.6.1 SemanticActionReducer の短文誤選定対策（G-6 / G-7、有効。旧 §R.6.3）
 
-##### 実機検証で確立した安全要件（確定事項、2026-09-19 追記）
+> **注記（2026-09-25）:** G-6/G-7 は `SemanticActionReducer` の変更であり、LLM 一本化後も有効なコードとして残る。
+> 本文は旧 §R.6.3 のまま残す。本文中の `toolGateway`／`chatGateway`（agy）へのルーティングに関する完了条件は、旧二重ルーティング（`archive/agy-runtime/`）時点の記録であり、
+> LLM 一本化後は「無関係なゲームツールを LLM に渡さない」ことが目的となる。本文中の「§R.6.3」「§R.6.2」「G-5」は旧番号・`archive/agy-runtime/docs/ELITEINTEL_PLAN_R6_AGY_RUNTIME.md` を指す。
 
-以下は実機検証で確認済みの事実である。§R.6「`agy` の実行境界（安全要件）」を具体化する。
-
-- `agy` には全ツールを無効化する単一フラグ（`--no-tools` 相当）は存在しない。
-- 実行のたびに空の一時ディレクトリを作成し、その中に隔離用の `settings.json`（`permissions.deny` に
-  `command(*)` / `write_file(*)` / `read_file(*)` を指定）を配置し、環境変数 `USERPROFILE` をその一時
-  ディレクトリへ向けることで、ホスト環境の設定（`toolPermission: always-proceed` 等）に関わらずエージェント
-  機能（シェル実行・ファイル読み書き）を無効化できることを実機で確認済み。
-- `--dangerously-skip-permissions` は使用しない（§R.13.10 の禁止と一致）。
-- `--json-schema` と `--output-format json` を併用することで、tool-call 形式の JSON 出力が得られることを
-  実機で確認済み。ただし `arguments` フィールドは `object` 型ではなく `string` 型（JSON 文字列として
-  シリアライズしたもの）で定義する必要がある。`object` 型で定義した場合、検証したモデル側でスキーマ
-  バリデーションエラーが発生した。
-- 検証に使用した一時ディレクトリと隔離用 `settings.json` は、検証終了後に完全に削除する。実装（G-1）でも
-  このライフサイクル（作成 → 使用 → 完全削除）を踏襲する。
-
-##### サブフェーズ分割
-
-§R.14 の実装台帳（Track J）にならい、v2-P3（Track G）の実装単位をサブフェーズへ分割する。各サブフェーズは
-§R.13 の統制手順（1 サブフェーズ＝1 作業ブランチ＝1 コミット、PLAN CHECK → 承認 → 実装 → TEST GATE →
-DIFF GATE → END REPORT）に従う。
-
-| ID | 内容 | 変更許可ファイル | TEST GATE |
-|---|---|---|---|
-| G-1 | `AgyCliTransport`（`LlmTransport` 実装）: プロセス実行、隔離ライフサイクル管理（一時ディレクトリ＋隔離 `settings.json`＋`USERPROFILE` 差し替え）、二重タイムアウト（既定／絶対上限）、プロセスツリー終了、`CCoreAdapter`（`app/src/main/java/elite/intel/bio/ccore/CCoreAdapter.java`）／`StreamCollector`（`app/src/main/java/elite/intel/bio/ccore/StreamCollector.java`）パターンの再利用 | 新規 `app/src/main/java/elite/intel/ai/brain/vega/llm/AgyCliTransport.java`、新規 `app/src/test/java/elite/intel/ai/brain/vega/llm/AgyCliTransportTest.java` | `./gradlew --no-daemon :app:test --tests '*AgyCliTransportTest'` |
-| G-2 | `AgyCliProviderAdapter`（`LlmProviderAdapter` 実装、`app/src/main/java/elite/intel/ai/brain/vega/llm/LlmProviderAdapter.java` を実装）: プロンプト構築、JSON Schema 生成（`arguments` は string 型）、tool-call 解析、要約ターン（`parseText`）処理 | 新規 `app/src/main/java/elite/intel/ai/brain/vega/llm/AgyCliProviderAdapter.java`、新規 `app/src/test/java/elite/intel/ai/brain/vega/llm/AgyCliProviderAdapterTest.java` | `./gradlew --no-daemon :app:test --tests '*AgyCliProviderAdapterTest'` |
-| G-3 | `ProviderEnum.AGY` の追加と `VegaLlmGatewayFactory` への統合。既存の `SystemSession.useLocalCommandLlm()`（ローカル LM Studio 優先、`VegaLlmGatewayFactory.create()` 内で最初に判定）と `LlmProviderResolver.detectCloudProvider()`（クラウド API キー設定）をそのまま優先し、いずれも未設定の場合にのみ `agy` を既定として選択する設計とする | `app/src/main/java/elite/intel/ai/ProviderEnum.java`、`app/src/main/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactory.java`、既存 `app/src/test/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactoryTest.java` | `./gradlew --no-daemon :app:test --tests '*VegaLlmGatewayFactoryTest'` |
-| G-4 | 固定 fixture によるテスト整備: 正常系、非ゼロ終了コード、タイムアウト、不正出力、`agy` 未インストール、隔離ディレクトリのクリーンアップ検証。新規の fixture 用リソースファイルが必要になった場合の配置場所は G-1/G-2 の PLAN CHECK 時に確定する | G-1/G-2 で作成した `app/src/test/java/elite/intel/ai/brain/vega/llm/AgyCliTransportTest.java`、`app/src/test/java/elite/intel/ai/brain/vega/llm/AgyCliProviderAdapterTest.java`（新規ファイルは作らずケースを追加する） | `./gradlew --no-daemon :app:test --tests '*AgyCliTransportTest' --tests '*AgyCliProviderAdapterTest'` |
-
-##### 完了条件
-
-§R.6 の完了条件をそのまま引き継ぐ。
-
-- `ProviderEnum` と `VegaLlmGatewayFactory` から `agy` を選択でき、既定になっている。
-- 固定 fixture（stdin / stdout / stderr / exit code / timeout / 不正出力 / 未インストール）でテストが成功する。
-- 日本語のテキスト指示が `agy` 経由で tool-call に変換され、既存アクションが実行される（v2-P4 の最初の実機確認）。
-- AI 会話が HTTP API の直接呼び出しに依存しない。
-
-#### R.6.2 ターン種別によるプロバイダー振り分け（G-5）
-
-##### 背景（実機確認で判明した事実、確定事項）
-
-G-1〜G-4 の実装後に実機確認を行ったところ、以下が判明した。
-
-- `VegaLlmGatewayFactory.create()`（`app/src/main/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactory.java`）は `SystemSession.useLocalCommandLlm()` を最初に判定し、`true` の場合は無条件に LM Studio 用の Gateway（`LOCAL_GATEWAY`）を返す。`agy` へは、`useLocalCommandLlm()` が `false` かつクラウド API キーが未設定・未検出（`LlmProviderResolver.detectCloudProvider() == ProviderEnum.UNKNOWN`）の場合にのみ到達する。
-- `useLocalCommandLlm` は `game_session` テーブルのカラムであり、`app/src/main/resources/db-migration/00030__schema.sql` で `boolean default true` として定義されている。この既定値は、`agy` 統合より前の 2026-04 のコミット「Fixing on-boarding. Default to LMStudio tulu3.1:8b-supernova etc」に由来する既存の設計判断であり、G-1〜G-4 では変更していない。
-- `AiServicesSettingsPanel`（`app/src/main/java/elite/intel/ui/screen/settings/AiServicesSettingsPanel.java`）の UI は `settings.ai.localSetup`（LM Studio）／`settings.ai.cloudSetup`（クラウド）の2択セグメントコントロールのみを提供し、`agy` に相当する第3の選択肢は存在しない。
-- 以上の結果、初期状態（DB 既定値のまま、設定変更なし）では `VegaLlmGatewayFactory.create()` は常に LM Studio 用 Gateway を返し、`agy` に一度も到達しない。
-- **この既存の仕組み（`useLocalCommandLlm` の既定値・優先順位・UI の2択構成）自体は、今回変更しない。**
-
-##### 新しい設計方針（確定事項）
-
-VEGA への応答要求を、以下の2種類に区別する。
-
-- **tool-calling ターン**: `request.tools()` に `SpeakFunction`（`speak`）以外のゲーム内アクションツールが含まれている（`TurnRoutingLlmGateway.isToolCallingTurn` が `true`）。ゲーム内アクションの実行判断が必要な場面。
-- **雑談・要約ターン**: `request.tools()` が空、または `SpeakFunction` のみを含む（`TurnRoutingLlmGateway.isToolCallingTurn` が `false`）。自由な会話や要約のみを行う場面。
-
-> **判定ロジックの確定経緯（2026-09-19、コミット `201b0ad2`）:**  
-> 当初は「`request.tools().isEmpty()`」での判定を予定していたが、`ComposedPrompt.tools()` が COMMANDER ターンにおいて常にシステム関数 `SpeakFunction` をリストに結合（union）するため、`SemanticActionReducer` がゲームツールをゼロ件に絞り込んだ「こんにちは」等の純粋な雑談であっても `request.tools()` には必ず `speak` が含まれることが判明した。その結果、単純な `isEmpty()` 判定では全ターンが tool-calling ターンと判定されてしまう不具合が生じたため、現行の実装では「`SpeakFunction` 以外のツール（非 speak ツール）が存在するか否か（`request.tools().stream().anyMatch(tool -> !SpeakFunction.ID.equals(tool.name()))`）」を厳格な判定条件として採用している。
-
-それぞれ次のプロバイダーを使用する。
-
-- tool-calling ターン: 既存の LLM Provider（`SystemSession.useLocalCommandLlm()` およびクラウド API キー設定に基づく、LM Studio／クラウド API）をそのまま使用する。
-- 雑談・要約ターン: `agy`（`AgyCliProviderAdapter` + `AgyCliTransport`）を使用する。
-
-LM Studio／クラウド API が未設定・未導入の環境では、tool-calling ターンは現状どおり接続エラーとなる。これは §R.7.1「ローカル LLM 導入」（次フェーズ）で解消する。
-
-##### G-5 実装計画
-
-§R.14 の実装台帳（Track J）にならい、Track G の実装単位として以下を追加する。
-
-| ID | 内容 | 変更許可ファイル | TEST GATE |
-|---|---|---|---|
-| G-5 | 非 speak ツールの有無に基づいて、tool-calling ターンと雑談・要約ターンで異なる `LlmProviderAdapter` / `LlmTransport` のペアを選択するルーティング層を実装する。`VegaLlmGatewayFactory.create()` が、既存の選択ロジック（LM Studio／クラウド、`agy` フォールバックなし）で構築した Gateway と、`agy` 専用の Gateway の2組を保持し、リクエストごとに使い分ける新規クラス `TurnRoutingLlmGateway`（`LlmGateway` 実装）を返すよう変更する。既存の `VegaLlmGateway`、`AgyCliTransport`、`AgyCliProviderAdapter` のインターフェース契約（`LlmGateway` / `LlmProviderAdapter` / `LlmTransport`）は変更しない。 | 新規 `app/src/main/java/elite/intel/ai/brain/vega/llm/TurnRoutingLlmGateway.java`、新規 `app/src/test/java/elite/intel/ai/brain/vega/llm/TurnRoutingLlmGatewayTest.java`、既存 `app/src/main/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactory.java`、既存 `app/src/test/java/elite/intel/ai/brain/vega/llm/VegaLlmGatewayFactoryTest.java` | `./gradlew --no-daemon :app:test --tests '*TurnRoutingLlmGatewayTest' --tests '*VegaLlmGatewayFactoryTest'` |
-
-##### 完了条件
-
-- `request.tools()` に非 speak ツールが含まれるリクエストは既存の LLM Provider（LM Studio／クラウド）へ、空または `speak` のみのリクエストは `agy` へ到達することが、固定 fixture で確認できる。
-- 既存の `VegaLlmGateway`、`AgyCliTransport`、`AgyCliProviderAdapter` のインターフェース契約に変更がない。
-
-#### R.6.3 エイリアス未定義ツールの除外による意味類似度の誤検出対策（G-6）
 
 ##### 背景（実機確認で判明した事実、確定事項）
 
@@ -396,65 +325,49 @@ G-6 merge 後、実機ログで再検証したところ、`hasNaturalLanguageAli
 - 短い入力（`SHORT_INPUT_CHAR_THRESHOLD` 未満）に対しては `SHORT_INPUT_SEM_FLOOR` が適用され、エイリアスリスト内の短いフレーズとの偶発一致（`exit_close`、`play_music` 等の再現シナリオ）が、固定 fixture で選定されないことを確認できる。
 - 通常の長さの入力に対する既存の意味類似度マッチング能力（`SEM_FLOOR`、`SEM_MARGIN`、`SEM_MAX`）に変化がないことを、既存テストで確認できる。
 
-#### R.6.4 stdin 化と Resident 常駐プロセスの本番導入（PR #10、PR #11）
-
-##### 1. プロンプト入力の stdin 化（PR #10、確定事項）
-
-- **背景と課題**: 初期実装（G-1）では `--print <prompt>` CLI 引数を用いてプロンプトを渡していたが、会話履歴やツール指示が蓄積した際に Windows OS のコマンドライン長制限（`CreateProcess` 32,767 文字制限）に達するリスク、および `CommandLineToArgvW` による引数パース時のダブルクォート・改行・マルチバイト文字（日本語）のトークン破損・エスケープ破損リスクが存在した。
-- **設計決定**: CLI 引数から `--print` を完全撤廃し、プロンプトを標準入力（`process.getOutputStream()`、UTF-8）へパイプ送信する方式に完全移行した。
-- **該当実装**: `AgyCliTransport.java`（L133-138、L189-204）
-
-##### 2. Resident agy 常駐プロセス管理（PR #11、確定事項）
-
-- **背景と課題**: ターンごとに `agy` プロセスを起動・終了するワンショット方式では、プロセス初期化に伴うレイテンシ（毎ターン 3〜6 秒）が累積し、会話の即応性が損なわれていた。また、プロセス毎の初期化に伴いスキーマ制約の解釈が不安定になるリスクがあった。
-- **本番アーキテクチャ**: `AgyResidentProcessManager` を導入し、常駐プロセスとの入出力ストリームを維持する常駐実行を **VEGA の本番既定経路** とした。
-  - **実行モード**: `agy` を `--effort low`、`--json-schema`（固定 SpeakFunction スキーマ、`arguments: string`）、`--print-timeout 15s` で起動し、`stream-json` 形式で双方向通信を行う。
-  - **二重タイムアウト境界**: agy CLI 内部の 15s タイムアウトと、Java 側の 20s watchdog（`cliTimeout + 5s`）の二重構造。タイムアウト時にプロセスが生存していればプロセス状態を `READY` に戻し、`TRANSIENT` failure を返却して次ターンでの再利用を可能とする。
-  - **透過的自動復旧（Auto-Recovery）**: 外部からの強制終了（taskkill 等）やパイプ切断（Broken pipe）を検知した場合、次回リクエスト時に透過的に新規プロセスを起動して復旧する（`test4`、`test5` で実証済み）。
-  - **ライフサイクル伝搬**: `AgyCliTransport` が `AutoCloseable` を実装し、`VegaRuntimeGraph.close()` → `VegaLlmGateway.close()` → `AgyCliTransport.close()` → `AgyResidentProcessManager.close()` を経由して、OS プロセスツリー（子孫プロセス含む）を強制終了し隔離一時ディレクトリを完全削除する（`test6`、`test7` で実証済み）。
-  - **ワンショット実行の扱い**: 従来のワンショット実行（`AgyCliTransport.sendOneShotOutcome`）は本番経路から切り離され、モック/フェイクプロセスを注入するユニットテスト用シーム（`ProcessStarter`）としてのみ保持される。
-- **該当実装**: `AgyResidentProcessManager.java`（新規）、`AgyCliTransport.java`、`VegaLlmGateway.java`、`AgyResidentProductionVerificationTest.java`（実機統合テスト、`@Tag("local-integration")` により CI 除外）
-
 ### R.7 v2-P4 以降
 
-#### R.7.1 ローカル LLM 導入（次フェーズ、未着手）
+#### R.7.1 ローカル LLM（Gemma 4 E4B）の日本語実機確認（2026-09-25 改訂、未着手）
 
-- **目的**: §R.6.2 で tool-calling ターンに引き続き使用する既存 LLM 経路（LM Studio）に、実際に動作するモデルを導入する。
-- **環境**: RTX 9070 16GB（ユーザー実機）。
-- **候補**: Google の無料の最新モデル（Gemma 系等）を軸に、次フェーズで選定する。
-- **制約**: このフェーズが完了するまでは、tool-calling ターン（ゲーム内アクション実行）は LLM 未設定によりエラーとなる制約が残る。
-- **着手時期**: G-5 完了後に着手する。
+- **目的**: §R.6 で全ターンが使用する LM Studio + Gemma 4 E4B が、日本語の雑談・指示・要約で実用になることを実機で確認する。（旧: 「ローカル LLM 導入 — 候補を Gemma 系等から選定」。モデルは Gemma 4 E4B で確定済み・実装済みのため、選定は不要）
+- **環境**: RTX 9070 16GB（ユーザー実機）、LM Studio、`google/gemma-4-e4b`。
+- **確認項目**: tool-calling の正確さ（`tool_choice=required` 下でのツール選択・引数生成、日本語指示）、雑談・要約の日本語品質、応答レイテンシ、`LocalLlmModelCheck` の警告が出ないこと。
+- **制約**: LM Studio が起動していない環境では **全ターン**（雑談を含む）が LLM 未接続エラーとなる。LLM を使わない決定的なコマンド経路は継続する。
+- **着手時期**: G-8 merge 後（G-9 と並行可）。
 
-- **v2-P4 日本語 Assistant / 自然言語:** deterministic command は LLM 不在でも利用可能。ゲームの事実は Journal / Status / Session から取得し、LLM が事実を捏造して Game Context を上書きすることは禁止。§17 の実機確認 3 項目は `agy` 経由で実施する。
+- **v2-P4 日本語 Assistant / 自然言語:** deterministic command は LLM 不在でも利用可能。ゲームの事実は Journal / Status / Session から取得し、LLM が事実を捏造して Game Context を上書きすることは禁止。§17 の実機確認 3 項目は LLM 経由（§R.6）で実施する。
   例: 「今どこにいる？」「貨物の残量は？」「この惑星で採取できる生物は？」「マップを開いて」「ミッションの目的地に行って」
-- **v2-P5 STT / TTS / VOICEVOX:** STT / TTS は Provider として分離。VOICEVOX はローカル実行前提、外部 TTS API を必須依存にしない。VOICEVOX 未起動でもテキスト表示を継続。完了判定は `PHASE11_VOICE_IO_PHASE_UPDATE.md` の実機 E2E（AI CLI Provider は `agy`）。**同梱の `ParakeetSTTImpl` を日本語 STT として扱わない**（`tokens.txt` に日本語語彙が無く、原理的に日本語を認識できないことを確認済み、§10）。日本語音声入力には別の STT バックエンドを新規に選定する（ローカルモデルの差し替え・外部 CLI 方式のいずれも候補として検証する）。STT の出力は常に未検証のユーザー入力として扱い（他言語 STT と同様）、そのままコマンドパラメータや DB へ書き込まない。
+- **v2-P5 STT / TTS / VOICEVOX:** STT / TTS は Provider として分離。VOICEVOX はローカル実行前提、外部 TTS API を必須依存にしない。VOICEVOX 未起動でもテキスト表示を継続。完了判定は `PHASE11_VOICE_IO_PHASE_UPDATE.md` の実機 E2E（AI Provider は §R.6 の LLM（Gemma 4 E4B）。旧: AI CLI Provider は `agy`）。**同梱の `ParakeetSTTImpl` を日本語 STT として扱わない**（`tokens.txt` に日本語語彙が無く、原理的に日本語を認識できないことを確認済み、§10）。日本語音声入力には別の STT バックエンドを新規に選定する（ローカルモデルの差し替え・外部 CLI 方式のいずれも候補として検証する）。STT の出力は常に未検証のユーザー入力として扱い（他言語 STT と同様）、そのままコマンドパラメータや DB へ書き込まない。
 - **v2-P6 Game Action / Ship Control:** Action Registry・Input Adapter・キーバインド設定・allowlist・dry-run・実行結果 verification。LLM から直接 OS キーボードイベントを発行することは禁止。
 - **v2-P7 HUD / Overlay / VR:** Assistant と同じ Game Context を表示し、CLI と HUD で別々の状態取得を行わない。
-- **v2-P8 Generic Game Data / Trade Assistant:** commodity / station / where-to-sell / trade route / cargo / 利益計算。**艤装（outfitting）検索コマンドを新設する**（2026-09-15 判明のギャップ、R.3 表参照）。既存は現在地限定の `query_local_outfitting`（LLM に艤装リストを読ませて回答させる）とモジュール画面を開くだけの `ShowModulesPanelCommand` のみで、`find_commodity` のような「範囲 ly 内からモジュールを検索する」コマンドが無い。「アイテム」が商品なのかモジュール／艤装なのかは、まず**ツール選択（LLM が呼ぶコマンド ID）の段階で区別する**——同じ `find_commodity` に両方を混在させない。新設する艤装検索コマンドの実装は `FindCommodityCommand` と同じ形にする: 名前の照合と検索自体は決定的コード（辞書照合 + 既存 `FuzzySearch`/Spansh 相当）が行い、`agy`/LLM は結果の説明・要約のみを担当する（判定・検索ロジックを LLM に持たせない、R.10 の非目標と一致）。
+- **v2-P8 Generic Game Data / Trade Assistant:** commodity / station / where-to-sell / trade route / cargo / 利益計算。**艤装（outfitting）検索コマンドを新設する**（2026-09-15 判明のギャップ、R.3 表参照）。既存は現在地限定の `query_local_outfitting`（LLM に艤装リストを読ませて回答させる）とモジュール画面を開くだけの `ShowModulesPanelCommand` のみで、`find_commodity` のような「範囲 ly 内からモジュールを検索する」コマンドが無い。「アイテム」が商品なのかモジュール／艤装なのかは、まず**ツール選択（LLM が呼ぶコマンド ID）の段階で区別する**——同じ `find_commodity` に両方を混在させない。新設する艤装検索コマンドの実装は `FindCommodityCommand` と同じ形にする: 名前の照合と検索自体は決定的コード（辞書照合 + 既存 `FuzzySearch`/Spansh 相当）が行い、LLM はツール選択・引数生成と結果の説明・要約のみを担当する（判定・検索ロジックを LLM に持たせない、R.10 の非目標と一致）。
 - **v2-P9 C-CORE 拡張:** 全 species、collection state、expected value、ranking、confidence。判定と価値評価を分離。C-CORE ruleset を EliteIntel 側へコピーせず、LLM は C-CORE 結果を説明・要約するだけとする。
-- **v2-P10 Offline Assistant:** ローカル CLI provider（例: Ollama CLI）+ VOICEVOX でネットワーク無しでも可能な範囲で日本語 Assistant を使える構成。
-- **v2-P11 Installer / Update / Runtime packaging:** Windows runtime package、CLI launcher、`agy` executable 設定、AI Provider / TTS 設定、optional HUD / VR、バージョン情報、更新機構。
+- **v2-P10 Offline Assistant:** ローカル LLM（LM Studio + Gemma 4 E4B、§R.6）+ ローカル TTS でネットワーク無しでも可能な範囲で日本語 Assistant を使える構成。（2026-09-25 改訂。旧: ローカル CLI provider（例: Ollama CLI）。Ollama は EliteIntel V1.1 で既に廃止済み — `VegaLlmGatewayFactory` の `LOCAL_GATEWAY` コメント参照）
+- **v2-P11 Installer / Update / Runtime packaging:** Windows runtime package、CLI launcher、AI Provider（LM Studio エンドポイント／モデル、クラウド API キー）/ TTS 設定、optional HUD / VR、バージョン情報、更新機構。（2026-09-25 改訂: `agy` executable 設定を削除）
 
 ### R.8 AI Provider 契約
 
+（2026-09-25 改訂、§R.6）
+
 ```text
-AIProvider
- ├─ AgyCliProvider      （既定）
- ├─ GeminiCliProvider   （任意）
- ├─ ClaudeCliProvider   （任意）
- └─ OllamaCliProvider   （v2-P10）
+LlmGateway（VegaLlmGateway）
+ ├─ LM Studio + Gemma 4 E4B （ローカル、useLocalCommandLlm = true のとき。既定・本プロジェクトの使用構成）
+ └─ クラウド LLM API        （CLOUD_GATEWAYS: upstream 由来の既存コード。削除しないが既定・検証対象ではない）
 ```
+
+旧契約（`AgyCliProvider`（既定）/ `GeminiCliProvider` / `ClaudeCliProvider` / `OllamaCliProvider`）は廃止する。実行時の AI Provider に CLI プロセスを使わない。
 
 Provider の差し替えで Game Context schema / C-CORE / Journal state / HUD renderer / Action Registry を変更してはならない。
 
-- 入力: Game Context + user prompt
-- 出力: 日本語 response（tool-calling ターンでは tool-call JSON）
-- エラー: process unavailable / non-zero exit / timeout / malformed output（Assistant Core が共通処理）
+- 入力: Game Context + user prompt + ツール定義（`SemanticActionReducer` で絞り込んだもの + `speak`）
+- 出力: tool-call（`speak` を含む）、または要約ターンでは plain text
+- エラー: 接続不可 / HTTP エラー / timeout / malformed output を `AiTransportResult` の失敗種別へ変換（Assistant Core が共通処理）
+- ツールの実行は Provider の責務ではない（EliteIntel の `IntelCommand` / `CommandRegistry`）
 
 ### R.9 テスト方針
 
 - **v2-P0〜P2:** 既存 build/test、`BundleKeyParityTest`・`BundleQuotingTest`、日本語 locale test、HUD / menu / settings の表示確認、既存機能の回帰
-- **v2-P3〜P4:** Provider interface test、CLI process test、stdin/stdout fixture、exit code / timeout / malformed output test、`agy` unavailable fallback、日本語 prompt / response test
+- **v2-P3〜P4:** Provider interface test、Gateway 選択 test（全ターンが同一 LLM Gateway へ到達すること）、HTTP transport の timeout / 接続失敗 / malformed output test、LLM unavailable 時に決定的コマンドが継続すること、日本語 prompt / response test（2026-09-25 改訂: CLI process test・stdin/stdout fixture・`agy` unavailable fallback を削除）
 - **v2-P5:** STT / TTS provider test、VOICEVOX unavailable fallback、実機 E2E
 - **v2-P6:** allowlist / dry-run / verification / 禁止操作 test
 - **v2-P7〜P8:** Game Context consistency、HUD rendering、Navigation / Mission / Cargo / Trade fixtures
@@ -465,14 +378,15 @@ Provider の差し替えで Game Context schema / C-CORE / Journal state / HUD r
 - LLM に Exobiology species 判定をさせない。LLM の回答をゲーム事実の Source of Truth にしない。
 - C-CORE ruleset を EliteIntel 側へコピーしない。
 - LLM から直接 OS キーボードイベントを発行しない。
-- 日本語化・`agy` 対応より先に C-CORE を完成させることを要求しない。
-- AI/LLM を特定の外部 API に固定しない。
+- 日本語化・LLM 一本化より先に C-CORE を完成させることを要求しない。
+- AI/LLM を特定の外部 API に固定しない（本プロジェクトはローカル LM Studio + Gemma 4 E4B を使用。upstream のクラウド API 経路は削除しない）。
+- 実行時の AI 会話に CLI プロセス（`agy` 等）を使わない（2026-09-25 追加）。
 - HUD / VR の実装を CLI の責務へ混在させない。
 
 ### R.11 現在の優先作業
 
 1. **Track J:** v2-P2 を §R.14 の実装台帳 P2-J1（`gui` の `settings.` 51 キー）から順に、§R.13 の手順で進める。v2-P0/P1 は完了済みなので再調査しない。
-2. **Track G:** v2-P3 の着手前 read-only 確認（`agy` の非対話実行方式と tool-call JSON 契約の成立可否）を実機で行う。
+2. **Track G:** LLM 一本化（§R.6）。G-8（経路切替）→ G-9（実行時 `agy` コードを `archive/agy-runtime/` へ移動）の順に進め、G-8 後に §R.7.1（Gemma 4 E4B の日本語実機確認）を行う。（2026-09-25 改訂。旧: v2-P3 の着手前 read-only 確認）
 3. C-CORE の追加・拡張（v2-P9）はその後。
 
 ### R.12 DB 非汚染ルール（2026-09-15 追加）
@@ -498,7 +412,7 @@ Provider の差し替えで Game Context schema / C-CORE / Journal state / HUD r
 
 1. LLM/`agy` から DB への直接アクセス経路（DB パス・接続情報・ORM/DAO への参照渡し）を作らない。書き込みは
    既存の `*Manager`（`ReminderManager` 等）や DAO など、EliteIntel 側の決定的コードのみが行う（§R.6 の
-   `agy` 実行境界と同じ原則）。
+   安全境界と同じ原則）。
 2. LLM が抽出した値が「既知のエンティティ名」（素材・商品・モジュール名など）を指す場合、**既知の辞書／
    テーブルと照合してから**でなければ検索・保存に使わない。辞書に無ければ `UNKNOWN` として扱い、検索も
    保存もしない（J-5・R.7 v2-P8 の方針と同じ）。
@@ -515,13 +429,18 @@ Provider の差し替えで Game Context schema / C-CORE / Journal state / HUD r
 - 許可リストに載っていない自由文保存コマンドが存在しないことをコードレビューで確認する。
 - v2-P3（`agy` 導入）は、このルールと R.6 の実行境界の両方を満たすまで、DB にアクセスできる環境では
   実行しない。
+- （2026-09-25 追加）LLM 一本化（§R.6）後も、本ルールは LLM（LM Studio + Gemma 4 E4B）に対してそのまま適用する。
+  本節中の「LLM/`agy`」は、以後「LLM」と読み替える。
 
 ### R.13 agy 実装統制（Execution Protocol）
 
 #### R.13.0 適用範囲
 
 この節は、**開発作業を `agy`（Antigravity CLI）に実装させるとき**の手順を定める。
-v2-P3 の「EliteIntel の AI Provider として `agy` を実行時に呼び出す」話（§R.6）とは別物である。
+旧 v2-P3 の「EliteIntel の AI Provider として `agy` を実行時に呼び出す」話（`archive/agy-runtime/`、未運用）とは別物である。
+（2026-09-25 注記: 実行時の `agy` は §R.6 で廃止したが、**開発作業には引き続き `agy` を使う**。本節は開発時の作業統制であり、この決定の影響を受けない。）
+- `agy` は `archive/agy-runtime/` 配下を、指示で明示的に求められた場合を除き読まない・参照しない・変更しない。
+
 §R.2（基本方針）、§R.6（実行時の安全境界）、§R.10（非目標）、§R.12（DB 非汚染）は、この節の前提としてそのまま適用する。
 
 - `agy` に渡す作業単位は §R.14 の**実装台帳の 1 行（サブフェーズ）**だけとする。
@@ -654,7 +573,7 @@ Git: before <SHA> / after <SHA> / branch <branch> / push: していない
 - `--dangerously-skip-permissions`（全ツール自動承認）は使用禁止。`/permissions` の常時許可プリセットも同様に禁止。
 - `--sandbox` の有無と挙動は実機で確認し、利用できる場合は使う。
 - **subagent・background task・並列実装・別サブフェーズへの委譲は禁止する。**
-- headless 出力（`--print` / JSON 系出力）で START / END REPORT を機械検証する仕組みは将来課題とする。非 TTY 環境で `agy -p` の標準出力が空になるという報告（google-antigravity/antigravity-cli issue #76）があるため、headless 利用は実機で出力取得を確認してから採用する。この問題は v2-P3（実行時の子プロセス呼び出し）にも影響するため、§R.6 の着手前確認でも同じ点を確認する。
+- headless 出力（`--print` / JSON 系出力）で START / END REPORT を機械検証する仕組みは将来課題とする。非 TTY 環境で `agy -p` の標準出力が空になるという報告（google-antigravity/antigravity-cli issue #76）があるため、headless 利用は実機で出力取得を確認してから採用する。（旧 v2-P3 の実行時子プロセス呼び出しにも関係した問題。実行時 `agy` は 2026-09-25 に廃止した。）
 
 #### R.13.11 agy への基本指示（テンプレート）
 
@@ -721,21 +640,14 @@ Plan commit: <SHA>
 
 P2-J1〜P2-J16 がすべて DONE になった時点で §R.5 の完了条件を確認し、§R.3 の v2-P2 の状態を更新する（計画書の更新はユーザーが行う）。
 
-#### v2-P3（AI Provider CLI化 / agy対応）実装台帳
+#### v2-P3b（LLM 一本化）実装台帳
 
-v2-P3 の実装は、G-1〜G-7、stdin 化（PR #10）、および resident agy 常駐化（PR #11）を経て完了した。
+v2-P3（AI Provider CLI化 / agy対応、G-1〜G-7・PR #10・PR #11）の台帳は `archive/agy-runtime/docs/ELITEINTEL_PLAN_R6_AGY_RUNTIME.md` へ移した（未運用）。G-6/G-7 のコードは有効（§R.6.1）。
 
 | ID | 内容 | 変更許可ファイル | TEST GATE / 検証 | 状態 |
 |---|---|---|---|---|
-| G-1 | `AgyCliTransport` の one-shot プロセス実行基礎実装。`--print` 引数およびモック用 `ProcessStarter` の導入。 | `app/src/main/java/elite/intel/ai/brain/vega/llm/AgyCliTransport.java` 等 | 単体テスト | DONE |
-| G-2 | `SpeakFunction` の引数型契約整合。`arguments` を `string` 型で統一し、CLI/スキーマとの不整合を解消。 | `app/src/main/java/elite/intel/ai/brain/vega/SpeakFunction.java` 等 | 単体テスト | DONE |
-| G-3 | `AgyCliProviderAdapter` のレスポンス契約整合。空応答や不正形式に対する例外ハンドリングおよびフォールバック定義。 | `app/src/main/java/elite/intel/ai/brain/vega/llm/AgyCliProviderAdapter.java` 等 | 単体テスト | DONE |
-| G-4 | `SemanticActionReducer` の日本語正規化および境界値強化。空文字・句読点・特殊文字の誤認識防止。 | `app/src/main/java/elite/intel/ai/brain/vega/SemanticActionReducer.java` 等 | 単体テスト | DONE |
-| G-5 | `TurnRoutingLlmGateway` による二重ルーティング層。非 speak ツールを含む場合は既存プロバイダー（LM Studio/クラウド）、非 speak ツールを含まない場合（雑談/要約/speakのみ）は `agy` へ振り分け。 | `TurnRoutingLlmGateway.java`、`VegaLlmGatewayFactory.java` 等 | 単体・結合テスト | DONE |
-| G-6 | エイリアス未定義ツールの除外による意味類似度の誤検出防止。自然言語エイリアスを持たない内部ツールの誤選定を遮断。 | `SemanticActionReducer.java` 等 | 単体テスト | DONE |
-| G-7 | 短文入力に対する意味類似度フロア引き上げ（`SHORT_INPUT_SEM_FLOOR`）。偶発的な短フレーズ一致を抑制。 | `SemanticActionReducer.java` 等 | 単体テスト | DONE |
-| PR #10 | プロンプト入力の stdin 化。Windows CLI コマンドライン長制限（32,767文字）およびエスケープ破損リスクを解消。 | `AgyCliTransport.java` | 単体テスト | DONE |
-| PR #11 | `AgyResidentProcessManager` による resident agy 常駐化。`stream-json` 双方向通信、二重タイムアウト（15s/20s）、透過的自動復旧、およびライフサイクル管理の実装。 | `AgyResidentProcessManager.java`、`AgyCliTransport.java`、`VegaLlmGateway.java`、`AgyResidentProductionVerificationTest.java` | 実機実測テスト（Test 1〜7 ALL PASS、Strict Schema 100%） | DONE |
+| G-8 | LLM 一本化: 経路切替（§R.6） | §R.6 の表 | §R.6 の表 | 未着手 |
+| G-9 | LLM 一本化: 実行時 `agy` コード・テストを `archive/agy-runtime/src/` へ移動（未運用） | §R.6 の表 | §R.6 の表 | 未着手（G-8 の後） |
 
 #### v2-P4 以降の台帳
 

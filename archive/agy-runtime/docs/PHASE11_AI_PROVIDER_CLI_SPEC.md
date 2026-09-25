@@ -7,6 +7,9 @@
 > **改訂注記（2026-09-15 / 2026-09-21）:** Roadmap v2（`ELITEINTEL_INTEGRATION_PLAN.md` §R）により、この仕様は **v2-P3** として扱う。
 > AI 会話の既定 CLI Provider は **`agy`（Antigravity CLI）** とし、本文中の Gemini CLI / Claude CLI は同じ Provider 契約に載せる任意の実装とする。
 > 2026-09-21 に v2-P3（G-1〜G-7、PR #10 stdin 化、PR #11 resident agy 常駐化）が main へ統合完了した。最新の本番構成・二重ルーティング契約（非 speak ツール判定）については `docs/ELITEINTEL_INTEGRATION_PLAN.md` §R.6 を正とする。
+>
+> **改訂注記（2026-09-25 / LLM 一本化）: 本仕様は廃止（superseded）。** AI 会話は LLM（LM Studio + Gemma 4 E4B）へ一本化し、実行時の AI 会話に CLI プロセスを使わないことに決定した（`ELITEINTEL_INTEGRATION_PLAN.md` §R.6）。本書は `docs/` から `archive/agy-runtime/docs/` へ移動した（未運用）。
+> 本書の §2「HTTP API を直接呼び出さず、ローカル CLI をプロセスとして起動する」、§3「HTTP API の直接呼び出しを採用しない」「API キー前提の既存 Provider は CLI Provider へ置き換える対象」は**無効**。本書は実行記録としてのみ残す。
 
 ## 1. Purpose
 
