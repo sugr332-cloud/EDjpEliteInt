@@ -19,6 +19,7 @@ import elite.intel.util.yaml.YamlFactory;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -151,7 +152,7 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                 searchDurationMs,
                 calcDurationMs);
 
-        TradeCandidatesDataDto dataDto = new TradeCandidatesDataDto(
+        TradeCandidatesDataDto dataDto = TradeCandidatesDataDto.create(
                 calcResult.status(),
                 currentSystem,
                 priority,
@@ -204,6 +205,21 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
         return DEFAULT_RADIUS;
     }
 
+    public static String formatInteger(Number n) {
+        if (n == null) return null;
+        return String.format(Locale.US, "%,d", n.longValue());
+    }
+
+    public static String formatLightYears(Double ly) {
+        if (ly == null) return null;
+        return String.format(Locale.US, "%.2f", ly);
+    }
+
+    public static String formatLightSeconds(Double ls) {
+        if (ls == null) return null;
+        return String.format(Locale.US, "%,d", Math.round(ls));
+    }
+
     private static String buildInstructions() {
         return """
                 Answer the commander's request for trade candidate recommendations based strictly on the provided data fields below.
@@ -212,17 +228,17 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                 - status: "ok" (trade candidates found), "insufficient_fresh_data" (fewer candidates found than requested due to freshness constraint), "no_result" (no profitable trade found), "profile_unavailable" (trade profile or cargo capacity is unavailable), or "location_unknown" (commander's current location is unknown)
                 - currentSystem: commander's current star system
                 - priority: sorting priority applied ("profit" or "nearest")
-                - searchRadiusLy: effective search radius in light years
+                - searchRadiusLy / searchRadiusLyDisplay: effective search radius in light years
                 - candidates: list of candidate trades, ranked 1 to 3, already sorted and calculated:
                   - rank: rank (1, 2, 3)
                   - commodity: canonical commodity name
-                  - buySystem / buyStation / buyPrice / supply / buyStationDistanceLs / buyMarketUpdatedAt
-                  - sellSystem / sellStation / sellPrice / demand / sellStationDistanceLs / sellMarketUpdatedAt
-                  - unitProfit: profit per ton (sellPrice - buyPrice)
-                  - units: cargo units to carry based on cargo capacity, capital, and supply/demand
-                  - tripProfit: total profit for one run (unitProfit * units)
-                  - distanceFromCurrentLy: distance from commander to buy system
-                  - routeDistanceLy: distance from buy system to sell system
+                  - buySystem / buyStation / buyPrice / buyPriceDisplay / supply / supplyDisplay / buyStationDistanceLs / buyStationDistanceLsDisplay / buyMarketUpdatedAt
+                  - sellSystem / sellStation / sellPrice / sellPriceDisplay / demand / demandDisplay / sellStationDistanceLs / sellStationDistanceLsDisplay / sellMarketUpdatedAt
+                  - unitProfit / unitProfitDisplay: profit per ton (sellPrice - buyPrice)
+                  - units / unitsDisplay: cargo units to carry based on cargo capacity, capital, and supply/demand
+                  - tripProfit / tripProfitDisplay: total profit for one run (unitProfit * units)
+                  - distanceFromCurrentLy / distanceFromCurrentLyDisplay: distance from commander to buy system
+                  - routeDistanceLy / routeDistanceLyDisplay: distance from buy system to sell system
                 
                 Rules:
                 - If status is "profile_unavailable": inform the commander in their language that trade candidate search cannot be performed because trade profile or cargo capacity is not available.
@@ -231,6 +247,8 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                 - If status is "insufficient_fresh_data": inform the commander in their language that fewer trade candidates than usual (mention the exact count found) were found within the 10-hour fresh market data window, and present the available candidate(s).
                 - If status is "ok": present the trade candidates clearly in the given order.
                 - For each candidate: report the commodity, buy station and system, sell station and system, cargo units, unit profit, total trip profit, distance to buy station, and route distance.
+                - Use the pre-formatted display string fields (*Display) for all numbers, prices, profits, quantities, and distances. Present numbers verbatim with Western Arabic numerals (e.g. 5,103,950, 12.61 ly, 473 Ls). Never convert numbers into kanji numerals (漢数字 like 一, 十, 百, 千, 万) or kana, and never re-round them.
+                - Light seconds (Ls) measure distance from the star to the station, NOT travel time. Never describe Ls as time (do NOT say 'takes X seconds' or '〜秒かかる').
                 - Do NOT re-rank or recalculate any candidate values; present the ranks and numbers exactly as given.
                 - Do NOT automatically plot routes or claim to have plotted a route. Advise the commander that they can instruct route plotting to a chosen destination separately if desired.
                 - Never invent commodities, stations, or numbers not present in the data.
@@ -238,24 +256,124 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                 """;
     }
 
+    public record TradeCandidateDto(
+            int rank,
+            String commodity,
+            String buySystem,
+            String buyStation,
+            int buyPrice,
+            String buyPriceDisplay,
+            long supply,
+            String supplyDisplay,
+            Double buyStationDistanceLs,
+            String buyStationDistanceLsDisplay,
+            String buyMarketUpdatedAt,
+            String sellSystem,
+            String sellStation,
+            int sellPrice,
+            String sellPriceDisplay,
+            long demand,
+            String demandDisplay,
+            Double sellStationDistanceLs,
+            String sellStationDistanceLsDisplay,
+            String sellMarketUpdatedAt,
+            int unitProfit,
+            String unitProfitDisplay,
+            int units,
+            String unitsDisplay,
+            long tripProfit,
+            String tripProfitDisplay,
+            Double distanceFromCurrentLy,
+            String distanceFromCurrentLyDisplay,
+            Double routeDistanceLy,
+            String routeDistanceLyDisplay
+    ) {
+        public static TradeCandidateDto from(TradeCandidate c) {
+            if (c == null) return null;
+            return new TradeCandidateDto(
+                    c.rank(),
+                    c.commodity(),
+                    c.buySystem(),
+                    c.buyStation(),
+                    c.buyPrice(),
+                    formatInteger(c.buyPrice()),
+                    c.supply(),
+                    formatInteger(c.supply()),
+                    c.buyStationDistanceLs(),
+                    formatLightSeconds(c.buyStationDistanceLs()),
+                    c.buyMarketUpdatedAt(),
+                    c.sellSystem(),
+                    c.sellStation(),
+                    c.sellPrice(),
+                    formatInteger(c.sellPrice()),
+                    c.demand(),
+                    formatInteger(c.demand()),
+                    c.sellStationDistanceLs(),
+                    formatLightSeconds(c.sellStationDistanceLs()),
+                    c.sellMarketUpdatedAt(),
+                    c.unitProfit(),
+                    formatInteger(c.unitProfit()),
+                    c.units(),
+                    formatInteger(c.units()),
+                    c.tripProfit(),
+                    formatInteger(c.tripProfit()),
+                    c.distanceFromCurrentLy(),
+                    formatLightYears(c.distanceFromCurrentLy()),
+                    c.routeDistanceLy(),
+                    formatLightYears(c.routeDistanceLy())
+            );
+        }
+    }
+
     public record TradeCandidatesDataDto(
             String status,
             String currentSystem,
             String priority,
             Integer searchRadiusLy,
-            List<TradeCandidate> candidates
+            String searchRadiusLyDisplay,
+            List<TradeCandidateDto> candidates
     ) implements ToYamlConvertable {
 
+        public TradeCandidatesDataDto(
+                String status,
+                String currentSystem,
+                String priority,
+                Integer searchRadiusLy,
+                List<TradeCandidateDto> candidates
+        ) {
+            this(status, currentSystem, priority, searchRadiusLy, formatInteger(searchRadiusLy), candidates);
+        }
+
         public static TradeCandidatesDataDto locationUnknown(String priority, int radiusLy) {
-            return new TradeCandidatesDataDto("location_unknown", null, priority, radiusLy, Collections.emptyList());
+            return new TradeCandidatesDataDto("location_unknown", null, priority, radiusLy, formatInteger(radiusLy), Collections.emptyList());
         }
 
         public static TradeCandidatesDataDto profileUnavailable(String currentSystem, String priority, int radiusLy) {
-            return new TradeCandidatesDataDto("profile_unavailable", currentSystem, priority, radiusLy, Collections.emptyList());
+            return new TradeCandidatesDataDto("profile_unavailable", currentSystem, priority, radiusLy, formatInteger(radiusLy), Collections.emptyList());
         }
 
         public static TradeCandidatesDataDto noResult(String currentSystem, String priority, int radiusLy) {
-            return new TradeCandidatesDataDto("no_result", currentSystem, priority, radiusLy, Collections.emptyList());
+            return new TradeCandidatesDataDto("no_result", currentSystem, priority, radiusLy, formatInteger(radiusLy), Collections.emptyList());
+        }
+
+        public static TradeCandidatesDataDto create(
+                String status,
+                String currentSystem,
+                String priority,
+                int radiusLy,
+                List<TradeCandidate> rawCandidates
+        ) {
+            List<TradeCandidateDto> candidateDtos = (rawCandidates == null)
+                    ? Collections.emptyList()
+                    : rawCandidates.stream().map(TradeCandidateDto::from).toList();
+            return new TradeCandidatesDataDto(
+                    status,
+                    currentSystem,
+                    priority,
+                    radiusLy,
+                    formatInteger(radiusLy),
+                    candidateDtos
+            );
         }
 
         @Override

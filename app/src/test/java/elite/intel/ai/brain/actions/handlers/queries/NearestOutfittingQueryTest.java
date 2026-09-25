@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -237,5 +238,65 @@ public class NearestOutfittingQueryTest {
         } finally {
             elite.intel.session.PlayerSession.getInstance().setCurrentPrimaryStarName(previousStar);
         }
+    }
+
+    @Test
+    void testNumberFormattingRules() {
+        // Standard expected values
+        assertEquals("5,103,950", NearestOutfittingQuery.formatInteger(5103950));
+        assertEquals("12.61", NearestOutfittingQuery.formatLightYears(12.6115723766904));
+        assertEquals("473", NearestOutfittingQuery.formatLightSeconds(473.444649));
+
+        // 0 handling
+        assertEquals("0", NearestOutfittingQuery.formatInteger(0));
+        assertEquals("0.00", NearestOutfittingQuery.formatLightYears(0.0));
+        assertEquals("0", NearestOutfittingQuery.formatLightSeconds(0.0));
+        assertEquals("0", NearestOutfittingQuery.formatHours(0L));
+
+        // null handling
+        assertNull(NearestOutfittingQuery.formatInteger(null));
+        assertNull(NearestOutfittingQuery.formatLightYears(null));
+        assertNull(NearestOutfittingQuery.formatLightSeconds(null));
+        assertNull(NearestOutfittingQuery.formatHours(null));
+
+        // Locale independence (e.g. Locale.GERMANY where commas and dots differ)
+        Locale previousLocale = Locale.getDefault();
+        try {
+            Locale.setDefault(Locale.GERMANY);
+            assertEquals("5,103,950", NearestOutfittingQuery.formatInteger(5103950));
+            assertEquals("12.61", NearestOutfittingQuery.formatLightYears(12.6115723766904));
+            assertEquals("473", NearestOutfittingQuery.formatLightSeconds(473.444649));
+            assertEquals("0", NearestOutfittingQuery.formatInteger(0));
+            assertEquals("0.00", NearestOutfittingQuery.formatLightYears(0.0));
+            assertEquals("0", NearestOutfittingQuery.formatLightSeconds(0.0));
+            assertNull(NearestOutfittingQuery.formatInteger(null));
+            assertNull(NearestOutfittingQuery.formatLightYears(null));
+            assertNull(NearestOutfittingQuery.formatLightSeconds(null));
+        } finally {
+            Locale.setDefault(previousLocale);
+        }
+    }
+
+    @Test
+    void testOutfittingDataDtoCarriesFormattedDisplayFields() {
+        NearestOutfittingQuery.OutfittingDataDto dto = NearestOutfittingQuery.OutfittingDataDto.found(
+                "5A FSD",
+                null,
+                "Shinrarta Dezhra",
+                "Jameson Memorial",
+                "orbital",
+                12.6115723766904,
+                473.444649,
+                5103950L,
+                "2026-09-26T00:00:00Z",
+                2L,
+                false
+        );
+
+        assertEquals("12.61", dto.distanceLyDisplay());
+        assertEquals("473", dto.distanceToArrivalLsDisplay());
+        assertEquals("5,103,950", dto.priceDisplay());
+        assertEquals("2", dto.dataAgeHoursDisplay());
+        assertNotNull(dto.toYaml());
     }
 }

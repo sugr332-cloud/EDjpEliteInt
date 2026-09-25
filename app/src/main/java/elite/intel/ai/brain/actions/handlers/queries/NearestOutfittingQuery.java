@@ -17,6 +17,7 @@ import elite.intel.util.yaml.YamlFactory;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -166,6 +167,26 @@ public class NearestOutfittingQuery extends BaseQueryAnalyzer implements IntelQu
         return ageHours != null && ageHours > STALE_THRESHOLD_HOURS;
     }
 
+    public static String formatInteger(Number n) {
+        if (n == null) return null;
+        return String.format(Locale.US, "%,d", n.longValue());
+    }
+
+    public static String formatLightYears(Double ly) {
+        if (ly == null) return null;
+        return String.format(Locale.US, "%.2f", ly);
+    }
+
+    public static String formatLightSeconds(Double ls) {
+        if (ls == null) return null;
+        return String.format(Locale.US, "%,d", Math.round(ls));
+    }
+
+    public static String formatHours(Long hours) {
+        if (hours == null) return null;
+        return String.format(Locale.US, "%,d", hours);
+    }
+
     private static String buildInstructions() {
         return """
                 Answer the commander's question about outfitting module purchase locations based on the data fields below.
@@ -177,11 +198,11 @@ public class NearestOutfittingQuery extends BaseQueryAnalyzer implements IntelQu
                 - starSystem: star system name where the module is sold
                 - stationName: station name selling the module
                 - stationType: orbital port, planetary port, or carrier
-                - distanceLy: distance from commander's current location in light years
-                - distanceToArrivalLs: distance from system arrival star to the station in light seconds
-                - price: module price in credits if known
+                - distanceLy / distanceLyDisplay: distance from commander's current location in light years
+                - distanceToArrivalLs / distanceToArrivalLsDisplay: distance from system arrival star to the station in light seconds
+                - price / priceDisplay: module price in credits if known
                 - outfittingUpdatedAt: ISO timestamp when outfitting data was recorded
-                - dataAgeHours: age of the data in hours
+                - dataAgeHours / dataAgeHoursDisplay: age of the data in hours
                 - stale: boolean flag indicating if data is older than 7 days
                 
                 Rules:
@@ -190,6 +211,8 @@ public class NearestOutfittingQuery extends BaseQueryAnalyzer implements IntelQu
                 - If status is "no_result": inform the commander in their language that no station matching their trade profile and search criteria was found selling this module.
                 - If status is "found": report the star system, station name, distance in light years, and arrival distance in light seconds clearly. Mention the price if available.
                 - When status is "found" and stale is true: warn the commander that the outfitting data is over 7 days old and availability may have changed. If stale is false, do not warn about data age.
+                - Use the pre-formatted display string fields (*Display) for all numbers, prices, distances, and data age. Present numbers verbatim with Western Arabic numerals (e.g. 5,103,950, 12.61 ly, 473 Ls). Never convert numbers into kanji numerals (漢数字 like 一, 十, 百, 千, 万) or kana, and never re-round them.
+                - Light seconds (Ls) measure distance from the system arrival star to the station, NOT travel time. Never describe Ls as time (do NOT say 'takes X seconds' or '〜秒かかる').
                 - Never invent star systems, stations, or prices not in the data.
                 - Always reply in the commander's language (e.g. Japanese).
                 """;
@@ -203,31 +226,63 @@ public class NearestOutfittingQuery extends BaseQueryAnalyzer implements IntelQu
             String stationName,
             String stationType,
             Double distanceLy,
+            String distanceLyDisplay,
             Double distanceToArrivalLs,
+            String distanceToArrivalLsDisplay,
             Long price,
+            String priceDisplay,
             String outfittingUpdatedAt,
             Long dataAgeHours,
+            String dataAgeHoursDisplay,
             boolean stale
     ) implements ToYamlConvertable {
+
+        public OutfittingDataDto(
+                String status,
+                String rawModuleInput,
+                MatchedModuleDto module,
+                String starSystem,
+                String stationName,
+                String stationType,
+                Double distanceLy,
+                Double distanceToArrivalLs,
+                Long price,
+                String outfittingUpdatedAt,
+                Long dataAgeHours,
+                boolean stale
+        ) {
+            this(
+                    status, rawModuleInput, module, starSystem, stationName, stationType,
+                    distanceLy, formatLightYears(distanceLy),
+                    distanceToArrivalLs, formatLightSeconds(distanceToArrivalLs),
+                    price, formatInteger(price),
+                    outfittingUpdatedAt,
+                    dataAgeHours, formatHours(dataAgeHours),
+                    stale
+            );
+        }
 
         public static OutfittingDataDto unknown(String rawModuleInput) {
             return new OutfittingDataDto(
                     "unknown_module", rawModuleInput, null, null, null, null,
-                    null, null, null, null, null, false
+                    null, null, null, null, null, null,
+                    null, null, null, false
             );
         }
 
         public static OutfittingDataDto locationUnknown(String rawModuleInput, MatchedModule matched) {
             return new OutfittingDataDto(
                     "location_unknown", rawModuleInput, MatchedModuleDto.from(matched), null, null, null,
-                    null, null, null, null, null, false
+                    null, null, null, null, null, null,
+                    null, null, null, false
             );
         }
 
         public static OutfittingDataDto noResult(String rawModuleInput, MatchedModule matched) {
             return new OutfittingDataDto(
                     "no_result", rawModuleInput, MatchedModuleDto.from(matched), null, null, null,
-                    null, null, null, null, null, false
+                    null, null, null, null, null, null,
+                    null, null, null, false
             );
         }
 
@@ -246,7 +301,12 @@ public class NearestOutfittingQuery extends BaseQueryAnalyzer implements IntelQu
         ) {
             return new OutfittingDataDto(
                     "found", rawModuleInput, MatchedModuleDto.from(matched), starSystem, stationName, stationType,
-                    distanceLy, distanceToArrivalLs, price, outfittingUpdatedAt, dataAgeHours, stale
+                    distanceLy, formatLightYears(distanceLy),
+                    distanceToArrivalLs, formatLightSeconds(distanceToArrivalLs),
+                    price, formatInteger(price),
+                    outfittingUpdatedAt,
+                    dataAgeHours, formatHours(dataAgeHours),
+                    stale
             );
         }
 

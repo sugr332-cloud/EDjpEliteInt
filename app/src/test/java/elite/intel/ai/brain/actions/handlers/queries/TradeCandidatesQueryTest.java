@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -340,6 +341,91 @@ public class TradeCandidatesQueryTest {
         } finally {
             PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
         }
+    }
+
+    @Test
+    void testNumberFormattingRules() {
+        // Standard expected values
+        assertEquals("5,103,950", TradeCandidatesQuery.formatInteger(5103950));
+        assertEquals("12.61", TradeCandidatesQuery.formatLightYears(12.6115723766904));
+        assertEquals("473", TradeCandidatesQuery.formatLightSeconds(473.444649));
+
+        // 0 handling
+        assertEquals("0", TradeCandidatesQuery.formatInteger(0));
+        assertEquals("0.00", TradeCandidatesQuery.formatLightYears(0.0));
+        assertEquals("0", TradeCandidatesQuery.formatLightSeconds(0.0));
+
+        // null handling
+        assertNull(TradeCandidatesQuery.formatInteger(null));
+        assertNull(TradeCandidatesQuery.formatLightYears(null));
+        assertNull(TradeCandidatesQuery.formatLightSeconds(null));
+
+        // Locale independence (e.g. Locale.GERMANY where commas and dots differ)
+        Locale previousLocale = Locale.getDefault();
+        try {
+            Locale.setDefault(Locale.GERMANY);
+            assertEquals("5,103,950", TradeCandidatesQuery.formatInteger(5103950));
+            assertEquals("12.61", TradeCandidatesQuery.formatLightYears(12.6115723766904));
+            assertEquals("473", TradeCandidatesQuery.formatLightSeconds(473.444649));
+            assertEquals("0", TradeCandidatesQuery.formatInteger(0));
+            assertEquals("0.00", TradeCandidatesQuery.formatLightYears(0.0));
+            assertEquals("0", TradeCandidatesQuery.formatLightSeconds(0.0));
+            assertNull(TradeCandidatesQuery.formatInteger(null));
+            assertNull(TradeCandidatesQuery.formatLightYears(null));
+            assertNull(TradeCandidatesQuery.formatLightSeconds(null));
+        } finally {
+            Locale.setDefault(previousLocale);
+        }
+    }
+
+    @Test
+    void testTradeCandidatesDataDtoCarriesFormattedDisplayFields() {
+        elite.intel.gameapi.search.spansh.tradecandidates.TradeCandidateCalculator.TradeCandidate rawCandidate =
+                new elite.intel.gameapi.search.spansh.tradecandidates.TradeCandidateCalculator.TradeCandidate(
+                        1,
+                        "Gold",
+                        "Shinrarta Dezhra",
+                        "Jameson Memorial",
+                        1000,
+                        50000L,
+                        473.444649,
+                        "2026-09-26T00:00:00Z",
+                        "Sol",
+                        "Columbus",
+                        6000,
+                        100000L,
+                        120.0,
+                        "2026-09-26T01:00:00Z",
+                        5000,
+                        100,
+                        500000L,
+                        12.6115723766904,
+                        30.5
+                );
+
+        TradeCandidatesDataDto dto = TradeCandidatesDataDto.create(
+                "ok",
+                "Shinrarta Dezhra",
+                "profit",
+                30,
+                List.of(rawCandidate)
+        );
+
+        assertEquals("30", dto.searchRadiusLyDisplay());
+        assertEquals(1, dto.candidates().size());
+        TradeCandidatesQuery.TradeCandidateDto c = dto.candidates().get(0);
+        assertEquals("1,000", c.buyPriceDisplay());
+        assertEquals("50,000", c.supplyDisplay());
+        assertEquals("473", c.buyStationDistanceLsDisplay());
+        assertEquals("6,000", c.sellPriceDisplay());
+        assertEquals("100,000", c.demandDisplay());
+        assertEquals("120", c.sellStationDistanceLsDisplay());
+        assertEquals("5,000", c.unitProfitDisplay());
+        assertEquals("100", c.unitsDisplay());
+        assertEquals("500,000", c.tripProfitDisplay());
+        assertEquals("12.61", c.distanceFromCurrentLyDisplay());
+        assertEquals("30.50", c.routeDistanceLyDisplay());
+        assertNotNull(dto.toYaml());
     }
 }
 
