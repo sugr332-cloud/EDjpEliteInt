@@ -65,8 +65,25 @@ public class TradeCandidateCalculatorTest {
                 ), null);
 
         TradeCandidatesResult result = TradeCandidateCalculator.calculate(List.of(s1), profile, "profit", NOW);
-        assertEquals("no_result", result.status());
+        assertEquals("too_few_stations", result.status());
+        assertEquals(1, result.freshStationsCount());
         assertTrue(result.candidates().isEmpty(), "Single station cannot trade with itself (A != B)");
+    }
+
+    @Test
+    void testZeroStationsReturnsTooFewStations() {
+        TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+        profile.setMaxCargo(100);
+
+        TradeCandidatesResult res0 = TradeCandidateCalculator.calculate(List.of(), profile, "profit", NOW);
+        assertEquals("too_few_stations", res0.status());
+        assertEquals(0, res0.freshStationsCount());
+        assertTrue(res0.candidates().isEmpty());
+
+        TradeCandidatesResult resNull = TradeCandidateCalculator.calculate(null, profile, "profit", NOW);
+        assertEquals("too_few_stations", resNull.status());
+        assertEquals(0, resNull.freshStationsCount());
+        assertTrue(resNull.candidates().isEmpty());
     }
 
     @Test

@@ -59,7 +59,10 @@ public class TradeCandidateCalculator {
             String priority,
             Instant now
     ) {
-        if (stations == null || stations.isEmpty() || profile == null || profile.getMaxCargo() <= 0) {
+        if (stations == null || stations.isEmpty()) {
+            return new TradeCandidatesResult("too_few_stations", Collections.emptyList(), 0, 0);
+        }
+        if (profile == null || profile.getMaxCargo() <= 0) {
             return new TradeCandidatesResult("no_result", Collections.emptyList(), 0, 0);
         }
 
@@ -73,7 +76,7 @@ public class TradeCandidateCalculator {
 
         if (freshStations.size() < 2) {
             // Cannot form a 1-hop pair with fewer than 2 fresh stations
-            return new TradeCandidatesResult("no_result", Collections.emptyList(), freshStations.size(), 0);
+            return new TradeCandidatesResult("too_few_stations", Collections.emptyList(), freshStations.size(), 0);
         }
 
         int maxCargo = profile.getMaxCargo();
@@ -241,7 +244,14 @@ public class TradeCandidateCalculator {
             ));
         }
 
-        String status = topCandidates.size() >= 3 ? "ok" : "insufficient_fresh_data";
+        String status;
+        if (topCandidates.isEmpty()) {
+            status = "no_result";
+        } else if (topCandidates.size() >= 3) {
+            status = "ok";
+        } else {
+            status = "insufficient_fresh_data";
+        }
         return new TradeCandidatesResult(status, topCandidates, freshStations.size(), bestTradePerRoute.size());
     }
 
