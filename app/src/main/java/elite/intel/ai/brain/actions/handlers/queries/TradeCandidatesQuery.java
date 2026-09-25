@@ -19,12 +19,16 @@ import elite.intel.util.yaml.YamlFactory;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Query handler that recommends the top 3 single-hop commodity trade candidates based on fresh market data (<= 10 hours).
  */
 @RegisterQuery
 public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuery {
+
+    private static final Logger log = LogManager.getLogger(TradeCandidatesQuery.class);
 
     public static final String ID = "query_trade_candidates";
     public static final String PARAM_PRIORITY = "priority";
@@ -89,6 +93,8 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
         // 1. Obtain current system
         String currentSystem = PlayerSession.getInstance().getPrimaryStarName();
         if (currentSystem == null || currentSystem.isBlank()) {
+            log.info("Trade candidates query: system=unknown, radius={}ly, priority={}", radiusLy, priority);
+            log.info("Trade candidates result: status=location_unknown, stations=0, freshStations=0, pairs=0, candidates=0 (search: 0ms, calc: 0ms)");
             TradeCandidatesDataDto locUnknownDto = TradeCandidatesDataDto.locationUnknown(priority, radiusLy);
             return process(new AiDataStruct(buildInstructions(), locUnknownDto), originalUserInput);
         }
@@ -96,26 +102,54 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
         // 2. Obtain trade profile; profile and cargo capacity must be available
         TradeRouteSearchCriteria profile = getTradeProfile();
         if (profile == null || profile.getMaxCargo() <= 0) {
+            log.info("Trade candidates query: system={}, radius={}ly, priority={}, profile={}",
+                    currentSystem, radiusLy, priority,
+                    profile == null ? "null" : "[maxCargo=" + profile.getMaxCargo() + "]");
+            log.info("Trade candidates result: status=profile_unavailable, stations=0, freshStations=0, pairs=0, candidates=0 (search: 0ms, calc: 0ms)");
             TradeCandidatesDataDto profileUnavailableDto = TradeCandidatesDataDto.profileUnavailable(currentSystem, priority, radiusLy);
             return process(new AiDataStruct(buildInstructions(), profileUnavailableDto), originalUserInput);
         }
 
+        log.info("Trade candidates query: system={}, radius={}ly, priority={}, profile=[requiresLargePad={}, maxLs={}, allowPlanetary={}, allowFleetCarriers={}, allowProhibited={}]",
+                currentSystem, radiusLy, priority,
+                profile.isRequiresLargePad(), profile.getMaxLsFromArrival(),
+                profile.isAllowPlanetary(), profile.isAllowFleetCarriers(), profile.isAllowProhibited());
+
         // 3. Execute search via Spansh API
+        long searchStart = System.currentTimeMillis();
         TradeCandidatesSearchCriteria criteria = TradeCandidatesSearchCriteria.create(currentSystem, radiusLy, profile, Instant.now());
         TradeStationSearchResultDto searchResult = searchClient.searchTradeStations(criteria);
+        long searchDurationMs = System.currentTimeMillis() - searchStart;
+
+        int rawStationCount = (searchResult != null && searchResult.getResults() != null)
+                ? searchResult.getResults().size()
+                : 0;
 
         if (searchResult == null || searchResult.getResults() == null || searchResult.getResults().isEmpty()) {
+            log.info("Trade candidates result: status=no_result, stations=0, freshStations=0, pairs=0, candidates=0 (search: {}ms, calc: 0ms)",
+                    searchDurationMs);
             TradeCandidatesDataDto noResultDto = TradeCandidatesDataDto.noResult(currentSystem, priority, radiusLy);
             return process(new AiDataStruct(buildInstructions(), noResultDto), originalUserInput);
         }
 
         // 4. Calculate top trade candidates
+        long calcStart = System.currentTimeMillis();
         TradeCandidatesResult calcResult = TradeCandidateCalculator.calculate(
                 searchResult.getResults(),
                 profile,
                 priority,
                 Instant.now()
         );
+        long calcDurationMs = System.currentTimeMillis() - calcStart;
+
+        log.info("Trade candidates result: status={}, stations={}, freshStations={}, pairs={}, candidates={} (search: {}ms, calc: {}ms)",
+                calcResult.status(),
+                rawStationCount,
+                calcResult.freshStationsCount(),
+                calcResult.routePairsCount(),
+                calcResult.candidates().size(),
+                searchDurationMs,
+                calcDurationMs);
 
         TradeCandidatesDataDto dataDto = new TradeCandidatesDataDto(
                 calcResult.status(),

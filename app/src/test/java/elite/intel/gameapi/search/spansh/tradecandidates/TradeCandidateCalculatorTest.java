@@ -300,6 +300,33 @@ public class TradeCandidateCalculatorTest {
         assertEquals("Imperial Slaves", allowedResult.candidates().get(0).commodity());
     }
 
+    @Test
+    void testDiagnosticsCountsInResult() {
+        TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+        profile.setMaxCargo(100);
+
+        StationResult s1 = createStation("s1", "Alpha", "Starport 1", 5.0, 100.0,
+                NOW.minus(1, ChronoUnit.HOURS).toString(), 0.0, 0.0, 0.0,
+                List.of(createMarketEntry("Gold", 1000, 0, 500L, 0L)), null);
+
+        StationResult s2 = createStation("s2", "Beta", "Starport 2", 10.0, 100.0,
+                NOW.minus(2, ChronoUnit.HOURS).toString(), 10.0, 0.0, 0.0,
+                List.of(createMarketEntry("Gold", 0, 3000, 0L, 500L)), null);
+
+        StationResult stale = createStation("stale", "Gamma", "Starport 3", 15.0, 100.0,
+                NOW.minus(12, ChronoUnit.HOURS).toString(), 20.0, 0.0, 0.0,
+                List.of(createMarketEntry("Gold", 0, 4000, 0L, 500L)), null);
+
+        TradeCandidatesResult result = TradeCandidateCalculator.calculate(
+                List.of(s1, s2, stale), profile, "profit", NOW
+        );
+
+        assertEquals("insufficient_fresh_data", result.status());
+        assertEquals(2, result.freshStationsCount(), "s1 and s2 are fresh, stale is excluded");
+        assertEquals(1, result.routePairsCount(), "1 profitable route pair s1->s2");
+        assertEquals(1, result.candidates().size());
+    }
+
     private static StationResult createStation(
             String id, String systemName, String stationName, Double distFromCurrent, Double distLs,
             String marketUpdatedAt, Double x, Double y, Double z,
