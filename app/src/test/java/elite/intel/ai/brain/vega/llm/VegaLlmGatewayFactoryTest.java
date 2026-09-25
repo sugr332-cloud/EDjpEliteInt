@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Verifies the user-facing "unsupported provider" message and gateway construction:
  * it names the configured provider and lists the providers VEGA currently supports,
  * derived dynamically from the wired adapters (so the list stays correct as providers
- * are added one at a time), and ensures agy is selectable and wired as the default.
+ * are added one at a time), and ensures create() returns a single LLM Gateway.
  */
 class VegaLlmGatewayFactoryTest {
 
@@ -25,8 +25,8 @@ class VegaLlmGatewayFactoryTest {
 
         // The provider the user actually configured is named, so they know what was rejected.
         assertTrue(message.contains("COHERE"), message);
-        // The currently-wired providers are listed dynamically by their friendly labels (default + cloud + local).
-        assertTrue(message.contains("agy"), message);
+        // The currently-wired providers are listed dynamically by their friendly labels (cloud + local).
+        assertFalse(message.contains("agy"), message);
         assertTrue(message.contains("Mistral"), message);
         assertTrue(message.contains("OpenAI"), message);
         assertTrue(message.contains("Grok"), message);
@@ -36,13 +36,6 @@ class VegaLlmGatewayFactoryTest {
         assertTrue(message.contains("LM Studio (Gemma 4)"), message);
         // Ollama was dropped; naming it as supported would send commanders back to the host we removed.
         assertFalse(message.contains("Ollama"), message);
-    }
-
-    @Test
-    void createExplicitProviderAgyReturnsGateway() {
-        try (LlmGateway gateway = VegaLlmGatewayFactory.create(ProviderEnum.AGY)) {
-            assertNotNull(gateway, "explicit ProviderEnum.AGY should produce an LlmGateway");
-        }
     }
 
     @Test
@@ -58,17 +51,14 @@ class VegaLlmGatewayFactoryTest {
                 UnsupportedOperationException.class,
                 () -> VegaLlmGatewayFactory.create(ProviderEnum.UNKNOWN));
         assertTrue(ex.getMessage().contains("UNKNOWN"), ex.getMessage());
-        assertTrue(ex.getMessage().contains("agy"), ex.getMessage());
     }
 
     @Test
-    void createReturnsTurnRoutingLlmGateway() {
+    void createReturnsSingleConfiguredLlmGatewayNotTurnRouting() {
         try (LlmGateway gateway = VegaLlmGatewayFactory.create()) {
             assertNotNull(gateway);
-            assertInstanceOf(TurnRoutingLlmGateway.class, gateway, "create() must return a TurnRoutingLlmGateway");
-            TurnRoutingLlmGateway routing = (TurnRoutingLlmGateway) gateway;
-            assertNotNull(routing.toolGateway(), "toolGateway must be wired");
-            assertNotNull(routing.chatGateway(), "chatGateway must be wired");
+            assertInstanceOf(VegaLlmGateway.class, gateway,
+                    "create() should directly produce a VegaLlmGateway instance");
         }
     }
 }

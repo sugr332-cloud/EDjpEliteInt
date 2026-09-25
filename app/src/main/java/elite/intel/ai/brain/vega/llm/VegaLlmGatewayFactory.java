@@ -66,13 +66,6 @@ public final class VegaLlmGatewayFactory {
                     new LmStudioLlmAdapter(session.getLmStudioCommandModel().trim()),
                     typedTransport(body -> LMStudioClient.getInstance().sendVegaRequest(body))));
 
-    /**
-     * The default CLI provider: Antigravity CLI (agy), serving as the primary offline-capable tool-call
-     * generator and plain-text summarizer when neither local nor cloud provider is configured.
-     */
-    private static final WiredProvider AGY_GATEWAY =
-            new WiredProvider("agy", session -> new VegaLlmGateway(
-                    new AgyCliProviderAdapter(), new AgyCliTransport()));
 
     private VegaLlmGatewayFactory() {
     }
@@ -100,18 +93,16 @@ public final class VegaLlmGatewayFactory {
     }
 
     /**
-     * Creates the dual-routing gateway for VEGA (§R.6.2):
-     * - Tool-calling turns (!request.tools().isEmpty()) route to the configured command provider (LM Studio or cloud API).
-     * - Chat / summarization turns (request.tools().isEmpty()) route to Antigravity CLI (agy).
+     * Creates the unified command gateway for VEGA (§R.6 G-8):
+     * All turns (tool-calling and plain-text chat/summarization) route to the single configured
+     * command provider (LM Studio or cloud API).
      */
     public static LlmGateway create() {
         return create(SystemSession.getInstance());
     }
 
     static LlmGateway create(SystemSession session) {
-        LlmGateway toolGateway = createConfiguredGateway(session);
-        LlmGateway chatGateway = AGY_GATEWAY.builder().apply(session);
-        return new TurnRoutingLlmGateway(toolGateway, chatGateway);
+        return createConfiguredGateway(session);
     }
 
     /**
@@ -130,9 +121,6 @@ public final class VegaLlmGatewayFactory {
      */
     public static LlmGateway create(ProviderEnum provider) {
         SystemSession session = SystemSession.getInstance();
-        if (provider == ProviderEnum.AGY) {
-            return AGY_GATEWAY.builder().apply(session);
-        }
         return build(CLOUD_GATEWAYS.get(provider), provider, session);
     }
 
@@ -152,8 +140,7 @@ public final class VegaLlmGatewayFactory {
      * as providers are added.
      */
     static String unsupportedMessage(String configured) {
-        return "VEGA mode does not support the " + configured + " provider yet. Supported now - default: "
-                + AGY_GATEWAY.label() + "; cloud: "
+        return "VEGA mode does not support the " + configured + " provider yet. Supported now - cloud: "
                 + labels(CLOUD_GATEWAYS.values()) + "; local: " + LOCAL_GATEWAY.label()
                 + ". Configure a supported provider to start VEGA.";
     }
