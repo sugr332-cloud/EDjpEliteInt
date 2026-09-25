@@ -83,7 +83,7 @@ C-CORE の追加・拡張（v2-P9）はこの 2 トラックの後に回す。�
 | v2-P5 | 音声入出力（STT / TTS / VOICEVOX） | 一部実装 | Kokoro→日本語フォールバック（`334b35b1`）。実機 E2E は未実施（`PHASE11_VOICE_IO_PHASE_UPDATE.md`）。**同梱 STT（`ParakeetSTTImpl`）は日本語語彙を持たず日本語音声を認識できない（§10 で確認済み）。日本語 STT は別バックエンドを新規に選定する（CLI 方式を含めて検証、R.7）** |
 | v2-P6 | Game Action / Ship Control の安全化 | 既存機能あり | 既存 `GameInputStep` / `GameControllerBus` / `KeyProcessor`。System Map 駅選択は未実装（§17） |
 | v2-P7 | HUD / Overlay / VR | 既存機能あり | Aleoida MATCH 表示は実装済み（旧 Phase 6、§13） |
-| v2-P8 | Generic Game Data / Trade Assistant | 既存機能あり（艤装検索は欠落） | 既存 Spansh / trade 機能（`FindCommodityCommand` 等）。日本語化は v2-P2 の対象。**艤装（モジュール）をギャラクシー内で検索するコマンドは存在しない**（`ShowModulesPanelCommand` はモジュール画面を開くだけ、`query_local_outfitting` は現在地の艤装を LLM に読ませるだけで、`find_commodity` のような「範囲 ly 内から探す」経路がない）。新規コマンドが必要（R.7） |
+| v2-P8 | Generic Game Data / Trade Assistant | 既存機能あり（艤装検索は欠落） | 既存 Spansh / trade 機能（`FindCommodityCommand` 等）。日本語化は v2-P2 の対象。**艤装（モジュール）をギャラクシー内で検索するコマンドは存在しない**（`ShowModulesPanelCommand` はモジュール画面を開くだけ、`query_local_outfitting` は現在地の艤装を LLM に読ませるだけで、`find_commodity` のような「範囲 ly 内から探す」経路がない）。新規コマンドが必要（R.7）。**仕様: `docs/V2_P8_TRADE_OUTFITTING_SPEC.md`（2026-09-25）** |
 | v2-P9 | C-CORE 統合の拡張（全 species / collection state / value / ranking） | 一部完了・後段 | C-CORE 本体は `c-core/`（54 tests passed）。旧 Phase 4・5・6・7(§14)・12(§15) 完了。旧 Phase 7（collection state）・8（all species）・10（value/ranking）未着手。旧 Phase 9 は保留（§16） |
 | v2-P10 | Offline Assistant（ローカル LLM: LM Studio + Gemma 4 E4B） | 未着手 | 2026-09-25 改訂（旧: ローカル CLI provider）。§R.6 の LLM 一本化と §R.7.1 の実機確認が前提 |
 | v2-P11 | Installer / Update / Runtime packaging | 一部 | C-CORE 同梱（旧 Phase 12、§15）のみ。`c-core/` からの `bio_entry` ビルド成果物を `distribution/ccore/windows/` へ置く工程は手動 |
@@ -340,7 +340,7 @@ G-6 merge 後、実機ログで再検証したところ、`hasNaturalLanguageAli
 - **v2-P5 STT / TTS / VOICEVOX:** STT / TTS は Provider として分離。VOICEVOX はローカル実行前提、外部 TTS API を必須依存にしない。VOICEVOX 未起動でもテキスト表示を継続。完了判定は `PHASE11_VOICE_IO_PHASE_UPDATE.md` の実機 E2E（AI Provider は §R.6 の LLM（Gemma 4 E4B）。旧: AI CLI Provider は `agy`）。**同梱の `ParakeetSTTImpl` を日本語 STT として扱わない**（`tokens.txt` に日本語語彙が無く、原理的に日本語を認識できないことを確認済み、§10）。日本語音声入力には別の STT バックエンドを新規に選定する（ローカルモデルの差し替え・外部 CLI 方式のいずれも候補として検証する）。STT の出力は常に未検証のユーザー入力として扱い（他言語 STT と同様）、そのままコマンドパラメータや DB へ書き込まない。
 - **v2-P6 Game Action / Ship Control:** Action Registry・Input Adapter・キーバインド設定・allowlist・dry-run・実行結果 verification。LLM から直接 OS キーボードイベントを発行することは禁止。
 - **v2-P7 HUD / Overlay / VR:** Assistant と同じ Game Context を表示し、CLI と HUD で別々の状態取得を行わない。
-- **v2-P8 Generic Game Data / Trade Assistant:** commodity / station / where-to-sell / trade route / cargo / 利益計算。**艤装（outfitting）検索コマンドを新設する**（2026-09-15 判明のギャップ、R.3 表参照）。既存は現在地限定の `query_local_outfitting`（LLM に艤装リストを読ませて回答させる）とモジュール画面を開くだけの `ShowModulesPanelCommand` のみで、`find_commodity` のような「範囲 ly 内からモジュールを検索する」コマンドが無い。「アイテム」が商品なのかモジュール／艤装なのかは、まず**ツール選択（LLM が呼ぶコマンド ID）の段階で区別する**——同じ `find_commodity` に両方を混在させない。新設する艤装検索コマンドの実装は `FindCommodityCommand` と同じ形にする: 名前の照合と検索自体は決定的コード（辞書照合 + 既存 `FuzzySearch`/Spansh 相当）が行い、LLM はツール選択・引数生成と結果の説明・要約のみを担当する（判定・検索ロジックを LLM に持たせない、R.10 の非目標と一致）。
+- **v2-P8 Generic Game Data / Trade Assistant:** （2026-09-25: 交易候補検索・艤装検索の詳細仕様と実装台帳は `docs/V2_P8_TRADE_OUTFITTING_SPEC.md` を正とする。鮮度 10 時間・「近い」は既存方式・ミッション掲示板検索は非目標・上位 3 件は新規 Tool のみ）commodity / station / where-to-sell / trade route / cargo / 利益計算。**艤装（outfitting）検索コマンドを新設する**（2026-09-15 判明のギャップ、R.3 表参照）。既存は現在地限定の `query_local_outfitting`（LLM に艤装リストを読ませて回答させる）とモジュール画面を開くだけの `ShowModulesPanelCommand` のみで、`find_commodity` のような「範囲 ly 内からモジュールを検索する」コマンドが無い。「アイテム」が商品なのかモジュール／艤装なのかは、まず**ツール選択（LLM が呼ぶコマンド ID）の段階で区別する**——同じ `find_commodity` に両方を混在させない。新設する艤装検索コマンドの実装は `FindCommodityCommand` と同じ形にする: 名前の照合と検索自体は決定的コード（辞書照合 + 既存 `FuzzySearch`/Spansh 相当）が行い、LLM はツール選択・引数生成と結果の説明・要約のみを担当する（判定・検索ロジックを LLM に持たせない、R.10 の非目標と一致）。
 - **v2-P9 C-CORE 拡張:** 全 species、collection state、expected value、ranking、confidence。判定と価値評価を分離。C-CORE ruleset を EliteIntel 側へコピーせず、LLM は C-CORE 結果を説明・要約するだけとする。
 - **v2-P10 Offline Assistant:** ローカル LLM（LM Studio + Gemma 4 E4B、§R.6）+ ローカル TTS でネットワーク無しでも可能な範囲で日本語 Assistant を使える構成。（2026-09-25 改訂。旧: ローカル CLI provider（例: Ollama CLI）。Ollama は EliteIntel V1.1 で既に廃止済み — `VegaLlmGatewayFactory` の `LOCAL_GATEWAY` コメント参照）
 - **v2-P11 Installer / Update / Runtime packaging:** Windows runtime package、CLI launcher、AI Provider（LM Studio エンドポイント／モデル、クラウド API キー）/ TTS 設定、optional HUD / VR、バージョン情報、更新機構。（2026-09-25 改訂: `agy` executable 設定を削除）
@@ -664,6 +664,8 @@ v2-P3（AI Provider CLI化 / agy対応、G-1〜G-7・PR #10・PR #11）の台帳
 | G-9 | LLM 一本化: 実行時 `agy` コード・テストを `archive/agy-runtime/src/` へ移動（未運用） | §R.6 の表 | §R.6 の表 | 未着手（G-8 の後） |
 
 #### v2-P4 以降の台帳
+
+- v2-P8（交易候補・艤装検索）の台帳は `docs/V2_P8_TRADE_OUTFITTING_SPEC.md` §9（P8-0〜P8-3）。
 
 v2-P4 以降は、着手前 read-only 確認の結果を踏まえて、同じ形式（ID・変更許可ファイル・TEST GATE）で本節に追加する。追加されるまで `agy` に実装させない。
 

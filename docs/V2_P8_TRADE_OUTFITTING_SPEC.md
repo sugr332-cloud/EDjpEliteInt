@@ -1,0 +1,171 @@
+# v2-P8 Trade / Outfitting Search Specification（交易候補・艤装検索仕様）
+
+**Status:** Draft（2026-09-25 決定事項を反映）
+**正本との関係:** `docs/ELITEINTEL_INTEGRATION_PLAN.md` §R.6（LLM 一本化）・§R.7 v2-P8・§R.12（DB 非汚染）の下位仕様。矛盾する場合は計画書を優先する。
+**前提:** アプリの AI は LM Studio + Gemma 4 E4B（§R.6）。数値の信頼性を LLM の推論能力に依存させない。
+
+## 0. 決定事項（2026-09-25）
+
+| 論点 | 決定 |
+|---|---|
+| 交易データの鮮度 | **既存の 10 時間に合わせる**（既存 `TradeRouteSearchCriteria` の `max_price_age = 36000` 秒）。新規 Tool も 10 時間で統一する |
+| 「近い」の定義 | **既存方式に統一**: 現在地星系からの光年距離の昇順。恒星からの距離（Ls）はトレードプロファイルの `maxLsFromArrival` による足切り（上限）として使い、並び順には使わない |
+| ミッション検索 | **v2-P8 から外す**（§8、非目標） |
+| 上位 3 候補 | **新規 Tool だけが 3 件を返す**。既存 `find_commodity`（1 件選択 + 自動航路設定）は変更しない |
+
+## 1. 目的
+
+EliteIntel の LLM Tool として次を追加する。
+
+1. **交易候補検索**（新規 `find_trade_candidates`）: 利益の高い交易候補を上位 3 件返す
+2. **艤装（モジュール）販売ステーション検索**（新規 `find_outfitting`）: 指定モジュールを売っている最寄りのステーションを返す
+3. 検索結果から目的地への航路設定へつなぐ（既存の航路設定機能を再利用、§7）
+
+## 2. 責務の分担
+
+### 2.1 LLM の責務
+
+- ユーザー要求の解釈、Tool の選択、Tool 引数の生成
+- Tool 結果の日本語での説明（Tool が返した候補・順位・数値をそのまま説明する）
+
+### 2.2 LLM に行わせないこと
+
+- 距離・利益・利益率・効率の計算、候補の順位付けや順位の変更
+- 市場データの鮮度の判断・補正、Tool 結果に無い数値の推測
+- 鮮度条件を外れたデータの採用
+
+### 2.3 Tool（決定的コード）の責務
+
+- 名前の照合（辞書照合。照合できなければ `UNKNOWN` として検索しない、§R.12 ルール 2）
+- 外部データ取得、鮮度フィルタ、距離・利益の計算、順位付け、上位 N 件の選定
+- 構造化結果の返却（数値はすべて Tool が計算した値）
+
+これは既存 `FindCommodityCommand` / `CommodityTradeSearch` と同じ方式である。
+
+## 3. 「近い」の定義（既存方式）
+
+既存の商品検索（`SpanshCommoditySearch`）の定義をそのまま使う。
+
+1. **並び順:** 現在地星系（`PlayerSession.getPrimaryStarName()`）からの光年距離の昇順（Spansh の距離ソート）
+2. **足切り:** 恒星からステーションまでの距離（Ls）は、トレードプロファイルの `maxLsFromArrival` を上限とする。並び順には使わない
+3. **パッドサイズ・惑星港・キャリア・許可制星系:** トレードプロファイルの既存設定（`requiresLargePad` / `allowPlanetary` / `allowFleetCarriers` / `allowPermit` 等）に従う
+4. **検索半径:** 指定が無ければ既存 `CommodityTradeSearch.defaultRange()`（FSD 最大ジャンプ距離 × 2、不明時 1000 ly）
+
+**ジャンプ数は使わない。** 航路を計算しないと求まらず、既存検索はどれも光年距離のみを返すため。
+
+## 4. データの鮮度
+
+- 新規の交易候補検索は、市場データの更新から **10 時間以内** のものだけを対象にする（既存交易ルート検索と同じ `max_price_age = 36000`）。
+- 10 時間以内のデータで 3 件に満たない場合、Tool は取れた件数だけを返し、状態 `insufficient_fresh_data` を付ける。LLM は「10 時間以内の市場データでは N 件しか見つかりませんでした」と伝える。古いデータへの拡張はしない（仕様変更として別途扱う）。
+- 既存 `find_commodity` の鮮度扱い（除外せず、7 日超に注記）は変更しない。
+- 艤装データの鮮度は **除外せず、更新時刻（`outfitting_updated_at`）を必ず返す**（暫定。艤装は価格ほど頻繁に変わらないため）。7 日超は既存 `find_commodity` と同様に注記する。
+
+## 5. 交易候補検索 `find_trade_candidates`（新規）
+
+### 5.1 用途
+
+「一番儲かる交易を 3 つ」「近くて儲かる交易先」「効率のいい交易」など、**最適候補を求める要求**。
+
+特定の商品名を指定した「○○を買える／売れる場所」は既存 `find_commodity` / `sell_commodity` のまま（変更しない）。複数ホップの交易ルートは既存 `calculate_trade_route` のまま。
+
+### 5.2 Tool 内の処理
+
+```text
+入力（LLM が生成）: 検索半径(任意)、優先(profit | nearest、任意)
+  ↓
+トレードプロファイル取得（貨物容量・資金・Ls 上限・パッド等）
+  ↓
+市場データ取得（10 時間以内）
+  ↓
+候補 = 1 ホップ（購入ステーション → 売却ステーション）
+  ↓
+各候補について計算:
+  単位利益 = 売値 − 買値
+  積載量   = min(貨物容量, 資金 ÷ 買値, 供給量, 需要量)
+  1 回の総利益 = 単位利益 × 積載量
+  距離（現在地 → 購入、購入 → 売却、ly）
+  ↓
+並び順:
+  profit（既定）: 1 回の総利益の降順 → 同値は現在地からの距離の昇順
+  nearest       : 現在地から購入ステーションまでの距離の昇順
+  ↓
+上位 3 件 + 状態（ok | insufficient_fresh_data | no_result）
+```
+
+- 「最高効率」「一番儲かる」は **1 回の総利益（profit）** として扱う（暫定）。1 時間あたり利益は航行時間の推定が必要で、既存実装に無いため使わない。
+- 候補の取得方法（Spansh のどの API で 1 ホップ候補を複数取れるか）は P8-0 の READ-ONLY 調査で確定する。
+
+### 5.3 返却値（候補ごと）
+
+```text
+rank
+commodity（商品名、canonical 英語名）
+buy_system / buy_station / buy_price / supply / buy_station_distance_ls / buy_market_updated_at
+sell_system / sell_station / sell_price / demand / sell_station_distance_ls / sell_market_updated_at
+unit_profit / units / trip_profit
+distance_from_current_ly / route_distance_ly
+```
+
+- **自動で航路設定しない。** ユーザーが候補を選んでから §7 で設定する（既存 `find_commodity` との違い）。
+
+## 6. 艤装販売ステーション検索 `find_outfitting`（新規）
+
+### 6.1 用途
+
+「5A FSD を売っているところ」「一番近い 5A FSD の販売ステーション」など。
+
+- 現在ステーションの艤装確認は既存 `query_local_outfitting`（`AnalyzeLocalOutfittingQuery`、EDSM の `OutfittingDto`）のまま。**拡張せず、別 Tool として新設する。**
+- 商品（commodity）とモジュール（module）は別 Tool。`find_commodity` にモジュールを混在させない（§R.7 v2-P8）。
+
+### 6.2 モジュール名の照合
+
+- LLM が抽出したモジュール指定（例: 「5A FSD」「5A フレームシフトドライブ」）は、決定的コードで **カテゴリ・クラス・レーティング**（または `ed_symbol`）へ照合する。照合できなければ `UNKNOWN` として検索しない（§R.12 ルール 2）。
+- 照合辞書の元データは P8-0 で確定する。候補: Spansh 検索結果の `modules`（`ed_symbol` / `class` / `rating` / `name` / `category`）、`various-meta-data/modules.csv`（モジュール名の多言語表。日本語列は無く、現在アプリからは参照されていない）。
+
+### 6.3 Tool 内の処理
+
+```text
+照合済みモジュール（category, class, rating / ed_symbol）
+  ↓
+Spansh ステーション検索（モジュールで絞り込み、§3 の並び順・足切り）
+  ↓
+最寄り 1 件（候補が無ければ no_result）
+```
+
+- 既存 `TradeStationSearchResultDto` は `modules`・`outfitting_updated_at` を受け取れる。Spansh がモジュール条件での絞り込みに対応するかは **P8-0 で実機確認する**（未確認のまま実装しない）。
+
+### 6.4 返却値
+
+```text
+module（name / class / rating）
+system / station / station_type
+distance_from_current_ly / station_distance_ls
+price（取得できる場合）
+outfitting_updated_at
+```
+
+- 自動で航路設定しない（§7）。
+
+## 7. 航路設定との接続
+
+- 航路設定は **既存機能を再利用する**（`RoutePlotter`。既存 `find_commodity` は検索後に自動で使っている。交易ルートには `NavigateToTradeStopCommand` がある）。
+- 新規 Tool（§5、§6）は目的地（system / station）を構造化して返すだけで、航路は設定しない。「そこへの航路を設定して」は、検索 Tool とは別のコマンドとして LLM が続けて呼ぶ。
+- 目的地を選ぶコマンドの具体設計（直前の検索結果の保持方法を含む）は P8-3 で行う。
+
+## 8. 非目標
+
+- **ミッション掲示板からの候補検索**: 掲示板の内容は外部 API（Spansh / EDSM）にも Journal にも出ない（Journal の `Missions` は受注済みミッションのみ）。データが無いため作らない。受注済みミッションの目的地案内（`NavigateToMissionTargetCommand` 等）は既存のまま。
+- ジャンプ数による並べ替え、1 時間あたり利益
+- 既存コマンド（`find_commodity`、`sell_commodity`、`calculate_trade_route`、`query_local_outfitting`）の挙動変更
+- INARA のデータ・画面の複製
+
+## 9. 実装台帳（v2-P8）
+
+§R.13 の統制手順に従う。P8-1 以降の変更許可ファイルと TEST GATE は、P8-0 の結果を踏まえて PLAN CHANGE REQUEST で本表に確定させてから着手する。
+
+| ID | 内容 | 変更許可ファイル | TEST GATE | 状態 |
+|---|---|---|---|---|
+| P8-0 | READ-ONLY 調査: (1) Spansh ステーション検索がモジュール条件（ed_symbol / class / rating）で絞り込めるか（実機でリクエストを 1 回送って確認）、(2) 1 ホップの交易候補を複数件取得できる Spansh API と条件（`max_price_age` を含む）、(3) モジュール名照合辞書の元データ（§6.2）、(4) 新規 Tool の登録方法（既存 `FindCommodityCommand` の登録・エイリアス・`ai_action_aliases` の構成）。報告のみ | なし | なし | 未着手 |
+| P8-1 | `find_outfitting`（§6） | P8-0 後に確定 | P8-0 後に確定 | 未着手 |
+| P8-2 | `find_trade_candidates`（§5） | P8-0 後に確定 | P8-0 後に確定 | 未着手 |
+| P8-3 | 検索結果の候補を選んで航路設定するコマンド（§7） | P8-1/P8-2 後に確定 | 確定時に記載 | 未着手 |
