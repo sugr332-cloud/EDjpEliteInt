@@ -169,6 +169,7 @@ class AiActionMapGeneratorTest {
             "query_markets",
             "query_material_inventory",
             "query_missions_and_rewards",
+            "query_nearest_outfitting",
             "query_pirate_mission",
             "query_planet_materials",
             "query_player_profile_rank_progress",

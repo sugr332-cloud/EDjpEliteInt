@@ -21,3 +21,13 @@ ai_action_aliases|fr|MISSING|transfer_power_to_ship_systems
 # warnings. Everything below is real, tracked backlog for later phases (P1/P2), not silent drift -
 # unlike the fr entry above, none of it is a permanent design decision. Delete lines from this block
 # as each area gets translated.
+
+ai_action_aliases|de|MISSING|query_nearest_outfitting
+ai_action_aliases|es|MISSING|query_nearest_outfitting
+ai_action_aliases|fr|MISSING|query_nearest_outfitting
+ai_action_aliases|it|MISSING|query_nearest_outfitting
+ai_action_aliases|pt|MISSING|query_nearest_outfitting
+ai_action_aliases|ptbz|MISSING|query_nearest_outfitting
+ai_action_aliases|ru|MISSING|query_nearest_outfitting
+ai_action_aliases|uk|MISSING|query_nearest_outfitting
+
