@@ -90,7 +90,9 @@ EliteIntel の LLM Tool として次を追加する。
   profit（既定）: 1 回の総利益の降順 → 同値は現在地からの距離の昇順
   nearest       : 現在地から購入ステーションまでの距離の昇順
   ↓
-上位 3 件 + 状態（ok | insufficient_fresh_data | no_result）
+同じ区間（購入ステーション・売却ステーションの組。星系名 + ステーション名で識別）は、1 回の総利益が最大の商品 1 件だけを残す（2026-09-25 追記: 3 件が同じ区間の商品違いで埋まらないようにするため）
+  ↓
+上位 3 件 + 状態（ok | insufficient_fresh_data | no_result | profile_unavailable | location_unknown）
 ```
 
 - 「最高効率」「一番儲かる」は **1 回の総利益（profit）** として扱う（暫定）。1 時間あたり利益は航行時間の推定が必要で、既存実装に無いため使わない。
