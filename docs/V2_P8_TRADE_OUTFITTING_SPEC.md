@@ -94,9 +94,11 @@ EliteIntel の LLM Tool として次を追加する。
 ```
 
 - 「最高効率」「一番儲かる」は **1 回の総利益（profit）** として扱う（暫定）。1 時間あたり利益は航行時間の推定が必要で、既存実装に無いため使わない。
-- **P8-0 の結果:** Spansh には 1 ホップ候補を複数件返す API が無い。`/api/trade/route`（`max_hops=1`、`max_price_age=36000`）は最適 1 件のみを返す（実機確認済み）。候補 3 件の取得方式は **未決**（§9 P8-2 の前提）:
+- **P8-0 の結果:** Spansh には 1 ホップ候補を複数件返す API が無い。`/api/trade/route`（`max_hops=1`、`max_price_age=36000`）は最適 1 件のみを返す（実機確認済み）。候補 3 件の取得方式は **案 2 に決定（2026-09-25）**。理由: `/api/trade/route` は非同期ジョブで 1 件あたり十数秒（P8-0 実測で約 17 秒）かかり、起点を増やす案 1 は音声応答として遅すぎるため。
   - 案 1: 現在地周辺の複数ステーションを起点に `/api/trade/route`（`max_hops=1`）を呼び、得られた 1 ホップ取引を総利益順に並べて上位 3 件を選ぶ。
-  - 案 2: 周辺ステーションの市場データ（10 時間以内）を取得し、§5.2 の計算を Tool 内で行って上位 3 件を選ぶ（取得データ量が大きくなる）。
+  - **案 2（採用）**: 周辺ステーションの市場データ（10 時間以内）を Spansh ステーション検索（同期 API）で取得し、§5.2 の計算を Tool 内で行って上位 3 件を選ぶ。
+    - 取得データ量が大きいため、検索半径・取得ステーション数（ページサイズ）・市場データの鮮度条件の指定方法は、P8-2 の PLAN CHECK で実機計測（応答時間・応答サイズ）に基づいて確定する。目安: 応答全体で 10 秒以内。
+    - 購入・売却の組み合わせ計算は取得したステーション間だけで行う（取得範囲外のステーションは候補にしない）。
 
 ### 5.3 返却値（候補ごと）
 
@@ -175,7 +177,7 @@ outfitting_updated_at
 |---|---|---|---|---|
 | P8-0 | READ-ONLY 調査: (1) Spansh ステーション検索のモジュール条件、(2) 1 ホップ交易候補を複数件取得する方法、(3) モジュール名照合辞書の元データ、(4) 新規 Tool の登録方法 | なし | なし | **DONE**（2026-09-25。結果は §5.2・§6.2・§6.3・§0 に反映） |
 | P8-1 | `query_nearest_outfitting`（§6）。Query として実装。モジュール照合辞書（canonical 名スナップショット + 日本語/通称対応表）、Spansh ステーション検索（`filters.modules`、距離順、プロファイルの Ls 上限・パッド・キャリア設定）、LLM への指示とデータ（`BaseQueryAnalyzer.process`）、EN/JA エイリアス | 新規: `app/src/main/java/elite/intel/ai/brain/actions/handlers/queries/NearestOutfittingQuery.java`、`app/src/main/java/elite/intel/gameapi/search/spansh/outfitting/` 配下（検索クライアント・照合辞書）、`app/src/main/resources/outfitting/` 配下（canonical 名スナップショット、日本語/通称対応表）、対応するテスト（`app/src/test/java/elite/intel/gameapi/search/spansh/outfitting/`、`app/src/test/java/elite/intel/ai/brain/actions/handlers/queries/NearestOutfittingQueryTest.java`）。既存: `app/src/main/resources/i18n/ai_action_aliases.properties`、`ai_action_aliases_ja.properties`（`query_nearest_outfitting` の 1 キーのみ追加）、`app/src/test/resources/i18n-parity-baseline.txt`（他 8 言語の当該キーの `MISSING` 行の追加のみ）。Query の説明文に i18n キー（`query.query_nearest_outfitting.*`）が必要な場合は、そのバンドルの EN/JA と baseline のみ。**`TradeStationSearchCriteria` など既存の検索クラスは変更しない**（新規クラスで組み立てる）。これ以外が必要なら PLAN CHANGE REQUEST | `./gradlew --no-daemon :app:test --tests 'elite.intel.gameapi.search.spansh.outfitting.*' --tests '*NearestOutfittingQueryTest' --tests '*BundleKeyParityTest' --tests '*BundleQuotingTest' --tests '*AiActionLocalizationsTest' --tests '*AliasPhraseTest' --tests '*AliasVocabularyTest'`、および全体 `./gradlew --no-daemon :app:test` で既知の失敗 10 件（§10）以外が無いこと | 未着手 |
-| P8-2 | `query_trade_candidates`（§5）。**候補取得方式（§5.2 案 1/案 2）の決定後に** 変更許可ファイルを確定する | 方式決定後に確定 | 方式決定後に確定 | 保留（方式未決） |
+| P8-2 | `query_trade_candidates`（§5）。Query として実装。候補取得は §5.2 案 2（市場データ取得 + Tool 内計算）。PLAN CHECK で Spansh ステーション検索の実機計測（数回まで）を行い、検索半径・ページサイズ・鮮度条件を提案する | P8-1 完了後、P8-2 の PLAN CHECK で確定（P8-1 と同じ構成: 新規 Query・`app/src/main/java/elite/intel/gameapi/search/spansh/` 配下の新規クラス・EN/JA エイリアス 1 キー・baseline） | PLAN CHECK で確定 | 未着手（方式: 案 2） |
 | P8-3 | 検索結果の候補を選んで航路設定するコマンド（§7） | P8-1/P8-2 後に確定 | 確定時に記載 | 未着手 |
 
 ## 10. 既知のテスト失敗（2026-09-25 時点、main）
