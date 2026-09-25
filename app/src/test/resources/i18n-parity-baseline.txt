@@ -30,4 +30,13 @@ ai_action_aliases|pt|MISSING|query_nearest_outfitting
 ai_action_aliases|ptbz|MISSING|query_nearest_outfitting
 ai_action_aliases|ru|MISSING|query_nearest_outfitting
 ai_action_aliases|uk|MISSING|query_nearest_outfitting
+ai_action_aliases|de|MISSING|query_trade_candidates
+ai_action_aliases|es|MISSING|query_trade_candidates
+ai_action_aliases|fr|MISSING|query_trade_candidates
+ai_action_aliases|it|MISSING|query_trade_candidates
+ai_action_aliases|pt|MISSING|query_trade_candidates
+ai_action_aliases|ptbz|MISSING|query_trade_candidates
+ai_action_aliases|ru|MISSING|query_trade_candidates
+ai_action_aliases|uk|MISSING|query_trade_candidates
+
 

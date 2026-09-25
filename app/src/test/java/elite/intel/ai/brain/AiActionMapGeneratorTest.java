@@ -183,6 +183,7 @@ class AiActionMapGeneratorTest {
             "query_system_security",
             "query_time",
             "query_total_bounties",
+            "query_trade_candidates",
             "query_trade_profile",
             "query_trade_route",
             "recover_srv_vehicle_get_on_board_ship",
