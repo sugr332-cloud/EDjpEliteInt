@@ -468,6 +468,12 @@ TEST GATE → DIFF GATE
 ローカルコミット（作業ブランチのみ）
   ↓
 END REPORT（停止。次のサブフェーズへ進まない）
+  ↓
+ユーザーによる END REPORT・差分の確認と merge 承認 ── 承認がなければ merge しない
+  ↓
+MERGE GATE（全体テスト → main へ merge → push、§R.13.9）
+  ↓
+MERGE REPORT（停止。次のサブフェーズへ進まない）
 ```
 
 - START REPORT を出す前にファイルを変更してはならない。
@@ -539,7 +545,7 @@ Phase: <ID>
 未実施:
 問題:
 計画との差異: なし / PLAN DEVIATION の内容
-Git: before <SHA> / after <SHA> / branch <branch> / push: していない
+Git: before <SHA> / after <SHA> / branch <branch> / push: していない（merge・push は承認後の MERGE GATE で行う）
 次のサブフェーズ: <ID>（自動的には進まない）
 ===== END =====
 ```
@@ -558,8 +564,16 @@ Git: before <SHA> / after <SHA> / branch <branch> / push: していない
 
 - 1 サブフェーズ = 1 作業ブランチ = 1 ローカルコミットを基本とする。ブランチ名は `v2/<phase-id>`（例: `v2/p2-j1`）。
 - 作業ブランチはユーザーが事前に作成し、指示に記載する。`agy` は現在のブランチが一致することを確認する。
-- `agy` に禁止する操作: ブランチの作成・切り替え、merge、rebase、push、PR 作成、タグ作成、`main` へのコミット。
-- merge と push はユーザーが END REPORT と差分を確認した後に行う。
+- **merge と push は `agy` が行う（2026-09-25 改訂。旧: ユーザーが行う）。** ただし、ユーザーが END REPORT と差分を確認し、**そのサブフェーズの merge を明示的に承認した後に限る。** END REPORT の提出だけで merge してはならない。
+- merge の手順（MERGE GATE）:
+  1. 作業ツリーがクリーンであること（`git status --porcelain` が空）を確認する。クリーンでなければ STOP（`stash` で退避しない）。
+  2. 作業ブランチ上で全体テスト `./gradlew --no-daemon :app:test` を実行し、PASS を確認する。FAIL なら STOP。
+  3. `main` に切り替え、`git pull --ff-only` で最新化する。fast-forward できなければ STOP。
+  4. `git merge --no-ff v2/<phase-id>` で merge する。conflict が出たら `git merge --abort` して STOP（自分で解決しない）。
+  5. `git push` で `main` を push する。
+  6. MERGE REPORT（merge commit の SHA、全体テストの結果、`git log --oneline -3`）を出して停止する。
+- 計画書の改訂（ユーザーが用意したパッチ）を `main` にコミット・push する作業は、ユーザーがパッチファイルを指定して明示的に指示した場合に限り `agy` が行ってよい。パッチの内容を変更してはならず、`git apply --check` が失敗したら STOP する。適用後は新しい Plan commit（`git log -1 --format=%H -- docs/ELITEINTEL_INTEGRATION_PLAN.md`）を報告する。
+- `agy` に禁止する操作: 上記 MERGE GATE・計画書改訂のコミット以外でのブランチの作成・切り替え、merge、push。rebase、force push、PR 作成、タグ作成、`stash`、`main` への直接コミット（merge commit と、上記の計画書改訂コミットを除く）、作業ブランチの削除。
 
 #### R.13.10 agy の実行設定
 
