@@ -299,4 +299,19 @@ public class NearestOutfittingQueryTest {
         assertEquals("2", dto.dataAgeHoursDisplay());
         assertNotNull(dto.toYaml());
     }
+
+    @Test
+    void testCalculateAgeHoursWithSpanshFormat() {
+        assertNull(NearestOutfittingQuery.calculateAgeHours(null));
+        assertNull(NearestOutfittingQuery.calculateAgeHours(""));
+        assertNull(NearestOutfittingQuery.calculateAgeHours("invalid"));
+
+        // Spansh +00 format should not throw and should return age
+        String timestamp = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss+00")
+                .withZone(java.time.ZoneOffset.UTC)
+                .format(java.time.Instant.now().minus(java.time.Duration.ofHours(3)));
+        Long ageHours = NearestOutfittingQuery.calculateAgeHours(timestamp);
+        assertNotNull(ageHours);
+        assertTrue(ageHours >= 2 && ageHours <= 4);
+    }
 }

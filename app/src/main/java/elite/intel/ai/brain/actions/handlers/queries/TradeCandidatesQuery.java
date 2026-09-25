@@ -247,7 +247,7 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                 - If status is "insufficient_fresh_data": inform the commander in their language that fewer trade candidates than usual (mention the exact count found) were found within the 10-hour fresh market data window, and present the available candidate(s).
                 - If status is "ok": present the trade candidates clearly in the given order.
                 - For each candidate: report the commodity, buy station and system, sell station and system, cargo units, unit profit, total trip profit, distance to buy station, and route distance.
-                - Use the pre-formatted display string fields (*Display) for all numbers, prices, profits, quantities, and distances. Present numbers verbatim with Western Arabic numerals (e.g. 5,103,950, 12.61 ly, 473 Ls). Never convert numbers into kanji numerals (漢数字 like 一, 十, 百, 千, 万) or kana, and never re-round them.
+                - Use the pre-formatted display string fields (*Display) as the source of truth for all numbers, prices, profits, quantities, and distances. Never recalculate or re-round them.
                 - Light seconds (Ls) measure distance from the star to the station, NOT travel time. Never describe Ls as time (do NOT say 'takes X seconds' or '〜秒かかる').
                 - Do NOT re-rank or recalculate any candidate values; present the ranks and numbers exactly as given.
                 - Do NOT automatically plot routes or claim to have plotted a route. Advise the commander that they can instruct route plotting to a chosen destination separately if desired.
