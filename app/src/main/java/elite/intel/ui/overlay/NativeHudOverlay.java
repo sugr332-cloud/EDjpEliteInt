@@ -673,7 +673,8 @@ public class NativeHudOverlay {
                 // else is and worth nothing next to what they are actually doing. A destination the app
                 // worked out (material trader, broker, factors) enriches this card rather than competing
                 // with it, so a stale errand can never claim the screen on its own.
-                new ShipRouteObjectiveSource());
+                new ShipRouteObjectiveSource(),
+                new QueryResultObjectiveSource());
     }
 
     static Optional<HudObjective> highestPriority(List<HudObjectiveSource> sources) {

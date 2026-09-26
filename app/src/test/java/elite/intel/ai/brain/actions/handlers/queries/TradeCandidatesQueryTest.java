@@ -736,5 +736,96 @@ public class TradeCandidatesQueryTest {
             PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
         }
     }
+
+    @Test
+    void testQuerySavesTradeCandidatesWhenResultsFoundAndClearsOnFailure() throws Exception {
+        elite.intel.db.managers.QueryResultDisplayManager manager = elite.intel.db.managers.QueryResultDisplayManager.getInstance();
+        manager.clearAll();
+
+        Instant now = Instant.now();
+        String freshTime = now.minus(1, ChronoUnit.HOURS).toString();
+
+        String s1Json = """
+                {
+                  "id": "s1",
+                  "system_name": "Sol",
+                  "name": "Galileo",
+                  "distance": 0.0,
+                  "distance_to_arrival": 300.0,
+                  "market_updated_at": "%s",
+                  "system_x": 0.0,
+                  "system_y": 0.0,
+                  "system_z": 0.0,
+                  "market": [
+                    {"commodity": "Gold", "buy_price": 4000, "sell_price": 0, "supply": 1000, "demand": 0}
+                  ]
+                }
+                """.formatted(freshTime);
+
+        String s2Json = """
+                {
+                  "id": "s2",
+                  "system_name": "Alpha Centauri",
+                  "name": "Columbus",
+                  "distance": 4.37,
+                  "distance_to_arrival": 500.0,
+                  "market_updated_at": "%s",
+                  "system_x": 4.37,
+                  "system_y": 0.0,
+                  "system_z": 0.0,
+                  "market": [
+                    {"commodity": "Gold", "buy_price": 0, "sell_price": 9000, "supply": 0, "demand": 1000}
+                  ]
+                }
+                """.formatted(freshTime);
+
+        StationResult s1 = GsonFactory.getGson().fromJson(s1Json, StationResult.class);
+        StationResult s2 = GsonFactory.getGson().fromJson(s2Json, StationResult.class);
+
+        TradeStationSearchResultDto dto = new TradeStationSearchResultDto();
+        dto.setResults(List.of(s1, s2));
+
+        TradeCandidatesSearchClient mockClient = new TradeCandidatesSearchClient() {
+            @Override
+            public TradeStationSearchResultDto searchTradeStations(TradeCandidatesSearchCriteria criteria) {
+                return dto;
+            }
+        };
+
+        TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+        profile.setMaxCargo(700);
+
+        TradeCandidatesQuery query = new TradeCandidatesQuery(mockClient) {
+            @Override
+            TradeRouteSearchCriteria getTradeProfile() {
+                return profile;
+            }
+
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                JsonObject res = new JsonObject();
+                res.addProperty("text_to_speech_response", "ok");
+                return res;
+            }
+        };
+
+        String prevStar = PlayerSession.getInstance().getPrimaryStarName();
+        try {
+            PlayerSession.getInstance().setCurrentPrimaryStarName("Sol");
+            query.handle("query_trade_candidates", new JsonObject(), "交易候補");
+
+            assertTrue(manager.getTradeCandidates().isPresent(), "Trade candidates should be saved on success");
+            assertEquals(1, manager.getTradeCandidates().get().data().candidates().size());
+
+            // Next, trigger location unknown - should clear
+            PlayerSession.getInstance().setCurrentPrimaryStarName(null);
+            query.handle("query_trade_candidates", new JsonObject(), "交易候補");
+
+            assertFalse(manager.getTradeCandidates().isPresent(), "Trade candidates should be cleared on location unknown");
+        } finally {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
+            manager.clearAll();
+        }
+    }
 }
 

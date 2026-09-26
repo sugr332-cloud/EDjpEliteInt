@@ -72,6 +72,7 @@ public class AiTabPanel extends JPanel {
 
     private HudLogArea chatPanel;
     private HudLogArea systemPanel;
+    private QueryResultDisplayPanel queryResultPanel;
     private HudTextField chatInputField;
     private JButton chatSendButton;
 
@@ -152,6 +153,7 @@ public class AiTabPanel extends JPanel {
     public void dispose() {
         summaryClockTimer.stop();
         UiBus.unregister(this);
+        if (queryResultPanel != null) queryResultPanel.dispose();
         if (updateAppButton != null) updateAppButton.dispose();
     }
 
@@ -224,9 +226,21 @@ public class AiTabPanel extends JPanel {
 
         systemPanel = new HudLogArea(12, HudLogArea.Style.SYSTEM_LOG);
 
-        // --- Main log area (conversation top, system below) ---
+        // --- Main log area (conversation left, query result right, system below) ---
         HudSection chatSection = logSection(getText("ai.section.conversation"), hudApplicationScrollPane(chatPanel));
         chatSection.body().add(buildChatInputRow(), BorderLayout.SOUTH);
+
+        queryResultPanel = new QueryResultDisplayPanel();
+        HudSection queryResultSection = new HudSection(getText("ai.section.queryResult"), new BorderLayout());
+        queryResultSection.setPreferredSize(new Dimension(320, 0));
+        queryResultSection.body().add(queryResultPanel, BorderLayout.CENTER);
+
+        HudSplitPane conversationSplit = new HudSplitPane(
+                JSplitPane.HORIZONTAL_SPLIT,
+                chatSection,
+                queryResultSection
+        );
+        conversationSplit.setResizeWeight(0.7);
 
         HudSection systemSection = logSection(getText("ai.section.systemMessages"), hudApplicationScrollPane(systemPanel));
         HudGlyphButton copyLogButton = buildCopyLogButton();
@@ -236,7 +250,7 @@ public class AiTabPanel extends JPanel {
         systemSection.setHeaderActions(copyLogButton, buildSaveLogButton(), buildDumpMemoryButton(), buildClearLogButton());
         HudSplitPane mainSplit = new HudSplitPane(
                 JSplitPane.VERTICAL_SPLIT,
-                chatSection,
+                conversationSplit,
                 systemSection
         );
         // Keep the diagnostic log at 65% of its previous height: 35% -> 22.75% of the split.

@@ -121,6 +121,7 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
             log.info("Trade candidates query: referenceSystem=unknown, referenceSource=none, radius={}ly, priority={}", radiusLy, priority);
             log.info("Trade candidates result: status=location_unknown, stations=0, freshStations=0, pairs=0, candidates=0 (search: 0ms, calc: 0ms)");
             TradeCandidatesDataDto locUnknownDto = TradeCandidatesDataDto.locationUnknown(currentSystem, priority, radiusLy);
+            storeDisplay(locUnknownDto);
             return process(new AiDataStruct(buildInstructions(), locUnknownDto), originalUserInput);
         }
 
@@ -133,6 +134,7 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
             log.info("Trade candidates result: status=profile_unavailable, stations=0, freshStations=0, pairs=0, candidates=0 (search: 0ms, calc: 0ms)");
             TradeCandidatesDataDto profileUnavailableDto = TradeCandidatesDataDto.profileUnavailable(
                     currentSystem, searchedFromSystem, referenceSource, priority, radiusLy);
+            storeDisplay(profileUnavailableDto);
             return process(new AiDataStruct(buildInstructions(), profileUnavailableDto), originalUserInput);
         }
 
@@ -156,6 +158,7 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                     searchDurationMs);
             TradeCandidatesDataDto tooFewDto = TradeCandidatesDataDto.tooFewStations(
                     currentSystem, searchedFromSystem, referenceSource, priority, radiusLy, 0);
+            storeDisplay(tooFewDto);
             return process(new AiDataStruct(buildInstructions(), tooFewDto), originalUserInput);
         }
 
@@ -189,7 +192,16 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                 calcResult.candidates()
         );
 
+        storeDisplay(dataDto);
         return process(new AiDataStruct(buildInstructions(), dataDto), originalUserInput);
+    }
+
+    private void storeDisplay(TradeCandidatesDataDto dto) {
+        try {
+            elite.intel.db.managers.QueryResultDisplayManager.getInstance().saveTradeCandidates(dto);
+        } catch (Exception e) {
+            log.warn("Failed to store trade candidates display: {}", e.getMessage());
+        }
     }
 
     TradeRouteSearchCriteria getTradeProfile() {

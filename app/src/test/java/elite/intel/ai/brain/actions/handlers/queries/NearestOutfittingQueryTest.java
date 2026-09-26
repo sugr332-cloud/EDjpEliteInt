@@ -6,6 +6,7 @@ import elite.intel.gameapi.search.spansh.outfitting.ModuleDictionary;
 import elite.intel.gameapi.search.spansh.outfitting.OutfittingStationSearchClient;
 import elite.intel.gameapi.search.spansh.outfitting.OutfittingStationSearchCriteria;
 import elite.intel.gameapi.search.spansh.station.marketstation.TradeStationSearchResultDto;
+import elite.intel.session.PlayerSession;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -313,5 +314,73 @@ public class NearestOutfittingQueryTest {
         Long ageHours = NearestOutfittingQuery.calculateAgeHours(timestamp);
         assertNotNull(ageHours);
         assertTrue(ageHours >= 2 && ageHours <= 4);
+    }
+
+    @Test
+    void testQuerySavesOutfittingWhenFoundAndClearsOnNoResult() throws Exception {
+        elite.intel.db.managers.QueryResultDisplayManager manager = elite.intel.db.managers.QueryResultDisplayManager.getInstance();
+        manager.clearAll();
+
+        String stationJson = """
+                {
+                    "name": "Jameson Memorial",
+                    "system_name": "Shinrarta Dezhra",
+                    "type": "Orbis Starport",
+                    "distance": 12.34,
+                    "distance_to_arrival": 450.0,
+                    "outfitting_updated_at": "2026-09-26 12:00:00+00",
+                    "modules": [
+                        {
+                            "name": "Frame Shift Drive",
+                            "class": 5,
+                            "rating": "A",
+                            "price": 5100000
+                        }
+                    ]
+                }
+                """;
+
+        TradeStationSearchResultDto.StationResult station = elite.intel.util.json.GsonFactory.getGson().fromJson(
+                stationJson, TradeStationSearchResultDto.StationResult.class);
+
+        TradeStationSearchResultDto searchDto = new TradeStationSearchResultDto();
+        searchDto.setResults(List.of(station));
+
+        OutfittingStationSearchClient mockClient = new OutfittingStationSearchClient() {
+            @Override
+            public TradeStationSearchResultDto searchOutfittingStations(OutfittingStationSearchCriteria criteria) {
+                return searchDto;
+            }
+        };
+
+        NearestOutfittingQuery query = new NearestOutfittingQuery(ModuleDictionary.getInstance(), mockClient) {
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                JsonObject res = new JsonObject();
+                res.addProperty("text_to_speech_response", "found");
+                return res;
+            }
+        };
+
+        String prevStar = PlayerSession.getInstance().getPrimaryStarName();
+        try {
+            PlayerSession.getInstance().setCurrentPrimaryStarName("Sol");
+            JsonObject params = new JsonObject();
+            params.addProperty("module", "5A FSD");
+            query.handle("query_nearest_outfitting", params, "5A FSD");
+
+            assertTrue(manager.getOutfitting().isPresent(), "Outfitting should be saved on found");
+            assertEquals("Shinrarta Dezhra", manager.getOutfitting().get().data().starSystem());
+
+            // Next, search unknown module - should clear
+            JsonObject unknownParams = new JsonObject();
+            unknownParams.addProperty("module", "unknown_xyz_module_123");
+            query.handle("query_nearest_outfitting", unknownParams, "unknown");
+
+            assertFalse(manager.getOutfitting().isPresent(), "Outfitting should be cleared on unknown module");
+        } finally {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
+            manager.clearAll();
+        }
     }
 }
