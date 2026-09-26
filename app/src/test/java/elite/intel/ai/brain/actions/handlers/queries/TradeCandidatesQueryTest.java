@@ -235,19 +235,29 @@ public class TradeCandidatesQueryTest {
             params.addProperty("radius", 0); // should be rounded to 50
             params.addProperty("priority", "nearest");
 
-            query.handle("query_trade_candidates", params, "近くて儲かる交易候補");
+            JsonObject response = query.handle("query_trade_candidates", params, "近くて儲かる交易候補");
 
-            assertNotNull(capturedDto[0]);
-            assertEquals("insufficient_fresh_data", capturedDto[0].status()); // 1 candidate found
-            assertEquals("Shinrarta Dezhra", capturedDto[0].currentSystem());
-            assertEquals("Shinrarta Dezhra", capturedDto[0].searchedFromSystem());
-            assertEquals("current", capturedDto[0].referenceSource());
-            assertEquals(2, capturedDto[0].freshStationCount());
-            assertEquals("nearest", capturedDto[0].priority());
-            assertEquals(50, capturedDto[0].searchRadiusLy()); // 0 normalized to 50
-            assertEquals(1, capturedDto[0].candidates().size());
+            // P8-8: LLM process(AiData, ...) must not be called when candidates are found
+            assertNull(capturedDto[0], "LLM process(AiData, ...) must NOT be called for insufficient_fresh_data with candidates");
+            assertNotNull(response);
+            assertTrue(response.has("text_to_speech_response"));
+            assertEquals(elite.intel.util.StringUtls.localizedResponse("handler.tradeCandidates.insufficientFreshData", 1),
+                    response.get("text_to_speech_response").getAsString());
 
-            var c = capturedDto[0].candidates().get(0);
+            // P8-6: Candidates must still be saved in QueryResultDisplayManager
+            var savedOpt = elite.intel.db.managers.QueryResultDisplayManager.getInstance().getTradeCandidates();
+            assertTrue(savedOpt.isPresent(), "Trade candidates should be saved in QueryResultDisplayManager");
+            TradeCandidatesDataDto savedDto = savedOpt.get().data();
+            assertEquals("insufficient_fresh_data", savedDto.status()); // 1 candidate found
+            assertEquals("Shinrarta Dezhra", savedDto.currentSystem());
+            assertEquals("Shinrarta Dezhra", savedDto.searchedFromSystem());
+            assertEquals("current", savedDto.referenceSource());
+            assertEquals(2, savedDto.freshStationCount());
+            assertEquals("nearest", savedDto.priority());
+            assertEquals(50, savedDto.searchRadiusLy()); // 0 normalized to 50
+            assertEquals(1, savedDto.candidates().size());
+
+            var c = savedDto.candidates().get(0);
             assertEquals(1, c.rank());
             assertEquals("Gold", c.commodity());
             assertEquals("Shinrarta Dezhra", c.buySystem());
@@ -258,9 +268,10 @@ public class TradeCandidatesQueryTest {
             assertEquals(100, c.units());
             assertEquals(500000L, c.tripProfit());
             assertEquals(10.0, c.routeDistanceLy());
-            assertNotNull(capturedDto[0].toYaml());
+            assertNotNull(savedDto.toYaml());
         } finally {
             PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
+            elite.intel.db.managers.QueryResultDisplayManager.getInstance().clearAll();
         }
     }
 
@@ -1073,6 +1084,170 @@ public class TradeCandidatesQueryTest {
                 "Instructions must mention reference_system_not_found status");
         assertTrue(capturedInstructions[0].contains("searchedFromSystem could not be found"),
                 "Instructions must advise verifying or correcting system name when reference_system_not_found");
+    }
+
+    // --- P8-8: Do not read trade candidates aloud; return fixed sentence without LLM ---
+
+    @Test
+    void testTradeCandidatesOkReturnsFixedSentenceWithoutLlm() throws Exception {
+        Instant now = Instant.now();
+        String freshTime = now.minus(1, ChronoUnit.HOURS).toString();
+
+        // 6 stations forming 3 distinct trade routes
+        String s1 = """
+                {"id":"s1","system_name":"Shinrarta Dezhra","name":"Jameson","distance":0.0,"distance_to_arrival":100.0,"market_updated_at":"%s","system_x":0.0,"system_y":0.0,"system_z":0.0,
+                 "market":[{"commodity":"Gold","buy_price":1000,"sell_price":0,"supply":1000,"demand":0}]}
+                """.formatted(freshTime);
+        String s2 = """
+                {"id":"s2","system_name":"Sol","name":"Columbus","distance":10.0,"distance_to_arrival":200.0,"market_updated_at":"%s","system_x":10.0,"system_y":0.0,"system_z":0.0,
+                 "market":[{"commodity":"Gold","buy_price":0,"sell_price":5000,"supply":0,"demand":1000}]}
+                """.formatted(freshTime);
+        String s3 = """
+                {"id":"s3","system_name":"Achenar","name":"Dawes","distance":15.0,"distance_to_arrival":300.0,"market_updated_at":"%s","system_x":15.0,"system_y":0.0,"system_z":0.0,
+                 "market":[{"commodity":"Silver","buy_price":2000,"sell_price":0,"supply":1000,"demand":0}]}
+                """.formatted(freshTime);
+        String s4 = """
+                {"id":"s4","system_name":"Alioth","name":"Irkutsk","distance":20.0,"distance_to_arrival":400.0,"market_updated_at":"%s","system_x":20.0,"system_y":0.0,"system_z":0.0,
+                 "market":[{"commodity":"Silver","buy_price":0,"sell_price":8000,"supply":0,"demand":1000}]}
+                """.formatted(freshTime);
+        String s5 = """
+                {"id":"s5","system_name":"Lave","name":"Lave Station","distance":25.0,"distance_to_arrival":500.0,"market_updated_at":"%s","system_x":25.0,"system_y":0.0,"system_z":0.0,
+                 "market":[{"commodity":"Platinum","buy_price":3000,"sell_price":0,"supply":1000,"demand":0}]}
+                """.formatted(freshTime);
+        String s6 = """
+                {"id":"s6","system_name":"Diso","name":"Shifnalport","distance":30.0,"distance_to_arrival":600.0,"market_updated_at":"%s","system_x":30.0,"system_y":0.0,"system_z":0.0,
+                 "market":[{"commodity":"Platinum","buy_price":0,"sell_price":12000,"supply":0,"demand":1000}]}
+                """.formatted(freshTime);
+
+        StationResult st1 = GsonFactory.getGson().fromJson(s1, StationResult.class);
+        StationResult st2 = GsonFactory.getGson().fromJson(s2, StationResult.class);
+        StationResult st3 = GsonFactory.getGson().fromJson(s3, StationResult.class);
+        StationResult st4 = GsonFactory.getGson().fromJson(s4, StationResult.class);
+        StationResult st5 = GsonFactory.getGson().fromJson(s5, StationResult.class);
+        StationResult st6 = GsonFactory.getGson().fromJson(s6, StationResult.class);
+
+        TradeStationSearchResultDto searchDto = new TradeStationSearchResultDto();
+        searchDto.setResults(List.of(st1, st2, st3, st4, st5, st6));
+
+        TradeCandidatesSearchClient mockClient = new TradeCandidatesSearchClient() {
+            @Override
+            public TradeStationSearchResultDto searchTradeStations(TradeCandidatesSearchCriteria criteria) {
+                return searchDto;
+            }
+        };
+
+        TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+        profile.setMaxCargo(100);
+        profile.setStartingCapital(0);
+
+        TradeCandidatesDataDto[] capturedDto = {null};
+        TradeCandidatesQuery query = new TradeCandidatesQuery(mockClient) {
+            @Override
+            TradeRouteSearchCriteria getTradeProfile() {
+                return profile;
+            }
+
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                if (struct.getData() instanceof TradeCandidatesDataDto dto) {
+                    capturedDto[0] = dto;
+                }
+                JsonObject res = new JsonObject();
+                res.addProperty("text_to_speech_response", "mock response");
+                return res;
+            }
+        };
+
+        String prevStar = PlayerSession.getInstance().getPrimaryStarName();
+        try {
+            PlayerSession.getInstance().setCurrentPrimaryStarName("Shinrarta Dezhra");
+
+            JsonObject params = new JsonObject();
+            params.addProperty("priority", "profit");
+
+            JsonObject response = query.handle("query_trade_candidates", params, "一番儲かる交易候補");
+
+            // Verify LLM was NOT called
+            assertNull(capturedDto[0], "LLM process(AiData, ...) must NOT be called for ok status");
+            assertNotNull(response);
+            assertTrue(response.has("text_to_speech_response"));
+            assertEquals(elite.intel.util.StringUtls.localizedResponse("handler.tradeCandidates.ok", 3),
+                    response.get("text_to_speech_response").getAsString());
+
+            // Verify candidates saved to manager
+            var savedOpt = elite.intel.db.managers.QueryResultDisplayManager.getInstance().getTradeCandidates();
+            assertTrue(savedOpt.isPresent());
+            assertEquals("ok", savedOpt.get().data().status());
+            assertEquals(3, savedOpt.get().data().candidates().size());
+        } finally {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
+            elite.intel.db.managers.QueryResultDisplayManager.getInstance().clearAll();
+        }
+    }
+
+    @Test
+    void testTradeCandidatesNoResultCallsLlm() throws Exception {
+        Instant now = Instant.now();
+        String freshTime = now.minus(1, ChronoUnit.HOURS).toString();
+
+        // 2 fresh stations but no profitable trades (no market items)
+        String s1 = """
+                {"id":"s1","system_name":"Sol","name":"Galileo","distance":0.0,"distance_to_arrival":100.0,"market_updated_at":"%s","system_x":0.0,"system_y":0.0,"system_z":0.0,"market":[]}
+                """.formatted(freshTime);
+        String s2 = """
+                {"id":"s2","system_name":"Alpha Centauri","name":"Columbus","distance":4.37,"distance_to_arrival":200.0,"market_updated_at":"%s","system_x":4.37,"system_y":0.0,"system_z":0.0,"market":[]}
+                """.formatted(freshTime);
+
+        StationResult st1 = GsonFactory.getGson().fromJson(s1, StationResult.class);
+        StationResult st2 = GsonFactory.getGson().fromJson(s2, StationResult.class);
+
+        TradeStationSearchResultDto searchDto = new TradeStationSearchResultDto();
+        searchDto.setResults(List.of(st1, st2));
+
+        TradeCandidatesSearchClient mockClient = new TradeCandidatesSearchClient() {
+            @Override
+            public TradeStationSearchResultDto searchTradeStations(TradeCandidatesSearchCriteria criteria) {
+                return searchDto;
+            }
+        };
+
+        TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+        profile.setMaxCargo(100);
+
+        TradeCandidatesDataDto[] capturedDto = {null};
+        TradeCandidatesQuery query = new TradeCandidatesQuery(mockClient) {
+            @Override
+            TradeRouteSearchCriteria getTradeProfile() {
+                return profile;
+            }
+
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                if (struct.getData() instanceof TradeCandidatesDataDto dto) {
+                    capturedDto[0] = dto;
+                }
+                JsonObject res = new JsonObject();
+                res.addProperty("text_to_speech_response", "mock response");
+                return res;
+            }
+        };
+
+        String prevStar = PlayerSession.getInstance().getPrimaryStarName();
+        try {
+            PlayerSession.getInstance().setCurrentPrimaryStarName("Sol");
+
+            JsonObject params = new JsonObject();
+            JsonObject response = query.handle("query_trade_candidates", params, "交易候補");
+
+            // For no_result (0 candidates), LLM MUST be called
+            assertNotNull(capturedDto[0], "LLM process(AiData, ...) must be called for no_result");
+            assertEquals("no_result", capturedDto[0].status());
+            assertTrue(capturedDto[0].candidates().isEmpty());
+            assertNotNull(response);
+        } finally {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
+            elite.intel.db.managers.QueryResultDisplayManager.getInstance().clearAll();
+        }
     }
 }
 

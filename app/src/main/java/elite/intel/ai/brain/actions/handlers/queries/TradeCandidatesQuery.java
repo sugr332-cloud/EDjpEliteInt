@@ -15,6 +15,7 @@ import elite.intel.gameapi.search.spansh.tradecandidates.TradeCandidatesSearchCl
 import elite.intel.gameapi.search.spansh.tradecandidates.TradeCandidatesSearchCriteria;
 import elite.intel.gameapi.search.spansh.traderoute.TradeRouteSearchCriteria;
 import elite.intel.session.PlayerSession;
+import elite.intel.util.StringUtls;
 import elite.intel.util.yaml.ToYamlConvertable;
 import elite.intel.util.yaml.YamlFactory;
 
@@ -230,6 +231,15 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
         );
 
         storeDisplay(dataDto);
+
+        if (!calcResult.candidates().isEmpty()) {
+            if ("ok".equals(calcResult.status())) {
+                return process(StringUtls.localizedResponse("handler.tradeCandidates.ok", calcResult.candidates().size()));
+            } else if ("insufficient_fresh_data".equals(calcResult.status())) {
+                return process(StringUtls.localizedResponse("handler.tradeCandidates.insufficientFreshData", calcResult.candidates().size()));
+            }
+        }
+
         return process(new AiDataStruct(buildInstructions(), dataDto), originalUserInput);
     }
 
