@@ -387,4 +387,13 @@ class NavigateToSearchResultCommandTest {
         assertTrue(plottedRoutes.isEmpty());
         assertTrue(reminders.isEmpty());
     }
+
+    @Test
+    void isVisibleForLLMEvenWhenNotInMainShipOrSituationUnknown() {
+        assertTrue(command.isVisibleForLLM(elite.intel.session.Status.detached(elite.intel.session.PlayerSituation.IN_SHIP_DEEP_SPACE)));
+        assertTrue(command.isVisibleForLLM(elite.intel.session.Status.detached(elite.intel.session.PlayerSituation.ON_FOOT)));
+        assertTrue(command.isVisibleForLLM(elite.intel.session.Status.detached(elite.intel.session.PlayerSituation.IN_SRV)));
+        assertTrue(command.isVisibleForLLM(elite.intel.session.Status.detached(elite.intel.session.PlayerSituation.UNKNOWN)));
+        assertTrue(command.isVisibleForLLM(null));
+    }
 }

@@ -93,7 +93,7 @@ public final class NavigateToSearchResultCommand implements IntelCommand {
 
     @Override
     public boolean isVisibleForLLM(Status status) {
-        return status.isInMainShip();
+        return true;
     }
 
     @Override
@@ -108,7 +108,7 @@ public final class NavigateToSearchResultCommand implements IntelCommand {
                         "rank",
                         "number",
                         false,
-                        "Candidate rank (1 to 3, default: 1)",
+                        "Candidate rank (1 to 3, default: 1). Treat kanji numerals 一, 二, 三 as 1, 2, 3.",
                         List.of("1", "2", "3"),
                         "Candidate rank 1, 2, or 3"
                 ),
