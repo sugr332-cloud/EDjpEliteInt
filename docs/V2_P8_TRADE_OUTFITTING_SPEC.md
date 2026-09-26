@@ -163,7 +163,30 @@ outfitting_updated_at
 
 - 航路設定は **既存機能を再利用する**（`RoutePlotter`。既存 `find_commodity` は検索後に自動で使っている。交易ルートには `NavigateToTradeStopCommand` がある）。
 - 新規 Tool（§5、§6）は目的地（system / station）を構造化して返すだけで、航路は設定しない。「そこへの航路を設定して」は、検索 Tool とは別のコマンドとして LLM が続けて呼ぶ。
-- 目的地を選ぶコマンドの具体設計（直前の検索結果の保持方法を含む）は P8-3 で行う。
+- 目的地を選ぶコマンドの具体設計は §7.1a（P8-3）。直前の検索結果の保持は §7.1（P8-6）
+
+### 7.1a 候補を選んで航路設定（P8-3、2026-09-26 決定）
+
+**決定:** 音声とクリックの両方に対応する。クリックは **AI タブのカード（§7.1）だけ**。ゲーム内 HUD のカードはクリックに対応しない（オーバーレイはクリックをゲームへ通す作りで、受け付けるには描画側の作り直しが必要なため）。
+
+**共通のコマンド `navigate_to_search_result`（Command、`IntelCommand`）:**
+
+- 引数: `rank`（number、省略時 1）、`leg`（string、`buy` / `sell`、省略時 `buy`）。型は `ActionParameterSpec.VALID_TYPES` の範囲
+- 対象は `QueryResultDisplayManager` の直近の結果（P8-6 で保存したもの。交易候補と艤装のうち保存時刻の新しい方）。LLM は候補の中身を渡さない。どの星系・ステーションへ行くかは Tool が保存済みの結果から決める
+- 交易候補: `leg=buy` → 購入側の星系・ステーション、`leg=sell` → 売却側。`rank` は 1〜件数
+- 艤装: `rank` は 1 のみ、`leg` は無視
+- 断る場合（航路は設定しない。理由をユーザーの言語の定型文で伝える）: 結果が無い、保存から 10 時間超（§4）、`rank` が範囲外、`leg` が buy/sell 以外
+- 実行: 既存 `ReminderManager.setReminder(文, 星系, ステーション, null)` で到着時の案内を残し（ギャラクシーマップの航路は星系までのため、ステーション名はこの案内で伝える）、既存 `RoutePlotter.plotRouteAnd(答え, 星系)` で航路を設定する。`RoutePlotter` は変更しない
+- 答え（定型文）: 例「ランク 1 の購入地、Sol の Galileo へ航路を設定します。」。数値は含めない
+- `isAvailableIn(IntelActionContext.GUI)` を true にする（クリックから呼ぶため）
+- EN/JA エイリアス: 例 `ランク{rank:X}の購入地に案内`、`{rank:X}位の売却先へ航路`、`艤装の販売ステーションへ案内`（既存のプレースホルダ書式 `{name:X}` に従う）
+
+**クリック（AI タブのカード）:**
+
+- 交易候補の枠に「購入地へ」「売却地へ」の 2 ボタン、艤装の枠に「ここへ」の 1 ボタンを付ける
+- 押したら既存 `GuiCommandRunner.runAfterClosingWindow(null, "navigate_to_search_result", {rank, leg}, true)` を呼ぶ。これは既存の仕組みで、Elite Dangerous のウィンドウを前面に出し（`GameWindowActivator`）、3 秒待ってからコマンドを実行する（ゲームが前面に来たときの音声デバイスのリセットを避けるため）。`GuiCommandRunner` / `GameWindowActivator` は変更しない
+- 押した後、その結果のボタンは 5 秒間無効にする（二重実行の防止）
+- 制約: ゲームのウィンドウが見つからない場合も、既存 `GuiCommandRunner` はそのままコマンドを実行する（キー入力は前面のウィンドウへ届く）。これは既存の GUI コマンドと同じ扱いとし、P8-3 では変えない
 
 ### 7.1 検索結果の表示（P8-6）
 
@@ -244,7 +267,7 @@ outfitting_updated_at
 | P8-4 | `query_trade_candidates` の拡張（2026-09-26 実機確認より）。実機ログ: Synuefe MR-C c29-24 から 50 ly・大型パッド・軌道のみ・10 時間以内で `stations=1, freshStations=1, pairs=0` となり、2 ステーション未満で区間を作れなかった（処理は正常）。(1) 省略可能な文字列パラメータ `referenceSystem` を追加し、指定時はその星系を検索の基準（Spansh の `reference_system`）にする。省略時は現在地。現在地も指定も無い場合のみ `location_unknown`。DataDto に基準星系（`searchedFromSystem`）と、それが指定か現在地か（`referenceSource`: specified / current）を入れ、距離はこの基準からの距離である旨を指示に書く。(2) 市場データ 10 時間以内のステーションが 2 未満のときは状態 `too_few_stations` と、その数（`freshStationCount`）を返し、「条件に合うステーションが N 件しかないため候補を作れない」ことをユーザーの言語で伝えるよう指示する（指定星系が Spansh で見つからない場合もステーション 0 件としてこの状態になる）。(3) EN/JA エイリアスの既存キー `query_trade_candidates` に、基準星系を指定する言い回しを追加する（例: `trade candidates near {referenceSystem:X}`、`{referenceSystem:X} 周辺の交易候補`）。計算内容・並び順は変更しない | `TradeCandidatesQuery.java`、`TradeCandidateCalculator.java`、`TradeCandidatesSearchCriteria.java`、それぞれの既存テスト、`ai_action_aliases.properties` / `ai_action_aliases_ja.properties`（`query_trade_candidates` の行のみ） | `./gradlew --no-daemon :app:test --tests '*TradeCandidatesQueryTest' --tests 'elite.intel.gameapi.search.spansh.tradecandidates.*' --tests '*AllActionParameterSpecsValidTest' --tests '*BundleKeyParityTest' --tests '*AiActionLocalizationsTest' --tests '*AliasPhraseTest' --tests '*AliasVocabularyTest' --tests '*AliasPhraseCollisionTest'` と全体テスト（既知の 10 件以外の失敗 0 件）。実機で「Sol 周辺の交易候補」が Sol 基準で検索されること | **DONE**（2026-09-26、main `23204b3`。EN エイリアスは `near` が既存の音声修復テストと衝突するため `around` / `from` を採用。実機再確認待ち） |
 | P8-5 | 交易候補の答え方の改善（2026-09-26 実機確認より）。実機: Sol 基準で候補 3 件が出たが、Gemma が全項目を読み上げて 323 トークン・生成 17 秒（全体約 21 秒）、総利益を「一七百七万円」と誤記（正しくは 17,070,320 クレジット）、1 位と 2 位が同じ星系（Duamta）の別ステーション → 同じ売却先・同じ商品で実質重複。(1) buildInstructions を「候補 1 件につき 1 文（商品、購入ステーションと星系、売却ステーションと星系、1 回の総利益）で答え、その他の数値はユーザーが尋ねたときだけ答える」に変更し、通貨は必ずクレジット（円などにしない）と明記する。(2) 同じ購入星系・同じ商品・同じ売却ステーションの候補は tripProfit 最大の 1 件にまとめてから上位 3 件を選ぶ（既存の区間単位のまとめに追加）。計算式は変更しない | `TradeCandidatesQuery.java`、`TradeCandidateCalculator.java`、それぞれの既存テスト | `./gradlew --no-daemon :app:test --tests '*TradeCandidatesQueryTest' --tests 'elite.intel.gameapi.search.spansh.tradecandidates.*'` と全体テスト（既知の 10 件以外の失敗 0 件）。実機で応答が短く（目安 100 トークン以下）、3 件が別の購入星系または別の商品・売却先になること | **DONE**（2026-09-26、main `31545c3`。重複判定キーは購入星系・商品・売却星系・売却ステーション。同利益時は区間距離の短い方、次に購入ステーション名。実機再確認待ち） |
 | P8-6 | 検索結果の表示（§7.1）。P8-5 のマージ後に着手する。(1) 結果の保存: 新規マイグレーション（既存の最終番号の次。2026-09-26 時点で `01050`）、DAO、Manager。(2) `TradeCandidatesQuery` / `NearestOutfittingQuery` から、LLM に渡す DataDto をそのまま保存する処理を追加（best-effort。LLM への指示・データ・計算は変更しない）。(3) AI タブの「検索結果」セクションと、候補ごとの枠（カード、項目名：値の縦並び）。(4) HUD 要約カード（新規 `HudObjectiveSource`、`NativeHudOverlay.defaultSources()` の最後に 1 行追加）。(5) EN/JA 文言 | 新規: `app/src/main/resources/db-migration/01050__query_result_display.sql`（番号は PLAN CHECK 時点の最終番号の次）、`app/src/main/java/elite/intel/db/dao/` に DAO 1 つ、`app/src/main/java/elite/intel/db/managers/` に Manager 1 つ、`app/src/main/java/elite/intel/ui/overlay/` に Source 1 つ、`app/src/main/java/elite/intel/ui/widget/` または `ui/screen/` に結果パネル 1 つ（カード部品を含めて 2 つまで）、それぞれのテスト。既存: `TradeCandidatesQuery.java`、`NearestOutfittingQuery.java`（保存呼び出しの追加のみ）、`AiTabPanel.java`（セクションの追加のみ。既存セクションの挙動は変えない）、`NativeHudOverlay.java`（`defaultSources()` に 1 行のみ）、`gui.properties` / `gui_ja.properties` と HUD 文言バンドルの EN/JA（新キーのみ）、`app/src/test/resources/i18n-parity-baseline.txt`（他 8 言語の `MISSING` 行のみ）、`TradeCandidatesQueryTest` / `NearestOutfittingQueryTest`（保存の検証の追加のみ）。UiBus のイベントを新設する場合は `app/src/main/java/elite/intel/ui/event/` に 1 クラス。これ以外（`OverlayProtocol`、ネイティブのオーバーレイ本体、`HudLogArea`、既存の Source を含む）が必要なら PLAN CHANGE REQUEST | 新規テスト: (a) Manager の保存・読み出し・種類ごとの上書き・消去、(b) Query の状態ごとの保存/消去（`ok`・`insufficient_fresh_data` → 保存、`no_result` 等 → 消去、艤装 `found` → 保存）と保存失敗時も応答が返ること、(c) HUD Source: 結果無し → empty、10 時間超 → empty、交易候補 3 件 → 1 件目の行と「他 2 件」、艤装 → 5 行、直近の種類が選ばれること、(d) カードのモデル: 候補 3 件 → 枠 3 つ・見出し「ランク 1〜3」、各枠の行の順番と項目名、`*Display` がそのまま入ること、鮮度が古い方になること、艤装 → 枠 1 つ。`./gradlew --no-daemon :app:test --tests '*TradeCandidatesQueryTest' --tests '*NearestOutfittingQueryTest' --tests '*BundleKeyParityTest' --tests '*BundleQuotingTest'` と新規テスト、全体テスト（既知の 10 件以外の失敗 0 件）。実機: 「Sol 周辺の交易候補」の後、AI タブにランク 1・2・3 の枠が別々に出て、各枠の中が「項目名：値」の縦並びで、数値が 3 桁区切りの算用数字であること。アプリ再起動後も表示が残ること。HUD に 1 件目の要約カードが出ること（航路未設定時） | 未着手 |
-| P8-3 | 検索結果の候補を選んで航路設定するコマンド（§7） | P8-1/P8-2 後に確定 | 確定時に記載 | 未着手 |
+| P8-3 | 候補を選んで航路設定（§7.1a）。P8-6 のマージ後に着手する。(1) 新規コマンド `navigate_to_search_result`（音声）。(2) AI タブのカードに「購入地へ」「売却地へ」「ここへ」ボタン（クリック → 既存 `GuiCommandRunner`）。HUD はクリック非対応 | 新規: `app/src/main/java/elite/intel/ai/brain/actions/handlers/commands/builtin/NavigateToSearchResultCommand.java` とそのテスト。既存: `QueryResultCard.java`（ボタンの追加のみ）、`QueryResultDisplayPanel.java`（ボタンに rank / leg を渡すのに必要な範囲のみ）、`QueryResultDisplayManager.java`（読み出しの補助が必要な場合のみ）、`ai_action_aliases.properties` / `ai_action_aliases_ja.properties`（`navigate_to_search_result` の 1 キーのみ）、`responses.properties` / `responses_ja.properties` と `gui.properties` / `gui_ja.properties`（新キーのみ）、`i18n-parity-baseline.txt`（他 8 言語の `MISSING` 行のみ）、`AiActionMapGeneratorTest.java`（スナップショットに 1 件追加のみ）、P8-6 の `QueryResultDisplayPanelTest.java`（ボタンの検証の追加のみ）。コマンド数の番兵テストがあればその数値のみ。`RoutePlotter`、`GuiCommandRunner`、`GameWindowActivator`、HUD 関連は変更しない。これ以外は PLAN CHANGE REQUEST | 新規テスト: 交易候補 rank 1〜3 × buy/sell で正しい星系・ステーションが `ReminderManager` と `RoutePlotter` に渡ること（`RoutePlotter` は差し替え可能にしてテストでは呼ばない）、艤装 rank 1、断るケース（結果なし・10 時間超・rank 範囲外・leg 不正）で航路を設定しないこと、GUI で利用可能なこと。カード: 交易候補の枠に 2 ボタン・艤装の枠に 1 ボタン、押すと rank / leg が正しく渡ること、5 秒間無効になること。`--tests '*NavigateToSearchResultCommandTest' --tests '*QueryResultDisplayPanelTest' --tests '*AllActionParameterSpecsValidTest' --tests '*AiActionMapGeneratorTest' --tests '*BundleKeyParityTest' --tests '*BundleQuotingTest' --tests '*AiActionLocalizationsTest' --tests '*AliasPhraseTest' --tests '*AliasVocabularyTest' --tests '*AliasPhraseCollisionTest'` と全体テスト（既知の 10 件以外の失敗 0 件）。実機: 「Sol 周辺の交易候補」の後、(a)「ランク 2 の購入地に案内して」でギャラクシーマップが開き航路が設定される、(b) AI タブのランク 1「売却地へ」を押すとゲームが前面に出て 3 秒後に航路が設定される | 未着手 |
 
 ## 10. 既知のテスト失敗（2026-09-25 時点、main）
 
