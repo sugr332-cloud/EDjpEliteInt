@@ -110,10 +110,11 @@ public class EdsmApiClient {
         if (starSystemName == null || starSystemName.isBlank()) {
             return StarSystemLookupResult.lookupFailed();
         }
+        String trimmedInput = starSystemName.trim();
         String endpoint = "/api-v1/systems";
         StringBuilder query = publicUrl(endpoint);
         try {
-            query.append("systemName=").append(URLEncoder.encode(starSystemName, StandardCharsets.UTF_8));
+            query.append("systemName=").append(URLEncoder.encode(trimmedInput, StandardCharsets.UTF_8));
         } catch (Exception e) {
             log.error("Failed to encode query parameters", e);
             return StarSystemLookupResult.lookupFailed();
@@ -124,8 +125,15 @@ public class EdsmApiClient {
         }
         try {
             StarSystemData[] systems = GsonFactory.getGson().fromJson(response, StarSystemData[].class);
-            if (systems != null && systems.length > 0 && systems[0] != null && systems[0].getName() != null && !systems[0].getName().isBlank()) {
-                return StarSystemLookupResult.found(systems[0].getName());
+            if (systems != null) {
+                for (StarSystemData system : systems) {
+                    if (system != null && system.getName() != null) {
+                        String candidateName = system.getName().trim();
+                        if (candidateName.equalsIgnoreCase(trimmedInput)) {
+                            return StarSystemLookupResult.found(candidateName);
+                        }
+                    }
+                }
             }
             return StarSystemLookupResult.notFound();
         } catch (JsonSyntaxException e) {

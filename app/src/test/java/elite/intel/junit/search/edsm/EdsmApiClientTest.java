@@ -281,4 +281,40 @@ class EdsmApiClientTest {
 
         verify(0, anyRequestedFor(anyUrl()));
     }
+
+    @Test
+    void lookupStarSystemName_exactMatchPicksMatchingElementOverPrefixMatches() {
+        stubFor(get(urlPathEqualTo("/api-v1/systems"))
+                .willReturn(okJson("[{\"name\":\"Solati\"},{\"name\":\"Sol\"}]")));
+
+        EdsmApiClient.StarSystemLookupResult result = EdsmApiClient.lookupStarSystemName("Sol");
+
+        assertEquals(EdsmApiClient.StarSystemLookupStatus.FOUND, result.status());
+        assertTrue(result.isFound());
+        assertEquals("Sol", result.canonicalName());
+    }
+
+    @Test
+    void lookupStarSystemName_caseInsensitiveMatchOverMultipleElements() {
+        stubFor(get(urlPathEqualTo("/api-v1/systems"))
+                .willReturn(okJson("[{\"name\":\"Solati\"},{\"name\":\"Sol\"}]")));
+
+        EdsmApiClient.StarSystemLookupResult result = EdsmApiClient.lookupStarSystemName("SOL");
+
+        assertEquals(EdsmApiClient.StarSystemLookupStatus.FOUND, result.status());
+        assertTrue(result.isFound());
+        assertEquals("Sol", result.canonicalName());
+    }
+
+    @Test
+    void lookupStarSystemName_prefixMatchOnlyWithoutExactMatch_returnsNotFound() {
+        stubFor(get(urlPathEqualTo("/api-v1/systems"))
+                .willReturn(okJson("[{\"name\":\"Solati\"}]")));
+
+        EdsmApiClient.StarSystemLookupResult result = EdsmApiClient.lookupStarSystemName("Sol");
+
+        assertEquals(EdsmApiClient.StarSystemLookupStatus.NOT_FOUND, result.status());
+        assertTrue(result.isNotFound());
+        assertNull(result.canonicalName());
+    }
 }
