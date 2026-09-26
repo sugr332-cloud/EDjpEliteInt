@@ -167,9 +167,9 @@ outfitting_updated_at
 
 ### 7.1 検索結果の表示（P8-6）
 
-**目的:** 音声（短い要約）だけでは候補の比較がしにくい。INARA のように、候補を列の揃った枠付きの表で見られるようにする。
+**目的:** 音声（短い要約）だけでは候補の比較がしにくい。INARA のように、候補を 1 件ずつ枠で区切り、項目名と値を縦に並べて見られるようにする。
 
-**データの出所:** 表と HUD カードの値は、Query が LLM に渡したのと同じ DataDto（`TradeCandidatesDataDto` / `OutfittingDataDto`）から作る。LLM の応答文は使わない。数値は DataDto の `*Display`（3 桁区切り・小数桁を丸めたもの）をそのまま表示し、表示側で再計算しない。例外は「鮮度（経過時間）」で、保存された更新時刻（`SpanshTimestamps` で解釈）から表示時に計算する。
+**データの出所:** AI タブのカードと HUD カードの値は、Query が LLM に渡したのと同じ DataDto（`TradeCandidatesDataDto` / `OutfittingDataDto`）から作る。LLM の応答文は使わない。数値は DataDto の `*Display`（3 桁区切り・小数桁を丸めたもの）をそのまま表示し、表示側で再計算しない。例外は「鮮度（経過時間）」で、保存された更新時刻（`SpanshTimestamps` で解釈）から表示時に計算する。
 
 **保存（derive-never-remember）:** HUD の既存規則（`HudObjectiveSource` の Javadoc）に従い、結果は DB に保存し、表示側は毎回 DB から読む。アプリを再起動しても直前の結果が表示される。
 
@@ -223,7 +223,7 @@ outfitting_updated_at
 - **ミッション掲示板からの候補検索**: 掲示板の内容は外部 API（Spansh / EDSM）にも Journal にも出ない（Journal の `Missions` は受注済みミッションのみ）。データが無いため作らない。受注済みミッションの目的地案内（`NavigateToMissionTargetCommand` 等）は既存のまま。
 - ジャンプ数による並べ替え、1 時間あたり利益
 - 既存コマンド（`find_commodity`、`sell_commodity`、`calculate_trade_route`、`query_local_outfitting`）の挙動変更
-- INARA のデータ・画面の複製（§7.1 の表は、列の揃った枠付き表示という考え方を参考にしたもので、INARA のデータや画面そのものは使わない）
+- INARA のデータ・画面の複製（§7.1 のカード表示は、候補を枠で区切って見せるという考え方を参考にしたもので、INARA のデータや画面そのものは使わない）
 
 ## 9. 実装台帳（v2-P8）
 
