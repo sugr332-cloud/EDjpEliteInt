@@ -69,8 +69,8 @@ public class PromptFactory implements AiPromptFactory {
         }
         sb.append("Respond with JSON only. Set \"text_to_speech_response\" to your answer.\n\n");
         sb.append(ttsResponseRules());
+        sb.append(numeralRule());
         sb.append("""
-                - Spell out numerals (e.g., twenty-three, not 23).
                 - Concise and direct. Answer only what the user asked.
                 - All numeric values in the provided data are pre-computed. Do not perform arithmetic.
                 - If data is missing, state that clearly.
@@ -178,6 +178,14 @@ public class PromptFactory implements AiPromptFactory {
 
     public static String ttsResponseRules() {
         return "text_to_speech_response must be plain spoken sentences. No markdown, no lists, no symbols.\n";
+    }
+
+    private String numeralRule() {
+        Language language = AiResponseLanguagePolicy.resolveEffectiveAiResponseLanguage(systemSession);
+        if (language == Language.JA) {
+            return "- Write numbers as Arabic numerals with thousands separators (e.g., 17,070,320). Do not write numbers in kanji or kana.\n";
+        }
+        return "- Spell out numerals (e.g., twenty-three, not 23).\n";
     }
 
     private String responseLanguageRule() {
