@@ -474,3 +474,22 @@ gui|ptbz|MISSING|log.sttJaModelMissing
 gui|ru|MISSING|log.sttJaModelMissing
 gui|uk|MISSING|log.sttJaModelMissing
 
+# --- P8-8: Trade candidates spoken response (do not read trade candidates aloud) ---
+responses|de|MISSING|handler.tradeCandidates.ok
+responses|es|MISSING|handler.tradeCandidates.ok
+responses|fr|MISSING|handler.tradeCandidates.ok
+responses|it|MISSING|handler.tradeCandidates.ok
+responses|pt|MISSING|handler.tradeCandidates.ok
+responses|ptbz|MISSING|handler.tradeCandidates.ok
+responses|ru|MISSING|handler.tradeCandidates.ok
+responses|uk|MISSING|handler.tradeCandidates.ok
+
+responses|de|MISSING|handler.tradeCandidates.insufficientFreshData
+responses|es|MISSING|handler.tradeCandidates.insufficientFreshData
+responses|fr|MISSING|handler.tradeCandidates.insufficientFreshData
+responses|it|MISSING|handler.tradeCandidates.insufficientFreshData
+responses|pt|MISSING|handler.tradeCandidates.insufficientFreshData
+responses|ptbz|MISSING|handler.tradeCandidates.insufficientFreshData
+responses|ru|MISSING|handler.tradeCandidates.insufficientFreshData
+responses|uk|MISSING|handler.tradeCandidates.insufficientFreshData
+
