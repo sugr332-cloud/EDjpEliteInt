@@ -22,6 +22,7 @@
 ./locations
 ./*.md
 /distribution/elite_intel_updater.jar
+/distribution/reazonspeech/
 /scratch/scratch.sql
 /installers/
 /PACKAGES.md

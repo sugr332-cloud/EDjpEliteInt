@@ -129,6 +129,10 @@ public final class AppPaths {
         return getDistributionFile("parakeet");
     }
 
+    public static Path getReazonSpeechModelDir() {
+        return getDistributionFile("reazonspeech");
+    }
+
     /**
      * Directory holding the in-process text-embedding model (multilingual-e5-small int8 ONNX +
      * tokenizer), shipped in distribution/embed/ exactly like the Parakeet and Kokoro models so the

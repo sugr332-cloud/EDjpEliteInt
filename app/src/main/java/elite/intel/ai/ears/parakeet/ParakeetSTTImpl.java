@@ -16,6 +16,7 @@ import elite.intel.i18n.Language;
 import elite.intel.session.SystemSession;
 import elite.intel.ui.event.AppLogEvent;
 import elite.intel.ui.event.PttButtonStateEvent;
+import elite.intel.ui.i18n.MultiLingualTextProvider;
 import elite.intel.util.AppPaths;
 import elite.intel.util.SherpaOnnxNatives;
 import elite.intel.util.StringUtls;
@@ -28,7 +29,9 @@ import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.Locale;
+import java.util.function.Supplier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -107,10 +110,77 @@ public class ParakeetSTTImpl implements EarsInterface {
         UiBus.register(this);
     }
 
+    public static final List<String> REAZON_SPEECH_FILES = List.of(
+            "encoder-epoch-99-avg-1.int8.onnx",
+            "decoder-epoch-99-avg-1.onnx",
+            "joiner-epoch-99-avg-1.int8.onnx",
+            "tokens.txt"
+    );
+
+    public static boolean isJapaneseModelAvailable(Path dir) {
+        if (dir == null || !Files.isDirectory(dir)) return false;
+        for (String file : REAZON_SPEECH_FILES) {
+            if (!Files.exists(dir.resolve(file))) return false;
+        }
+        return true;
+    }
+
+    static Supplier<Path> reazonSpeechModelDirSupplier = AppPaths::getReazonSpeechModelDir;
+
+    public static boolean isJapaneseModelAvailable() {
+        return isJapaneseModelAvailable(reazonSpeechModelDirSupplier.get());
+    }
+
+    record ModelSpec(Path modelDir, Path encoderFile, Path decoderFile, Path joinerFile, Path tokensFile, int featureDim) {}
+
+    static ModelSpec resolveModelSpec(Language language) {
+        Path modelDir;
+        Path encoderFile;
+        Path decoderFile;
+        Path joinerFile;
+        Path tokensFile;
+        int featureDim;
+
+        if (language == Language.JA) {
+            modelDir = reazonSpeechModelDirSupplier.get();
+            encoderFile = modelDir.resolve("encoder-epoch-99-avg-1.int8.onnx");
+            decoderFile = modelDir.resolve("decoder-epoch-99-avg-1.onnx");
+            joinerFile = modelDir.resolve("joiner-epoch-99-avg-1.int8.onnx");
+            tokensFile = modelDir.resolve("tokens.txt");
+            featureDim = 80;
+        } else {
+            modelDir = AppPaths.getParakeetModelDir();
+            encoderFile = modelDir.resolve("encoder.int8.onnx");
+            decoderFile = modelDir.resolve("decoder.int8.onnx");
+            joinerFile = modelDir.resolve("joiner.int8.onnx");
+            tokensFile = modelDir.resolve("tokens.txt");
+            featureDim = 128;
+        }
+        return new ModelSpec(modelDir, encoderFile, decoderFile, joinerFile, tokensFile, featureDim);
+    }
+
+    static String sanitizeTranscript(String rawText, Language language) {
+        if (rawText == null) return "";
+        String trimmed = rawText.trim();
+        return (language == Language.JA) ? trimmed : trimmed.toLowerCase(Locale.ROOT);
+    }
+
+    static boolean isTranscriptUsable(String transcript, Language language) {
+        if (transcript == null || transcript.isBlank()) return false;
+        int minLength = (language == Language.JA) ? 2 : 3;
+        return transcript.length() >= minLength;
+    }
+
     @Override
     public void start() {
         if (processingThread != null && processingThread.isAlive()) {
             log.warn("Parakeet STT already running");
+            return;
+        }
+
+        if (systemSession.getLanguage() == Language.JA && !isJapaneseModelAvailable()) {
+            log.warn("Japanese STT model not found in {}", reazonSpeechModelDirSupplier.get());
+            UiBus.publish(new AppLogEvent(MultiLingualTextProvider.getText("log.sttJaModelMissing")));
             return;
         }
 
@@ -144,7 +214,10 @@ public class ParakeetSTTImpl implements EarsInterface {
                 NOISE_FLOOR, RMS_THRESHOLD_HIGH, RMS_THRESHOLD_LOW, calibrationWasStored));
 
         recognizer = buildRecognizer();
-        log.info("Parakeet recognizer loaded from {}", AppPaths.getParakeetModelDir());
+        Path loadedModelDir = systemSession.getLanguage() == Language.JA
+                ? reazonSpeechModelDirSupplier.get()
+                : AppPaths.getParakeetModelDir();
+        log.info("Parakeet recognizer loaded from {}", loadedModelDir);
 
         transcriptionExecutor = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "Parakeet-Transcription");
@@ -210,26 +283,22 @@ public class ParakeetSTTImpl implements EarsInterface {
             }
         }
 
-        Path modelDir = AppPaths.getParakeetModelDir();
-        Path encoderFile = modelDir.resolve("encoder.int8.onnx");
-        Path decoderFile = modelDir.resolve("decoder.int8.onnx");
-        Path joinerFile = modelDir.resolve("joiner.int8.onnx");
-        Path tokensFile = modelDir.resolve("tokens.txt");
+        ModelSpec spec = resolveModelSpec(systemSession.getLanguage());
 
-        if (!Files.exists(encoderFile)) throw new IllegalStateException("Parakeet encoder missing at: " + encoderFile);
-        if (!Files.exists(decoderFile)) throw new IllegalStateException("Parakeet decoder missing at: " + decoderFile);
-        if (!Files.exists(joinerFile)) throw new IllegalStateException("Parakeet joiner missing at: " + joinerFile);
-        if (!Files.exists(tokensFile)) throw new IllegalStateException("Parakeet tokens missing at: " + tokensFile);
+        if (!Files.exists(spec.encoderFile())) throw new IllegalStateException("Encoder missing at: " + spec.encoderFile());
+        if (!Files.exists(spec.decoderFile())) throw new IllegalStateException("Decoder missing at: " + spec.decoderFile());
+        if (!Files.exists(spec.joinerFile())) throw new IllegalStateException("Joiner missing at: " + spec.joinerFile());
+        if (!Files.exists(spec.tokensFile())) throw new IllegalStateException("Tokens missing at: " + spec.tokensFile());
 
         OfflineTransducerModelConfig transducer = OfflineTransducerModelConfig.builder()
-                .setEncoder(AppPaths.toNativePath(encoderFile))
-                .setDecoder(AppPaths.toNativePath(decoderFile))
-                .setJoiner(AppPaths.toNativePath(joinerFile))
+                .setEncoder(AppPaths.toNativePath(spec.encoderFile()))
+                .setDecoder(AppPaths.toNativePath(spec.decoderFile()))
+                .setJoiner(AppPaths.toNativePath(spec.joinerFile()))
                 .build();
 
         OfflineModelConfig modelConfig = OfflineModelConfig.builder()
                 .setTransducer(transducer)
-                .setTokens(AppPaths.toNativePath(tokensFile))
+                .setTokens(AppPaths.toNativePath(spec.tokensFile()))
                 .setNumThreads(Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(), systemSession.getSttThreads())))
                 .setDebug(false)
                 .setProvider("cpu")
@@ -237,7 +306,7 @@ public class ParakeetSTTImpl implements EarsInterface {
 
         FeatureConfig featureConfig = FeatureConfig.builder()
                 .setSampleRate(SAMPLE_RATE)
-                .setFeatureDim(128)
+                .setFeatureDim(spec.featureDim())
                 .build();
 
 
@@ -452,7 +521,20 @@ public class ParakeetSTTImpl implements EarsInterface {
             // other trace anywhere - no UI line, no event - so the reason has to travel with the transcript.
             // The peak is here because Amplifier normalizes to a peak: one loud sample anywhere in the
             // capture (a beep, a knock) sets the gain for the whole utterance and leaves the voice quiet.
-            byte[] conditioned = padAudio(trimLeadingLowEnergy(pcmBytes));
+            // JA (ReazonSpeech Zipformer): bypass leading trim to prevent clipping unvoiced consonants
+            // (e.g. "フレーム" -> "シフト"), while dropping buffers with no speech energy above noise floor.
+            // EN (Parakeet): keep original leading trim for greedy search hallucination suppression.
+            byte[] trimmed;
+            if (systemSession.getLanguage() == Language.JA) {
+                if (!hasSpeechEnergy(pcmBytes)) {
+                    log.info("STT dropped (JA: no speech detected above noise floor): captured {}ms", durationMs(pcmBytes.length));
+                    return;
+                }
+                trimmed = pcmBytes;
+            } else {
+                trimmed = trimLeadingLowEnergy(pcmBytes);
+            }
+            byte[] conditioned = padAudio(trimmed);
             byte[] forDecoder = Amplifier.amplify(conditioned);
             // Peak alone cannot tell speech from silence: one button click in an otherwise empty buffer
             // reads the same as a spoken phrase. RMS is the sustained level, so the pair separates them -
@@ -471,10 +553,10 @@ public class ParakeetSTTImpl implements EarsInterface {
                 stream.acceptWaveform(samples, SAMPLE_RATE);
                 recognizer.decode(stream);
                 OfflineRecognizerResult result = recognizer.getResult(stream);
-                String transcript = result.getText().toLowerCase().trim();
+                String transcript = sanitizeTranscript(result.getText(), systemSession.getLanguage());
                 log.debug("Parakeet transcription took {} ms", System.currentTimeMillis() - timeStart);
 
-                if (transcript.isBlank() || transcript.length() < 3) {
+                if (!isTranscriptUsable(transcript, systemSession.getLanguage())) {
                     log.info("STT dropped (nothing a phrase could be made of): [{}] - {}", transcript, capture);
                     // Keep exactly what the decoder was given. This is the one failure the numbers above
                     // cannot explain on their own, and listening to it answers in seconds what another
@@ -636,6 +718,25 @@ public class ParakeetSTTImpl implements EarsInterface {
     }
 
     /**
+     * Checks if any 10ms frame in the PCM buffer has RMS exceeding threshold.
+     * Used for Japanese STT (ReazonSpeech) to verify speech presence across the full utterance
+     * without stripping leading ambient noise or unvoiced consonants.
+     */
+    static boolean hasSpeechEnergy(byte[] pcm, double threshold) {
+        final int FRAME_BYTES = 320; // 160 samples = 10ms at 16kHz, 16-bit mono
+        int offset = 0;
+        while (offset + FRAME_BYTES <= pcm.length) {
+            if (calculateRMS(pcm, offset, FRAME_BYTES) >= threshold) return true;
+            offset += FRAME_BYTES;
+        }
+        return false;
+    }
+
+    boolean hasSpeechEnergy(byte[] pcm) {
+        return hasSpeechEnergy(pcm, NOISE_FLOOR * LEADING_TRIM_THRESHOLD_FACTOR);
+    }
+
+    /**
      * Strips leading 10ms frames whose RMS is below NOISE_FLOOR * LEADING_TRIM_THRESHOLD_FACTOR.
      * Stops at the first frame that crosses the threshold, so speech onsets are preserved.
      */
@@ -673,11 +774,11 @@ public class ParakeetSTTImpl implements EarsInterface {
         return peak;
     }
 
-    private double calculateRMS(byte[] buffer, int length) {
+    static double calculateRMS(byte[] buffer, int length) {
         return calculateRMS(buffer, 0, length);
     }
 
-    private double calculateRMS(byte[] buffer, int offset, int length) {
+    static double calculateRMS(byte[] buffer, int offset, int length) {
         if (length < 2) return 0.0;
         double sum = 0.0;
         int samples = length / 2;
@@ -689,7 +790,7 @@ public class ParakeetSTTImpl implements EarsInterface {
         return Math.sqrt(sum / samples);
     }
 
-    private static String toLangCode(Language lang) {
+    static String toLangCode(Language lang) {
         return switch (lang) {
             case EN -> "en";
             case FR -> "fr";
@@ -700,12 +801,7 @@ public class ParakeetSTTImpl implements EarsInterface {
             case IT -> "it";
             // Parakeet takes ISO 639-1 only: both Portuguese variants transcribe as "pt".
             case PT, PTBZ -> "pt";
-            // The bundled model's vocabulary (distribution/parakeet/tokens.txt) is Latin/Cyrillic only -
-            // no Japanese tokens exist, so Japanese speech cannot be transcribed by this model regardless
-            // of the language hint passed. "en" is not a working substitute, only the least-wrong of the
-            // codes this method already returns; voice input stays unavailable for Japanese until a
-            // Japanese-capable model is bundled.
-            case JA -> "en";
+            case JA -> "ja";
         };
     }
 
