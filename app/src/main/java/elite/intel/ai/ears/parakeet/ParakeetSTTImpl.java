@@ -29,6 +29,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
@@ -49,6 +50,8 @@ public class ParakeetSTTImpl implements EarsInterface {
     private static final int ENTER_VOICE_FRAMES = 1;
     private static final int EXIT_SILENCE_FRAMES = 6;
     private static final int PRE_ROLL_FRAMES = 2;
+    public static final int JA_PRE_ROLL_PRIOR_MS = 500;
+    public static final int JA_PRE_ROLL_PRIOR_BYTES = SAMPLE_RATE * 2 * JA_PRE_ROLL_PRIOR_MS / 1000;
     private static final long BASE_BACKOFF_MS = 2000;
     private static final long MAX_BACKOFF_MS = 60000;
     private static final long INFERENCE_TIMEOUT_SEC = 4;
@@ -171,6 +174,42 @@ public class ParakeetSTTImpl implements EarsInterface {
         return transcript.length() >= minLength;
     }
 
+    static void trimPreRoll(Deque<byte[]> preRoll, Language language) {
+        trimPreRoll(preRoll, language, JA_PRE_ROLL_PRIOR_BYTES, PRE_ROLL_FRAMES);
+    }
+
+    static void trimPreRoll(Deque<byte[]> preRoll, Language language, int targetPriorBytes, int maxFramesNonJa) {
+        if (preRoll == null || preRoll.isEmpty()) return;
+
+        if (language == Language.JA) {
+            if (preRoll.size() <= 1) return;
+
+            int priorBytes = 0;
+            int i = 0;
+            int priorCount = preRoll.size() - 1;
+            for (byte[] frame : preRoll) {
+                if (i < priorCount) {
+                    priorBytes += frame.length;
+                }
+                i++;
+            }
+
+            while (preRoll.size() > 1) {
+                byte[] first = preRoll.peekFirst();
+                if (first != null && (priorBytes - first.length) >= targetPriorBytes) {
+                    preRoll.removeFirst();
+                    priorBytes -= first.length;
+                } else {
+                    break;
+                }
+            }
+        } else {
+            while (preRoll.size() > maxFramesNonJa) {
+                preRoll.removeFirst();
+            }
+        }
+    }
+
     @Override
     public void start() {
         if (processingThread != null && processingThread.isAlive()) {
@@ -218,6 +257,9 @@ public class ParakeetSTTImpl implements EarsInterface {
                 ? reazonSpeechModelDirSupplier.get()
                 : AppPaths.getParakeetModelDir();
         log.info("Parakeet recognizer loaded from {}", loadedModelDir);
+        if (systemSession.getLanguage() == Language.JA) {
+            log.info("JA pre-roll: {} bytes ({} ms) before gate", JA_PRE_ROLL_PRIOR_BYTES, JA_PRE_ROLL_PRIOR_MS);
+        }
 
         transcriptionExecutor = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "Parakeet-Transcription");
@@ -423,7 +465,7 @@ public class ParakeetSTTImpl implements EarsInterface {
                     pttWindow.reset();
 
                     preRoll.addLast(copyOf(audio, audioLen));
-                    if (preRoll.size() > PRE_ROLL_FRAMES) preRoll.removeFirst();
+                    trimPreRoll(preRoll, systemSession.getLanguage());
 
                     // Schmitt-trigger hysteresis: the gate opens only above the HIGH
                     // level, but stays open until rms falls below the lower CLOSE level
