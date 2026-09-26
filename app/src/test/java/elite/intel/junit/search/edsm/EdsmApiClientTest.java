@@ -218,4 +218,103 @@ class EdsmApiClientTest {
         assertNull(dto.data);
         verify(0, anyRequestedFor(anyUrl()));
     }
+
+    // --- lookupStarSystemName ---
+
+    @Test
+    void lookupStarSystemName_findsSingleSystem_returnsFoundWithCanonicalName() {
+        stubFor(get(urlPathEqualTo("/api-v1/systems"))
+                .willReturn(okJson("[{\"name\":\"Sol\"}]")));
+
+        EdsmApiClient.StarSystemLookupResult result = EdsmApiClient.lookupStarSystemName("SOL");
+
+        assertEquals(EdsmApiClient.StarSystemLookupStatus.FOUND, result.status());
+        assertTrue(result.isFound());
+        assertEquals("Sol", result.canonicalName());
+        verify(getRequestedFor(urlPathEqualTo("/api-v1/systems"))
+                .withQueryParam("systemName", equalTo("SOL")));
+    }
+
+    @Test
+    void lookupStarSystemName_emptyArray_returnsNotFound() {
+        stubFor(get(urlPathEqualTo("/api-v1/systems"))
+                .willReturn(okJson("[]")));
+
+        EdsmApiClient.StarSystemLookupResult result = EdsmApiClient.lookupStarSystemName("NonExistentSystem");
+
+        assertEquals(EdsmApiClient.StarSystemLookupStatus.NOT_FOUND, result.status());
+        assertTrue(result.isNotFound());
+        assertNull(result.canonicalName());
+    }
+
+    @Test
+    void lookupStarSystemName_http503_returnsLookupFailed() {
+        stubFor(get(urlPathEqualTo("/api-v1/systems"))
+                .willReturn(aResponse().withStatus(503)));
+
+        EdsmApiClient.StarSystemLookupResult result = EdsmApiClient.lookupStarSystemName("Sol");
+
+        assertEquals(EdsmApiClient.StarSystemLookupStatus.LOOKUP_FAILED, result.status());
+        assertTrue(result.isLookupFailed());
+        assertNull(result.canonicalName());
+    }
+
+    @Test
+    void lookupStarSystemName_malformedJson_returnsLookupFailed() {
+        stubFor(get(urlPathEqualTo("/api-v1/systems"))
+                .willReturn(okJson("not-valid-json")));
+
+        EdsmApiClient.StarSystemLookupResult result = EdsmApiClient.lookupStarSystemName("Sol");
+
+        assertEquals(EdsmApiClient.StarSystemLookupStatus.LOOKUP_FAILED, result.status());
+        assertTrue(result.isLookupFailed());
+        assertNull(result.canonicalName());
+    }
+
+    @Test
+    void lookupStarSystemName_nullOrBlank_returnsLookupFailedWithoutCall() {
+        EdsmApiClient.StarSystemLookupResult nullResult = EdsmApiClient.lookupStarSystemName(null);
+        assertEquals(EdsmApiClient.StarSystemLookupStatus.LOOKUP_FAILED, nullResult.status());
+
+        EdsmApiClient.StarSystemLookupResult blankResult = EdsmApiClient.lookupStarSystemName("   ");
+        assertEquals(EdsmApiClient.StarSystemLookupStatus.LOOKUP_FAILED, blankResult.status());
+
+        verify(0, anyRequestedFor(anyUrl()));
+    }
+
+    @Test
+    void lookupStarSystemName_exactMatchPicksMatchingElementOverPrefixMatches() {
+        stubFor(get(urlPathEqualTo("/api-v1/systems"))
+                .willReturn(okJson("[{\"name\":\"Solati\"},{\"name\":\"Sol\"}]")));
+
+        EdsmApiClient.StarSystemLookupResult result = EdsmApiClient.lookupStarSystemName("Sol");
+
+        assertEquals(EdsmApiClient.StarSystemLookupStatus.FOUND, result.status());
+        assertTrue(result.isFound());
+        assertEquals("Sol", result.canonicalName());
+    }
+
+    @Test
+    void lookupStarSystemName_caseInsensitiveMatchOverMultipleElements() {
+        stubFor(get(urlPathEqualTo("/api-v1/systems"))
+                .willReturn(okJson("[{\"name\":\"Solati\"},{\"name\":\"Sol\"}]")));
+
+        EdsmApiClient.StarSystemLookupResult result = EdsmApiClient.lookupStarSystemName("SOL");
+
+        assertEquals(EdsmApiClient.StarSystemLookupStatus.FOUND, result.status());
+        assertTrue(result.isFound());
+        assertEquals("Sol", result.canonicalName());
+    }
+
+    @Test
+    void lookupStarSystemName_prefixMatchOnlyWithoutExactMatch_returnsNotFound() {
+        stubFor(get(urlPathEqualTo("/api-v1/systems"))
+                .willReturn(okJson("[{\"name\":\"Solati\"}]")));
+
+        EdsmApiClient.StarSystemLookupResult result = EdsmApiClient.lookupStarSystemName("Sol");
+
+        assertEquals(EdsmApiClient.StarSystemLookupStatus.NOT_FOUND, result.status());
+        assertTrue(result.isNotFound());
+        assertNull(result.canonicalName());
+    }
 }

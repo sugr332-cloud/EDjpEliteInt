@@ -74,6 +74,74 @@ public class EdsmApiClient {
         return dto;
     }
 
+    public enum StarSystemLookupStatus {
+        FOUND,
+        NOT_FOUND,
+        LOOKUP_FAILED
+    }
+
+    public record StarSystemLookupResult(StarSystemLookupStatus status, String canonicalName) {
+        public static StarSystemLookupResult found(String canonicalName) {
+            return new StarSystemLookupResult(StarSystemLookupStatus.FOUND, canonicalName);
+        }
+
+        public static StarSystemLookupResult notFound() {
+            return new StarSystemLookupResult(StarSystemLookupStatus.NOT_FOUND, null);
+        }
+
+        public static StarSystemLookupResult lookupFailed() {
+            return new StarSystemLookupResult(StarSystemLookupStatus.LOOKUP_FAILED, null);
+        }
+
+        public boolean isFound() {
+            return status == StarSystemLookupStatus.FOUND;
+        }
+
+        public boolean isNotFound() {
+            return status == StarSystemLookupStatus.NOT_FOUND;
+        }
+
+        public boolean isLookupFailed() {
+            return status == StarSystemLookupStatus.LOOKUP_FAILED;
+        }
+    }
+
+    public static StarSystemLookupResult lookupStarSystemName(String starSystemName) {
+        if (starSystemName == null || starSystemName.isBlank()) {
+            return StarSystemLookupResult.lookupFailed();
+        }
+        String trimmedInput = starSystemName.trim();
+        String endpoint = "/api-v1/systems";
+        StringBuilder query = publicUrl(endpoint);
+        try {
+            query.append("systemName=").append(URLEncoder.encode(trimmedInput, StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            log.error("Failed to encode query parameters", e);
+            return StarSystemLookupResult.lookupFailed();
+        }
+        String response = callEdsm(query);
+        if (response.isEmpty()) {
+            return StarSystemLookupResult.lookupFailed();
+        }
+        try {
+            StarSystemData[] systems = GsonFactory.getGson().fromJson(response, StarSystemData[].class);
+            if (systems != null) {
+                for (StarSystemData system : systems) {
+                    if (system != null && system.getName() != null) {
+                        String candidateName = system.getName().trim();
+                        if (candidateName.equalsIgnoreCase(trimmedInput)) {
+                            return StarSystemLookupResult.found(candidateName);
+                        }
+                    }
+                }
+            }
+            return StarSystemLookupResult.notFound();
+        } catch (JsonSyntaxException e) {
+            log.warn("Invalid JSON from EDSM: {}", response, e);
+            return StarSystemLookupResult.lookupFailed();
+        }
+    }
+
     public static StarsWithinRadiusDto searchStarSystems(String starSystemName, int radius) {
         if (starSystemName == null) return new StarsWithinRadiusDto();
         String endpoint = "/api-v1/sphere-systems";
