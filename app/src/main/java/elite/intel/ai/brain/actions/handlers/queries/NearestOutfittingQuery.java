@@ -15,6 +15,9 @@ import elite.intel.session.PlayerSession;
 import elite.intel.util.yaml.ToYamlConvertable;
 import elite.intel.util.yaml.YamlFactory;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -27,6 +30,8 @@ import java.util.Optional;
  */
 @RegisterQuery
 public class NearestOutfittingQuery extends BaseQueryAnalyzer implements IntelQuery {
+
+    private static final Logger log = LogManager.getLogger(NearestOutfittingQuery.class);
 
     public static final String ID = "query_nearest_outfitting";
     public static final String PARAM_MODULE = "module";
@@ -79,6 +84,7 @@ public class NearestOutfittingQuery extends BaseQueryAnalyzer implements IntelQu
             // UNKNOWN: do not perform external search (spec §6.2, §R.12 Rule 2).
             // Pass state to LLM without hardcoded strings (requirement 6).
             OutfittingDataDto unknownDto = OutfittingDataDto.unknown(rawModule);
+            storeDisplay(unknownDto);
             return process(new AiDataStruct(buildInstructions(), unknownDto), originalUserInput);
         }
 
@@ -89,6 +95,7 @@ public class NearestOutfittingQuery extends BaseQueryAnalyzer implements IntelQu
         if (currentSystem == null || currentSystem.isBlank()) {
             // LOCATION_UNKNOWN: do not perform external search when current system is unknown
             OutfittingDataDto locUnknownDto = OutfittingDataDto.locationUnknown(rawModule, matched);
+            storeDisplay(locUnknownDto);
             return process(new AiDataStruct(buildInstructions(), locUnknownDto), originalUserInput);
         }
         TradeRouteSearchCriteria profile = TradeProfileManager.getInstance().getCriteria(false);
@@ -100,6 +107,7 @@ public class NearestOutfittingQuery extends BaseQueryAnalyzer implements IntelQu
         if (searchResult == null || searchResult.getResults() == null || searchResult.getResults().isEmpty()) {
             // NO_RESULT: pass state to LLM without hardcoded strings
             OutfittingDataDto noResultDto = OutfittingDataDto.noResult(rawModule, matched);
+            storeDisplay(noResultDto);
             return process(new AiDataStruct(buildInstructions(), noResultDto), originalUserInput);
         }
 
@@ -124,7 +132,16 @@ public class NearestOutfittingQuery extends BaseQueryAnalyzer implements IntelQu
                 stale
         );
 
+        storeDisplay(foundDto);
         return process(new AiDataStruct(buildInstructions(), foundDto), originalUserInput);
+    }
+
+    private void storeDisplay(OutfittingDataDto dto) {
+        try {
+            elite.intel.db.managers.QueryResultDisplayManager.getInstance().saveOutfitting(dto);
+        } catch (Exception e) {
+            log.warn("Failed to store outfitting display: {}", e.getMessage());
+        }
     }
 
     private String extractModuleParam(JsonObject params, String originalUserInput) {

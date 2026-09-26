@@ -81,6 +81,14 @@ class CardPrecedenceTest {
     }
 
     @Test
+    void queryResultYieldsToPlottedRouteAndAcceptedWork() {
+        assertEquals("ship-route", winnerOf("query-result", "ship-route"));
+        assertEquals("mission", winnerOf("mission", "query-result"));
+        assertEquals("trade-route", winnerOf("trade-route", "query-result"));
+        assertEquals("query-result", winnerOf("query-result"));
+    }
+
+    @Test
     void aQuietHudShowsNothing() {
         assertTrue(NativeHudOverlay.highestPriority(List.of()).isEmpty());
     }
@@ -117,6 +125,7 @@ class CardPrecedenceTest {
             case "ExobiologyObjectiveSource" -> "exobiology";
             case "BountyHuntObjectiveSource" -> "bounty-hunt";
             case "ShipRouteObjectiveSource" -> "ship-route";
+            case "QueryResultObjectiveSource" -> "query-result";
             default -> throw new AssertionError(
                     "unmapped overlay source " + source.getClass().getSimpleName()
                             + " - add it to the ladder this test pins");
