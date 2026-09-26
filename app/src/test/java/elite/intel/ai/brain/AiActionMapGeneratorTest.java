@@ -143,6 +143,7 @@ class AiActionMapGeneratorTest {
             "navigate_to_next_trade_stop",
             "navigate_to_pirate_mission_provider",
             "navigate_to_pirate_mission_target",
+            "navigate_to_search_result",
             "navigate_to_squadron_carrier",
             "open_fss_scan_system",
             "plot_route_next_neutron_star_waypoint",

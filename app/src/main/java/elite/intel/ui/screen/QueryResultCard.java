@@ -2,9 +2,13 @@ package elite.intel.ui.screen;
 
 import elite.intel.ai.brain.actions.handlers.queries.NearestOutfittingQuery.OutfittingDataDto;
 import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeCandidateDto;
+import com.google.gson.JsonObject;
+import elite.intel.ai.brain.actions.handlers.commands.builtin.NavigateToSearchResultCommand;
 import elite.intel.db.FuzzySearch;
 import elite.intel.ui.overlay.QueryResultObjectiveSource;
+import elite.intel.ui.support.GuiCommandRunner;
 import elite.intel.ui.theme.HudPalette;
+import elite.intel.ui.widget.HudButton;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -29,11 +33,21 @@ public class QueryResultCard extends JPanel {
 
     private final String title;
     private final List<CardRow> rows;
+    private final List<JButton> actionButtons;
 
     public QueryResultCard(String title, List<CardRow> rows) {
+        this(title, rows, Collections.emptyList());
+    }
+
+    public QueryResultCard(String title, List<CardRow> rows, List<JButton> actionButtons) {
         this.title = title;
         this.rows = rows != null ? List.copyOf(rows) : Collections.emptyList();
+        this.actionButtons = actionButtons != null ? List.copyOf(actionButtons) : Collections.emptyList();
         buildUi();
+    }
+
+    public List<JButton> getActionButtons() {
+        return actionButtons;
     }
 
     public String getCardTitle() {
@@ -79,7 +93,18 @@ public class QueryResultCard extends JPanel {
         String freshness = QueryResultObjectiveSource.calculateFreshness(c.buyMarketUpdatedAt(), c.sellMarketUpdatedAt(), now);
         list.add(new CardRow(getText("ai.queryResult.row.freshness"), freshness != null ? freshness : "-", false, false));
 
-        return new QueryResultCard(title, list);
+        return new QueryResultCard(title, list, createTradeCandidateButtons(c.rank()));
+    }
+
+    private static List<JButton> createTradeCandidateButtons(int rank) {
+        List<JButton> buttons = new ArrayList<>();
+        JButton buyBtn = new HudButton(getText("ai.queryResult.btn.buy"), false);
+        JButton sellBtn = new HudButton(getText("ai.queryResult.btn.sell"), false);
+        buttons.add(buyBtn);
+        buttons.add(sellBtn);
+        setupButtonAction(buyBtn, buttons, rank, "buy");
+        setupButtonAction(sellBtn, buttons, rank, "sell");
+        return buttons;
     }
 
     public static QueryResultCard forOutfitting(OutfittingDataDto dto, Instant now) {
@@ -108,7 +133,36 @@ public class QueryResultCard extends JPanel {
         String freshness = QueryResultObjectiveSource.calculateFreshness(dto.outfittingUpdatedAt(), null, now);
         list.add(new CardRow(getText("ai.queryResult.row.freshness"), freshness != null ? freshness : "-", dto.stale(), false));
 
-        return new QueryResultCard(title, list);
+        List<JButton> buttons = new ArrayList<>();
+        JButton goBtn = new HudButton(getText("ai.queryResult.btn.outfitting"), false);
+        buttons.add(goBtn);
+        setupButtonAction(goBtn, buttons, 1, "buy");
+
+        return new QueryResultCard(title, list, buttons);
+    }
+
+    private static void setupButtonAction(JButton button, List<JButton> cardButtons, int rank, String leg) {
+        button.addActionListener(e -> {
+            disableButtonsTemporarily(cardButtons);
+            JsonObject params = new JsonObject();
+            params.addProperty("rank", rank);
+            params.addProperty("leg", leg);
+            params.addProperty("source", "gui");
+            GuiCommandRunner.runAfterClosingWindow(null, NavigateToSearchResultCommand.ID, params, true);
+        });
+    }
+
+    private static void disableButtonsTemporarily(List<JButton> buttons) {
+        for (JButton btn : buttons) {
+            btn.setEnabled(false);
+        }
+        Timer timer = new Timer(5000, e -> {
+            for (JButton btn : buttons) {
+                btn.setEnabled(true);
+            }
+        });
+        timer.setRepeats(false);
+        timer.start();
     }
 
     private void buildUi() {
@@ -153,5 +207,16 @@ public class QueryResultCard extends JPanel {
         }
 
         add(rowsPanel, BorderLayout.CENTER);
+
+        // Footer: Action Buttons
+        if (!actionButtons.isEmpty()) {
+            JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 2));
+            btnPanel.setOpaque(false);
+            btnPanel.setBorder(new EmptyBorder(2, 4, 4, 4));
+            for (JButton btn : actionButtons) {
+                btnPanel.add(btn);
+            }
+            add(btnPanel, BorderLayout.SOUTH);
+        }
     }
 }

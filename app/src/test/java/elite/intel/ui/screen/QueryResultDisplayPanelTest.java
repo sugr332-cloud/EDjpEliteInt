@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.awt.*;
+import javax.swing.JButton;
 import java.time.Instant;
 import java.util.List;
 
@@ -176,5 +177,55 @@ class QueryResultDisplayPanelTest {
         assertEquals(1, comps.length);
         assertInstanceOf(javax.swing.JLabel.class, comps[0]);
         panel.dispose();
+    }
+
+    @Test
+    void tradeCandidateCardHasTwoButtonsAndDisablesOnAction() {
+        TradeCandidateDto cand = createCandidate(1, "Gold", "Sol", "Galileo", "Alpha Centauri", "Columbus", 7000000L);
+        QueryResultCard card = QueryResultCard.forTradeCandidate(cand, Instant.now());
+
+        List<JButton> buttons = card.getActionButtons();
+        assertEquals(2, buttons.size(), "Trade candidate card must have exactly 2 action buttons");
+
+        JButton buyBtn = buttons.get(0);
+        JButton sellBtn = buttons.get(1);
+
+        assertTrue(buyBtn.isEnabled());
+        assertTrue(sellBtn.isEnabled());
+
+        // Click buy button
+        buyBtn.doClick();
+
+        // Both buttons on the card should be disabled immediately for 5 seconds
+        assertFalse(buyBtn.isEnabled(), "Buy button should be disabled after click");
+        assertFalse(sellBtn.isEnabled(), "Sell button should be disabled after click");
+    }
+
+    @Test
+    void outfittingCardHasOneButtonAndDisablesOnAction() {
+        OutfittingDataDto dto = new OutfittingDataDto(
+                "found",
+                "5A FSD",
+                new MatchedModuleDto("Frame Shift Drive", 5, "A"),
+                "Sol",
+                "Daedalus",
+                "Coriolis",
+                10.5,
+                120.0,
+                5000000L,
+                "2026-09-26 12:00:00+00",
+                1L,
+                false
+        );
+        QueryResultCard card = QueryResultCard.forOutfitting(dto, Instant.now());
+
+        List<JButton> buttons = card.getActionButtons();
+        assertEquals(1, buttons.size(), "Outfitting card must have exactly 1 action button");
+
+        JButton goBtn = buttons.get(0);
+        assertTrue(goBtn.isEnabled());
+
+        goBtn.doClick();
+        assertFalse(goBtn.isEnabled(), "Outfitting button should be disabled after click");
     }
 }
