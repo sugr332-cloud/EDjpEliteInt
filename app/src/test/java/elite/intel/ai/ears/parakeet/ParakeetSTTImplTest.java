@@ -13,7 +13,9 @@ import org.junit.jupiter.api.io.TempDir;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -187,6 +189,143 @@ class ParakeetSTTImplTest {
             constant[i + 1] = (byte) ((val >> 8) & 0xFF);
         }
         assertEquals(1000.0, ParakeetSTTImpl.calculateRMS(constant, constant.length), 0.01);
+    }
+
+    @Test
+    void trimPreRollForJapaneseMaintainsAtLeast500msBeforeLatestFrameWith100msFrames() {
+        Deque<byte[]> preRoll = new ArrayDeque<>();
+        final int frameSize = 3200; // 100ms at 16kHz 16-bit mono
+
+        for (int i = 0; i < 10; i++) {
+            preRoll.addLast(new byte[frameSize]);
+            ParakeetSTTImpl.trimPreRoll(preRoll, Language.JA);
+        }
+
+        // Prior frames: 16,000 / 3,200 = 5 frames (16,000 bytes)
+        // Total frames: 5 prior + 1 latest = 6 frames
+        assertEquals(6, preRoll.size());
+
+        int priorBytes = calculatePriorBytes(preRoll);
+        assertTrue(priorBytes >= ParakeetSTTImpl.JA_PRE_ROLL_PRIOR_BYTES);
+        assertEquals(16000, priorBytes);
+
+        // Verify minimality: removing first would violate >= 16,000
+        byte[] first = preRoll.peekFirst();
+        assertNotNull(first);
+        assertTrue((priorBytes - first.length) < ParakeetSTTImpl.JA_PRE_ROLL_PRIOR_BYTES);
+    }
+
+    @Test
+    void trimPreRollForJapaneseMaintainsAtLeast500msBeforeLatestFrameWith50msFrames() {
+        Deque<byte[]> preRoll = new ArrayDeque<>();
+        final int frameSize = 1600; // 50ms at 16kHz 16-bit mono
+
+        for (int i = 0; i < 20; i++) {
+            preRoll.addLast(new byte[frameSize]);
+            ParakeetSTTImpl.trimPreRoll(preRoll, Language.JA);
+        }
+
+        // Prior frames: 16,000 / 1,600 = 10 frames (16,000 bytes)
+        // Total frames: 10 prior + 1 latest = 11 frames
+        assertEquals(11, preRoll.size());
+        int priorBytes = calculatePriorBytes(preRoll);
+        assertEquals(16000, priorBytes);
+
+        byte[] first = preRoll.peekFirst();
+        assertNotNull(first);
+        assertTrue((priorBytes - first.length) < ParakeetSTTImpl.JA_PRE_ROLL_PRIOR_BYTES);
+    }
+
+    @Test
+    void trimPreRollForJapaneseMaintainsAtLeast500msBeforeLatestFrameWith32msFrames() {
+        Deque<byte[]> preRoll = new ArrayDeque<>();
+        final int frameSize = 1024; // 32ms at 16kHz 16-bit mono
+
+        for (int i = 0; i < 30; i++) {
+            preRoll.addLast(new byte[frameSize]);
+            ParakeetSTTImpl.trimPreRoll(preRoll, Language.JA);
+        }
+
+        // Prior frames: ceil(16,000 / 1,024) = 16 frames (16,384 bytes)
+        // Total frames: 16 prior + 1 latest = 17 frames
+        assertEquals(17, preRoll.size());
+        int priorBytes = calculatePriorBytes(preRoll);
+        assertEquals(16384, priorBytes);
+        assertTrue(priorBytes >= ParakeetSTTImpl.JA_PRE_ROLL_PRIOR_BYTES);
+
+        // Verify minimality
+        byte[] first = preRoll.peekFirst();
+        assertNotNull(first);
+        assertTrue((priorBytes - first.length) < ParakeetSTTImpl.JA_PRE_ROLL_PRIOR_BYTES);
+    }
+
+    @Test
+    void trimPreRollForJapaneseWithVaryingFrameLengthsMaintainsMinimality() {
+        Deque<byte[]> preRoll = new ArrayDeque<>();
+        int[] pattern = {3200, 800, 1600, 800, 3200, 1600, 800};
+
+        for (int round = 0; round < 10; round++) {
+            for (int len : pattern) {
+                preRoll.addLast(new byte[len]);
+                ParakeetSTTImpl.trimPreRoll(preRoll, Language.JA);
+
+                int priorBytes = calculatePriorBytes(preRoll);
+                if (preRoll.size() > 1 && priorBytes >= ParakeetSTTImpl.JA_PRE_ROLL_PRIOR_BYTES) {
+                    byte[] first = preRoll.peekFirst();
+                    assertNotNull(first);
+                    assertTrue((priorBytes - first.length) < ParakeetSTTImpl.JA_PRE_ROLL_PRIOR_BYTES,
+                            "Pre-roll must be the minimal set holding >= 16000 prior bytes");
+                }
+            }
+        }
+
+        int finalPriorBytes = calculatePriorBytes(preRoll);
+        assertTrue(finalPriorBytes >= ParakeetSTTImpl.JA_PRE_ROLL_PRIOR_BYTES);
+    }
+
+    @Test
+    void trimPreRollForEnglishKeepsExactlyTwoFrames() {
+        Deque<byte[]> preRoll = new ArrayDeque<>();
+        for (int i = 0; i < 10; i++) {
+            preRoll.addLast(new byte[3200]);
+            ParakeetSTTImpl.trimPreRoll(preRoll, Language.EN);
+        }
+        assertEquals(2, preRoll.size(), "English pre-roll must stay at exactly PRE_ROLL_FRAMES = 2");
+    }
+
+    @Test
+    void pushToTalkDoesNotUsePreRoll() throws Exception {
+        SystemSession.getInstance().setPushToTalkEnabled(true);
+        try {
+            ParakeetSTTImpl stt = new ParakeetSTTImpl();
+            Field preRollField = ParakeetSTTImpl.class.getDeclaredField("preRoll");
+            preRollField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Deque<byte[]> preRoll = (Deque<byte[]>) preRollField.get(stt);
+
+            preRoll.addLast(new byte[1000]);
+            preRoll.addLast(new byte[1000]);
+            assertFalse(preRoll.isEmpty());
+
+            preRoll.clear();
+            assertTrue(preRoll.isEmpty(), "PTT mode must not retain pre-roll audio");
+        } finally {
+            SystemSession.getInstance().setPushToTalkEnabled(false);
+        }
+    }
+
+    private static int calculatePriorBytes(Deque<byte[]> preRoll) {
+        if (preRoll.size() <= 1) return 0;
+        int total = 0;
+        int count = 0;
+        int priorLimit = preRoll.size() - 1;
+        for (byte[] frame : preRoll) {
+            if (count < priorLimit) {
+                total += frame.length;
+            }
+            count++;
+        }
+        return total;
     }
 
     private static class EventRecorder {
