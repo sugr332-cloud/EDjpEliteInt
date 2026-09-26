@@ -463,3 +463,14 @@ responses|pt|MISSING|handler.navigateToSearchResult.invalidLeg
 responses|ptbz|MISSING|handler.navigateToSearchResult.invalidLeg
 responses|ru|MISSING|handler.navigateToSearchResult.invalidLeg
 responses|uk|MISSING|handler.navigateToSearchResult.invalidLeg
+
+# --- P5-1: Japanese STT (ReazonSpeech) ---
+gui|de|MISSING|log.sttJaModelMissing
+gui|es|MISSING|log.sttJaModelMissing
+gui|fr|MISSING|log.sttJaModelMissing
+gui|it|MISSING|log.sttJaModelMissing
+gui|pt|MISSING|log.sttJaModelMissing
+gui|ptbz|MISSING|log.sttJaModelMissing
+gui|ru|MISSING|log.sttJaModelMissing
+gui|uk|MISSING|log.sttJaModelMissing
+
