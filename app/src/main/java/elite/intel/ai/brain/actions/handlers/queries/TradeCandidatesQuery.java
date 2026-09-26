@@ -5,6 +5,8 @@ import com.google.gson.JsonObject;
 import elite.intel.ai.brain.actions.ActionParameterSpec;
 import elite.intel.ai.brain.actions.handlers.queries.struct.AiDataStruct;
 import elite.intel.db.managers.TradeProfileManager;
+import elite.intel.gameapi.search.edsm.EdsmApiClient;
+import elite.intel.gameapi.search.edsm.EdsmApiClient.StarSystemLookupResult;
 import elite.intel.gameapi.search.spansh.station.marketstation.TradeStationSearchResultDto;
 import elite.intel.gameapi.search.spansh.tradecandidates.TradeCandidateCalculator;
 import elite.intel.gameapi.search.spansh.tradecandidates.TradeCandidateCalculator.TradeCandidate;
@@ -44,15 +46,26 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
     public static final String PRIORITY_PROFIT = "profit";
     public static final String PRIORITY_NEAREST = "nearest";
 
+    @FunctionalInterface
+    public interface StarSystemLookup {
+        StarSystemLookupResult lookup(String starSystemName);
+    }
+
     private final TradeCandidatesSearchClient searchClient;
+    private final StarSystemLookup starSystemLookup;
 
     public TradeCandidatesQuery() {
-        this(TradeCandidatesSearchClient.getInstance());
+        this(TradeCandidatesSearchClient.getInstance(), EdsmApiClient::lookupStarSystemName);
+    }
+
+    public TradeCandidatesQuery(TradeCandidatesSearchClient searchClient) {
+        this(searchClient, EdsmApiClient::lookupStarSystemName);
     }
 
     // Visible for testing
-    public TradeCandidatesQuery(TradeCandidatesSearchClient searchClient) {
+    public TradeCandidatesQuery(TradeCandidatesSearchClient searchClient, StarSystemLookup starSystemLookup) {
         this.searchClient = searchClient;
+        this.starSystemLookup = (starSystemLookup != null) ? starSystemLookup : EdsmApiClient::lookupStarSystemName;
     }
 
     @Override
@@ -107,8 +120,32 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
         String searchedFromSystem;
         String referenceSource;
         if (referenceSystemParam != null) {
-            searchedFromSystem = referenceSystemParam;
             referenceSource = "specified";
+            StarSystemLookupResult lookupResult;
+            try {
+                lookupResult = starSystemLookup.lookup(referenceSystemParam);
+            } catch (Exception e) {
+                log.warn("Failed to lookup star system in EDSM: {}", e.getMessage());
+                lookupResult = StarSystemLookupResult.lookupFailed();
+            }
+
+            if (lookupResult != null && lookupResult.isFound() && lookupResult.canonicalName() != null) {
+                String canonical = lookupResult.canonicalName();
+                log.info("Star system lookup: specified={}, normalized={}, result=found", referenceSystemParam, canonical);
+                searchedFromSystem = canonical;
+            } else if (lookupResult != null && lookupResult.isNotFound()) {
+                log.info("Star system lookup: specified={}, result=not_found", referenceSystemParam);
+                log.info("Trade candidates query: referenceSystem={}, referenceSource={}, radius={}ly, priority={}",
+                        referenceSystemParam, referenceSource, radiusLy, priority);
+                log.info("Trade candidates result: status=reference_system_not_found, stations=0, freshStations=0, pairs=0, candidates=0 (search: 0ms, calc: 0ms)");
+                TradeCandidatesDataDto notFoundDto = TradeCandidatesDataDto.referenceSystemNotFound(
+                        currentSystem, referenceSystemParam, priority, radiusLy);
+                storeDisplay(notFoundDto);
+                return process(new AiDataStruct(buildInstructions(), notFoundDto), originalUserInput);
+            } else {
+                log.info("Star system lookup: specified={}, result=lookup_failed (using specified name)", referenceSystemParam);
+                searchedFromSystem = referenceSystemParam;
+            }
         } else if (currentSystem != null) {
             searchedFromSystem = currentSystem;
             referenceSource = "current";
@@ -283,7 +320,7 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                 Answer the commander's request for trade candidate recommendations based strictly on the provided data fields below.
                 
                 Data fields:
-                - status: "ok" (trade candidates found), "insufficient_fresh_data" (fewer candidates found than requested due to freshness constraint), "too_few_stations" (fewer than 2 stations with fresh market data found in range to form trade routes), "no_result" (no profitable trade found), "profile_unavailable" (trade profile or cargo capacity is unavailable), or "location_unknown" (commander's reference location is unknown)
+                - status: "ok" (trade candidates found), "insufficient_fresh_data" (fewer candidates found than requested due to freshness constraint), "too_few_stations" (fewer than 2 stations with fresh market data found in range to form trade routes), "no_result" (no profitable trade found), "profile_unavailable" (trade profile or cargo capacity is unavailable), "location_unknown" (commander's reference location is unknown), or "reference_system_not_found" (the specified reference star system was not found in the galaxy database)
                 - currentSystem: commander's current star system
                 - searchedFromSystem: star system used as the center reference for this search
                 - referenceSource: "specified" (commander explicitly requested this reference system) or "current" (commander's current star system was used as default)
@@ -302,6 +339,7 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                   - routeDistanceLy / routeDistanceLyDisplay: distance from buy system to sell system
                 
                 Rules:
+                - If status is "reference_system_not_found": inform the commander in their language that the star system searchedFromSystem could not be found, and advise them to verify or correct the system name.
                 - If status is "profile_unavailable": inform the commander in their language that trade candidate search cannot be performed because trade profile or cargo capacity is not available.
                 - If status is "location_unknown": inform the commander in their language that trade candidate search cannot be performed because their reference location is unknown.
                 - If status is "too_few_stations": inform the commander in their language that trade candidates cannot be generated because there are only freshStationCount station(s) (mention the exact count) with fresh market data matching the criteria within searchRadiusLy ly of searchedFromSystem.
@@ -423,6 +461,10 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                 List<TradeCandidateDto> candidates
         ) {
             this(status, currentSystem, currentSystem, "current", 0, priority, searchRadiusLy, formatInteger(searchRadiusLy), candidates);
+        }
+
+        public static TradeCandidatesDataDto referenceSystemNotFound(String currentSystem, String searchedFromSystem, String priority, int radiusLy) {
+            return new TradeCandidatesDataDto("reference_system_not_found", currentSystem, searchedFromSystem, "specified", 0, priority, radiusLy, formatInteger(radiusLy), Collections.emptyList());
         }
 
         public static TradeCandidatesDataDto locationUnknown(String currentSystem, String priority, int radiusLy) {

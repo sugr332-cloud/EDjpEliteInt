@@ -3,6 +3,7 @@ package elite.intel.ai.brain.actions.handlers.queries;
 import com.google.gson.JsonObject;
 import elite.intel.ai.brain.actions.ActionParameterSpec;
 import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeCandidatesDataDto;
+import elite.intel.gameapi.search.edsm.EdsmApiClient;
 import elite.intel.gameapi.search.spansh.station.marketstation.TradeStationSearchResultDto;
 import elite.intel.gameapi.search.spansh.station.marketstation.TradeStationSearchResultDto.StationResult;
 import elite.intel.gameapi.search.spansh.tradecandidates.TradeCandidatesSearchClient;
@@ -826,6 +827,252 @@ public class TradeCandidatesQueryTest {
             PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
             manager.clearAll();
         }
+    }
+
+    // --- P8-7: Reference system normalization tests ---
+
+    @Test
+    void testReferenceSystemNormalizedWhenFound() throws Exception {
+        boolean[] searchCalled = {false};
+        String[] searchedSystem = {null};
+        TradeCandidatesSearchClient mockClient = new TradeCandidatesSearchClient() {
+            @Override
+            public TradeStationSearchResultDto searchTradeStations(TradeCandidatesSearchCriteria criteria) {
+                searchCalled[0] = true;
+                searchedSystem[0] = criteria.getReferenceSystem();
+                return new TradeStationSearchResultDto();
+            }
+        };
+
+        boolean[] lookupCalled = {false};
+        TradeCandidatesQuery.StarSystemLookup mockLookup = systemName -> {
+            lookupCalled[0] = true;
+            if ("SOL".equalsIgnoreCase(systemName)) {
+                return EdsmApiClient.StarSystemLookupResult.found("Sol");
+            }
+            return EdsmApiClient.StarSystemLookupResult.notFound();
+        };
+
+        TradeCandidatesDataDto[] capturedDto = {null};
+        TradeCandidatesQuery query = new TradeCandidatesQuery(mockClient, mockLookup) {
+            @Override
+            TradeRouteSearchCriteria getTradeProfile() {
+                TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+                profile.setMaxCargo(700);
+                return profile;
+            }
+
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                if (struct.getData() instanceof TradeCandidatesDataDto dto) {
+                    capturedDto[0] = dto;
+                }
+                JsonObject res = new JsonObject();
+                res.addProperty("text_to_speech_response", "ok");
+                return res;
+            }
+        };
+
+        JsonObject params = new JsonObject();
+        params.addProperty("referenceSystem", "SOL");
+
+        query.handle("query_trade_candidates", params, "SOL周辺の交易候補");
+
+        assertTrue(lookupCalled[0], "EDSM lookup must be called when referenceSystem is specified");
+        assertTrue(searchCalled[0], "Spansh search must be called after system normalization");
+        assertEquals("Sol", searchedSystem[0], "Spansh must be queried with normalized canonical name 'Sol'");
+        assertNotNull(capturedDto[0]);
+        assertEquals("Sol", capturedDto[0].searchedFromSystem(), "DataDto searchedFromSystem must be normalized to 'Sol'");
+        assertEquals("specified", capturedDto[0].referenceSource());
+    }
+
+    @Test
+    void testReferenceSystemNotFoundDoesNotCallSpansh() throws Exception {
+        boolean[] searchCalled = {false};
+        TradeCandidatesSearchClient mockClient = new TradeCandidatesSearchClient() {
+            @Override
+            public TradeStationSearchResultDto searchTradeStations(TradeCandidatesSearchCriteria criteria) {
+                searchCalled[0] = true;
+                return new TradeStationSearchResultDto();
+            }
+        };
+
+        TradeCandidatesQuery.StarSystemLookup mockLookup = systemName ->
+                EdsmApiClient.StarSystemLookupResult.notFound();
+
+        TradeCandidatesDataDto[] capturedDto = {null};
+        String[] instructionsText = {null};
+        TradeCandidatesQuery query = new TradeCandidatesQuery(mockClient, mockLookup) {
+            @Override
+            TradeRouteSearchCriteria getTradeProfile() {
+                TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+                profile.setMaxCargo(700);
+                return profile;
+            }
+
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                if (struct.getData() instanceof TradeCandidatesDataDto dto) {
+                    capturedDto[0] = dto;
+                }
+                instructionsText[0] = struct.getInstructions();
+                JsonObject res = new JsonObject();
+                res.addProperty("text_to_speech_response", "ok");
+                return res;
+            }
+        };
+
+        JsonObject params = new JsonObject();
+        params.addProperty("referenceSystem", "NonExistentSystem");
+
+        query.handle("query_trade_candidates", params, "NonExistentSystem周辺の交易候補");
+
+        assertFalse(searchCalled[0], "Spansh search must NOT be called when EDSM returns not_found");
+        assertNotNull(capturedDto[0]);
+        assertEquals("reference_system_not_found", capturedDto[0].status());
+        assertEquals("NonExistentSystem", capturedDto[0].searchedFromSystem());
+        assertEquals("specified", capturedDto[0].referenceSource());
+        assertTrue(capturedDto[0].candidates().isEmpty());
+    }
+
+    @Test
+    void testReferenceSystemLookupFailedUsesSpecifiedName() throws Exception {
+        boolean[] searchCalled = {false};
+        String[] searchedSystem = {null};
+        TradeCandidatesSearchClient mockClient = new TradeCandidatesSearchClient() {
+            @Override
+            public TradeStationSearchResultDto searchTradeStations(TradeCandidatesSearchCriteria criteria) {
+                searchCalled[0] = true;
+                searchedSystem[0] = criteria.getReferenceSystem();
+                return new TradeStationSearchResultDto();
+            }
+        };
+
+        TradeCandidatesQuery.StarSystemLookup mockLookup = systemName ->
+                EdsmApiClient.StarSystemLookupResult.lookupFailed();
+
+        TradeCandidatesDataDto[] capturedDto = {null};
+        TradeCandidatesQuery query = new TradeCandidatesQuery(mockClient, mockLookup) {
+            @Override
+            TradeRouteSearchCriteria getTradeProfile() {
+                TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+                profile.setMaxCargo(700);
+                return profile;
+            }
+
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                if (struct.getData() instanceof TradeCandidatesDataDto dto) {
+                    capturedDto[0] = dto;
+                }
+                JsonObject res = new JsonObject();
+                res.addProperty("text_to_speech_response", "ok");
+                return res;
+            }
+        };
+
+        JsonObject params = new JsonObject();
+        params.addProperty("referenceSystem", "FallbackSystem");
+
+        query.handle("query_trade_candidates", params, "FallbackSystem周辺の交易候補");
+
+        assertTrue(searchCalled[0], "Spansh search must be called even when EDSM lookup fails");
+        assertEquals("FallbackSystem", searchedSystem[0], "Specified system name must be used on lookup failure");
+        assertNotNull(capturedDto[0]);
+        assertEquals("FallbackSystem", capturedDto[0].searchedFromSystem());
+        assertEquals("specified", capturedDto[0].referenceSource());
+    }
+
+    @Test
+    void testCurrentSystemDoesNotTriggerLookup() throws Exception {
+        boolean[] lookupCalled = {false};
+        TradeCandidatesQuery.StarSystemLookup mockLookup = systemName -> {
+            lookupCalled[0] = true;
+            return EdsmApiClient.StarSystemLookupResult.found("Normalized");
+        };
+
+        boolean[] searchCalled = {false};
+        String[] searchedSystem = {null};
+        TradeCandidatesSearchClient mockClient = new TradeCandidatesSearchClient() {
+            @Override
+            public TradeStationSearchResultDto searchTradeStations(TradeCandidatesSearchCriteria criteria) {
+                searchCalled[0] = true;
+                searchedSystem[0] = criteria.getReferenceSystem();
+                return new TradeStationSearchResultDto();
+            }
+        };
+
+        TradeCandidatesDataDto[] capturedDto = {null};
+        TradeCandidatesQuery query = new TradeCandidatesQuery(mockClient, mockLookup) {
+            @Override
+            TradeRouteSearchCriteria getTradeProfile() {
+                TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+                profile.setMaxCargo(700);
+                return profile;
+            }
+
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                if (struct.getData() instanceof TradeCandidatesDataDto dto) {
+                    capturedDto[0] = dto;
+                }
+                JsonObject res = new JsonObject();
+                res.addProperty("text_to_speech_response", "ok");
+                return res;
+            }
+        };
+
+        String prevStar = PlayerSession.getInstance().getPrimaryStarName();
+        try {
+            PlayerSession.getInstance().setCurrentPrimaryStarName("CurrentStar");
+
+            JsonObject params = new JsonObject(); // no referenceSystem
+            query.handle("query_trade_candidates", params, "交易候補");
+
+            assertFalse(lookupCalled[0], "EDSM lookup must NOT be called when using current system");
+            assertTrue(searchCalled[0], "Spansh search must be called with current system");
+            assertEquals("CurrentStar", searchedSystem[0]);
+            assertNotNull(capturedDto[0]);
+            assertEquals("CurrentStar", capturedDto[0].searchedFromSystem());
+            assertEquals("current", capturedDto[0].referenceSource());
+        } finally {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
+        }
+    }
+
+    @Test
+    void testInstructionsContainReferenceSystemNotFoundDescription() throws Exception {
+        TradeCandidatesQuery.StarSystemLookup mockLookup = systemName ->
+                EdsmApiClient.StarSystemLookupResult.notFound();
+
+        String[] capturedInstructions = {null};
+        TradeCandidatesQuery query = new TradeCandidatesQuery(TradeCandidatesSearchClient.getInstance(), mockLookup) {
+            @Override
+            TradeRouteSearchCriteria getTradeProfile() {
+                TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+                profile.setMaxCargo(700);
+                return profile;
+            }
+
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                capturedInstructions[0] = struct.getInstructions();
+                JsonObject res = new JsonObject();
+                res.addProperty("text_to_speech_response", "ok");
+                return res;
+            }
+        };
+
+        JsonObject params = new JsonObject();
+        params.addProperty("referenceSystem", "MissingSystem");
+
+        query.handle("query_trade_candidates", params, "MissingSystem周辺の交易候補");
+
+        assertNotNull(capturedInstructions[0]);
+        assertTrue(capturedInstructions[0].contains("\"reference_system_not_found\""),
+                "Instructions must mention reference_system_not_found status");
+        assertTrue(capturedInstructions[0].contains("searchedFromSystem could not be found"),
+                "Instructions must advise verifying or correcting system name when reference_system_not_found");
     }
 }
 
