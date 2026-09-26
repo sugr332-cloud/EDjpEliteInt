@@ -705,5 +705,36 @@ public class TradeCandidatesQueryTest {
             PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
         }
     }
+
+    @Test
+    void testBuildInstructionsConciseSentenceAndCreditsRule() throws Exception {
+        String[] capturedInstruction = {null};
+        TradeCandidatesQuery query = new TradeCandidatesQuery() {
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                capturedInstruction[0] = struct.getInstructions();
+                return new JsonObject();
+            }
+        };
+
+        String prevStar = PlayerSession.getInstance().getPrimaryStarName();
+        try {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(null);
+            query.handle("query_trade_candidates", new JsonObject(), "交易候補");
+
+            assertNotNull(capturedInstruction[0]);
+            String inst = capturedInstruction[0];
+            // Rule 1: exactly one concise sentence per candidate
+            assertTrue(inst.contains("one concise sentence per candidate"),
+                    "Instructions must state one concise sentence per candidate");
+            // Rule 2: Currency explicitly stated as credits, never yen
+            assertTrue(inst.contains("Currency must always be explicitly stated as credits"),
+                    "Instructions must require currency as credits");
+            assertTrue(inst.contains("yen (円)"),
+                    "Instructions must explicitly prohibit yen");
+        } finally {
+            PlayerSession.getInstance().setCurrentPrimaryStarName(prevStar);
+        }
+    }
 }
 
