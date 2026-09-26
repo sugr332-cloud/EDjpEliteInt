@@ -356,6 +356,109 @@ public class TradeCandidateCalculatorTest {
         assertFalse(TradeCandidateCalculator.isMarketFresh("2026-09-25 12:10:00+00", now));
     }
 
+    @Test
+    void testDeduplicateSameBuySystemCommoditySellStationPromotesFourthCandidate() {
+        TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+        profile.setMaxCargo(100);
+
+        String fresh = NOW.minus(1, ChronoUnit.HOURS).toString();
+
+        // Target station in Sol
+        StationResult sol = createStation("sol_st", "Sol", "Columbus", 0.0, 100.0, fresh, 0.0, 0.0, 0.0,
+                List.of(
+                        createMarketEntry("Gold", 0, 5000, 0L, 1000L),
+                        createMarketEntry("Silver", 0, 4000, 0L, 1000L),
+                        createMarketEntry("Palladium", 0, 3500, 0L, 1000L),
+                        createMarketEntry("Cobalt", 0, 3000, 0L, 1000L)
+                ), null);
+
+        // Duamta Station 1: Gold buy 1000 -> profit 4000/t (tripProfit 400k)
+        StationResult duamta1 = createStation("d1", "Duamta", "Alpha Station", 10.0, 200.0, fresh, 10.0, 0.0, 0.0,
+                List.of(createMarketEntry("Gold", 1000, 0, 1000L, 0L)), null);
+
+        // Duamta Station 2: Gold buy 1200 -> profit 3800/t (tripProfit 380k) -> Same buySystem, commodity, sellStation!
+        StationResult duamta2 = createStation("d2", "Duamta", "Beta Station", 10.0, 300.0, fresh, 10.0, 0.0, 0.0,
+                List.of(createMarketEntry("Gold", 1200, 0, 1000L, 0L)), null);
+
+        // Alpha Station: Silver buy 1000 -> profit 3000/t (tripProfit 300k)
+        StationResult alpha = createStation("a1", "AlphaSys", "Alpha Port", 15.0, 100.0, fresh, 15.0, 0.0, 0.0,
+                List.of(createMarketEntry("Silver", 1000, 0, 1000L, 0L)), null);
+
+        // Beta Station: Palladium buy 1000 -> profit 2500/t (tripProfit 250k) - normally rank 4, should be promoted to rank 3
+        StationResult beta = createStation("b1", "BetaSys", "Beta Port", 20.0, 100.0, fresh, 20.0, 0.0, 0.0,
+                List.of(createMarketEntry("Palladium", 1000, 0, 1000L, 0L)), null);
+
+        // Gamma Station: Cobalt buy 1000 -> profit 2000/t (tripProfit 200k)
+        StationResult gamma = createStation("g1", "GammaSys", "Gamma Port", 25.0, 100.0, fresh, 25.0, 0.0, 0.0,
+                List.of(createMarketEntry("Cobalt", 1000, 0, 1000L, 0L)), null);
+
+        TradeCandidatesResult result = TradeCandidateCalculator.calculate(
+                List.of(sol, duamta1, duamta2, alpha, beta, gamma), profile, "profit", NOW
+        );
+
+        assertEquals("ok", result.status());
+        List<TradeCandidate> candidates = result.candidates();
+        assertEquals(3, candidates.size(), "Top 3 candidates must be selected");
+
+        // Rank 1: Duamta1 -> Sol (Gold, 400k)
+        assertEquals(1, candidates.get(0).rank());
+        assertEquals("Duamta", candidates.get(0).buySystem());
+        assertEquals("Alpha Station", candidates.get(0).buyStation());
+        assertEquals("Gold", candidates.get(0).commodity());
+        assertEquals(400000L, candidates.get(0).tripProfit());
+
+        // Rank 2: Alpha -> Sol (Silver, 300k)
+        assertEquals(2, candidates.get(1).rank());
+        assertEquals("AlphaSys", candidates.get(1).buySystem());
+        assertEquals("Silver", candidates.get(1).commodity());
+        assertEquals(300000L, candidates.get(1).tripProfit());
+
+        // Rank 3: Beta -> Sol (Palladium, 250k) - Duamta2 was deduplicated before picking top 3!
+        assertEquals(3, candidates.get(2).rank());
+        assertEquals("BetaSys", candidates.get(2).buySystem());
+        assertEquals("Palladium", candidates.get(2).commodity());
+        assertEquals(250000L, candidates.get(2).tripProfit());
+    }
+
+    @Test
+    void testDeduplicateTieBreakerSameTripProfit() {
+        TradeRouteSearchCriteria profile = new TradeRouteSearchCriteria();
+        profile.setMaxCargo(100);
+
+        String fresh = NOW.minus(1, ChronoUnit.HOURS).toString();
+
+        StationResult sol = createStation("sol_st", "Sol", "Columbus", 0.0, 100.0, fresh, 0.0, 0.0, 10.0,
+                List.of(createMarketEntry("Gold", 0, 5000, 0L, 1000L)), null);
+
+        // Case 1: Same profit, different route distance (shorter route distance wins)
+        // dLong is 10 ly from Sol (at z=0)
+        StationResult dLong = createStation("d_long", "Duamta", "Zeta Station", 10.0, 100.0, fresh, 0.0, 0.0, 0.0,
+                List.of(createMarketEntry("Gold", 1000, 0, 1000L, 0L)), null);
+        // dShort is 5 ly from Sol (at z=5)
+        StationResult dShort = createStation("d_short", "Duamta", "Omega Station", 10.0, 100.0, fresh, 0.0, 0.0, 5.0,
+                List.of(createMarketEntry("Gold", 1000, 0, 1000L, 0L)), null);
+
+        TradeCandidatesResult resultDist = TradeCandidateCalculator.calculate(
+                List.of(sol, dLong, dShort), profile, "profit", NOW
+        );
+        assertEquals(1, resultDist.candidates().size());
+        assertEquals("Omega Station", resultDist.candidates().get(0).buyStation(),
+                "Shorter route distance (5 ly vs 10 ly) must win tie-breaker even if station name is later alphabetically");
+
+        // Case 2: Same profit, same route distance (alphabetical buyStation name wins)
+        StationResult dA = createStation("d_a", "Duamta", "Alpha Station", 10.0, 100.0, fresh, 0.0, 0.0, 0.0,
+                List.of(createMarketEntry("Gold", 1000, 0, 1000L, 0L)), null);
+        StationResult dB = createStation("d_b", "Duamta", "Beta Station", 10.0, 100.0, fresh, 0.0, 0.0, 0.0,
+                List.of(createMarketEntry("Gold", 1000, 0, 1000L, 0L)), null);
+
+        TradeCandidatesResult resultName = TradeCandidateCalculator.calculate(
+                List.of(sol, dB, dA), profile, "profit", NOW
+        );
+        assertEquals(1, resultName.candidates().size());
+        assertEquals("Alpha Station", resultName.candidates().get(0).buyStation(),
+                "When profit and distance are tied, earlier alphabetical station name ('Alpha Station') must win");
+    }
+
     private static StationResult createStation(
             String id, String systemName, String stationName, Double distFromCurrent, Double distLs,
             String marketUpdatedAt, Double x, Double y, Double z,

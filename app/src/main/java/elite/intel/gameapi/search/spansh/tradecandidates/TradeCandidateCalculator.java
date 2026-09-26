@@ -196,7 +196,30 @@ public class TradeCandidateCalculator {
             return new TradeCandidatesResult("no_result", Collections.emptyList(), freshStations.size(), 0);
         }
 
-        List<TradeCandidate> candidates = new ArrayList<>(bestTradePerRoute.values());
+        // Deduplicate candidates with same buySystem, commodity, and sellStation.
+        // Deterministic tie-breaker:
+        // 1. higher tripProfit
+        // 2. shorter routeDistanceLy (nulls last)
+        // 3. buyStation name alphabetically
+        Comparator<TradeCandidate> dedupeComparator = Comparator
+                .comparingLong(TradeCandidate::tripProfit).reversed()
+                .thenComparing(TradeCandidate::routeDistanceLy, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(TradeCandidate::buyStation, Comparator.nullsLast(Comparator.naturalOrder()));
+
+        Map<String, TradeCandidate> dedupedCandidatesMap = new LinkedHashMap<>();
+        for (TradeCandidate candidate : bestTradePerRoute.values()) {
+            String dedupeKey = (candidate.buySystem() == null ? "" : candidate.buySystem().trim().toLowerCase(Locale.ROOT))
+                    + "::" + (candidate.commodity() == null ? "" : candidate.commodity().trim().toLowerCase(Locale.ROOT))
+                    + "::" + (candidate.sellSystem() == null ? "" : candidate.sellSystem().trim().toLowerCase(Locale.ROOT))
+                    + "::" + (candidate.sellStation() == null ? "" : candidate.sellStation().trim().toLowerCase(Locale.ROOT));
+
+            TradeCandidate existing = dedupedCandidatesMap.get(dedupeKey);
+            if (existing == null || dedupeComparator.compare(candidate, existing) < 0) {
+                dedupedCandidatesMap.put(dedupeKey, candidate);
+            }
+        }
+
+        List<TradeCandidate> candidates = new ArrayList<>(dedupedCandidatesMap.values());
 
         // 3. Sort candidates based on priority (Comparator.nullsLast for null distance)
         boolean nearestSort = "nearest".equalsIgnoreCase(priority);

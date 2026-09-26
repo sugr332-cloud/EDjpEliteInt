@@ -298,7 +298,8 @@ public class TradeCandidatesQuery extends BaseQueryAnalyzer implements IntelQuer
                 - If status is "ok": present the trade candidates clearly in the given order.
                 - Distances (distanceFromCurrentLy) are measured from searchedFromSystem.
                 - When referenceSource is "specified", present the results as candidates around searchedFromSystem rather than commander's current position.
-                - For each candidate: report the commodity, buy station and system, sell station and system, cargo units, unit profit, total trip profit, distance to buy station, and route distance.
+                - For each candidate: answer with exactly one concise sentence per candidate, reporting only the commodity, buy station and system, sell station and system, and total trip profit. Do NOT report other numerical details (such as cargo units, unit profit, Ls distance, or Ly distance) unless the user explicitly asks for them.
+                - Currency must always be explicitly stated as credits (e.g. 'クレジット' in Japanese). Never refer to currency as yen (円) or any other real-world currency.
                 - Use the pre-formatted display string fields (*Display) as the source of truth for all numbers, prices, profits, quantities, and distances. Never recalculate or re-round them.
                 - Light seconds (Ls) measure distance from the star to the station, NOT travel time. Never describe Ls as time (do NOT say 'takes X seconds' or '〜秒かかる').
                 - Do NOT re-rank or recalculate any candidate values; present the ranks and numbers exactly as given.
