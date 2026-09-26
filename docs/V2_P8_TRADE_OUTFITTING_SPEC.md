@@ -241,6 +241,8 @@ outfitting_updated_at
 - 交易候補の枠に「購入地へ」「売却地へ」の 2 ボタン、艤装の枠に「ここへ」の 1 ボタンを付ける
 - 押したら既存 `GuiCommandRunner.runAfterClosingWindow(null, "navigate_to_search_result", {rank, leg}, true)` を呼ぶ。これは既存の仕組みで、Elite Dangerous のウィンドウを前面に出し（`GameWindowActivator`）、3 秒待ってからコマンドを実行する（ゲームが前面に来たときの音声デバイスのリセットを避けるため）。`GuiCommandRunner` / `GameWindowActivator` は変更しない
 - 押した後、その結果のボタンは 5 秒間無効にする（二重実行の防止）
+- 読み上げ（2026-09-26 PLAN CHECK で判明）: 既存 `GuiCommandRunner` はコマンドの戻り値を読み上げない（了解の一言だけ）。そのため、ボタンからは引数に `source: "gui"` を加えて呼び、コマンドは `source` が `gui` のときだけ答え（断る理由を含む）を `AiVoxResponseEvent` で自分で読み上げ、戻り値は null にする。音声経由（`source` なし）は従来どおり戻り値で答える（二重に読まない）。`source` は LLM 向けの `parameters()` には載せない
+- 船内チェック: 既存の航路系コマンド（`NavigateToTradeStopCommand`）と同じく `isVisibleForLLM` は `status.isInMainShip()`。GUI 経由はこの判定を通らないため、`execute` の中でも本船に乗っていなければ航路を設定せず断る
 - 制約: ゲームのウィンドウが見つからない場合も、既存 `GuiCommandRunner` はそのままコマンドを実行する（キー入力は前面のウィンドウへ届く）。これは既存の GUI コマンドと同じ扱いとし、P8-3 では変えない
 
 ## 8. 非目標
