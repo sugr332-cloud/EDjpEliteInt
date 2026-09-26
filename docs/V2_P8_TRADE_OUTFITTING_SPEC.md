@@ -13,7 +13,7 @@
 | ミッション検索 | **v2-P8 から外す**（§8、非目標） |
 | 上位 3 候補 | **新規 Tool だけが 3 件を返す**。既存 `find_commodity`（1 件選択 + 自動航路設定）は変更しない |
 | Tool の種類と ID（2026-09-25、P8-0 後） | 新規 2 Tool は **Query（`IntelQuery` / `@RegisterQuery`、`BaseQueryAnalyzer.process` でデータと指示を LLM に渡し、LLM が回答する）** として実装する。Command（`IntelCommand`、定型文を自分で読み上げる）にはしない。ID は既存 Query の命名に合わせ `query_nearest_outfitting` / `query_trade_candidates` とする（旧仮称 `find_outfitting` / `find_trade_candidates`） |
-| 検索結果の表示（2026-09-26） | **AI タブに枠付きの表（INARA 風の列構成）を出し、ゲーム内 HUD には 1 件目の要約カードを出す**。対象は交易候補と艤装検索の両方。表の値は Tool の構造化データ（DataDto の `*Display`）から作り、LLM の文章からは作らない。音声は短い要約のまま（P8-5）。詳細は §7.1、実装は P8-6 |
+| 検索結果の表示（2026-09-26） | **AI タブに、候補 1 件ごとに別の枠（カード）を出し、枠の中は「項目名：値」を 1 行ずつ縦に並べる**（2026-09-26 改訂。当初の横長の表は読みにくいため変更）。**ゲーム内 HUD には 1 件目の要約カードを出す**。対象は交易候補と艤装検索の両方。表の値は Tool の構造化データ（DataDto の `*Display`）から作り、LLM の文章からは作らない。音声は短い要約のまま（P8-5）。詳細は §7.1、実装は P8-6 |
 
 ## 1. 目的
 
@@ -178,14 +178,34 @@ outfitting_updated_at
 - 保存は best-effort: 失敗しても Query の応答は失敗にしない（既存 `CommodityTradeSearch.store()` と同じ扱い）
 - DB への書き込みは Tool（決定的コード）が行う。LLM の出力は書き込まない（§R.12）
 
-**AI タブの表:**
+**AI タブのカード表示（2026-09-26 改訂）:**
 
-- AI タブに「検索結果」セクション（既存 `HudSection` の見た目）を追加し、その中に表を置く。枠線・見出し行・罫線付き。読み取り専用で、並べ替えや編集はしない。数値列は右寄せ
-- 見出しの上に 1 行で検索条件を出す: 交易候補は基準星系・半径・優先・検索時刻、艤装はモジュール名（クラス・レーティング付き）と検索時刻
-- 交易候補の列: `#` / 品目（`FuzzySearch.localizedCommodityName`）/ 購入ステーション（星系）/ 購入 Ls / 売却ステーション（星系）/ 売却 Ls / 単位利益（cr）/ 数量（t）/ 1 回の総利益（cr）/ 区間距離（ly）/ 鮮度（購入側と売却側のうち古い方、時間単位）
-- 艤装の列: モジュール / ステーション / 星系 / 種別 / 距離（ly）/ 到着 Ls / 価格（cr）/ 鮮度。7 日超（`stale`）は警告色
+- AI タブに「検索結果」セクション（既存 `HudSection` の見た目）を追加する。その中に **候補 1 件ごとに独立した枠（カード）** を縦に並べる。ランク 1・2・3 はそれぞれ別の枠にする。1 つの表にまとめない
+- 枠の中は **「項目名：値」を 1 行ずつ** 縦に並べる。横に詰めて並べない。値の数値は右寄せでも左寄せでもよいが、行内で項目名と値の区切りが分かること。読み取り専用で、編集・並べ替えはしない
+- 枠が 3 つ入りきらない場合はセクション内を縦スクロールにする
+- セクションの先頭に 1 行で検索条件を出す: 交易候補は基準星系・半径・優先・検索時刻、艤装はモジュール名（クラス・レーティング付き）と検索時刻
+- 交易候補の枠（見出し「ランク N」）の行:
+
+  ```
+  ランク 1
+  品目：        Silver
+  購入：        Galileo（Sol）
+  購入 Ls：     505 Ls
+  売却：        ○○ Port（○○）
+  売却 Ls：     1,200 Ls
+  1 回の総利益： 5,119,200 cr
+  単位利益：    7,110 cr/t
+  数量：        720 t
+  区間距離：    12.61 ly
+  基準から：    3.20 ly
+  鮮度：        2 時間前
+  ```
+
+  品目は `FuzzySearch.localizedCommodityName`。鮮度は購入側と売却側のうち古い方
+- 艤装は枠 1 つ（見出し「艤装販売」）で、行 = モジュール / ステーション / 星系 / 種別 / 距離（ly）/ 到着 Ls / 価格（cr）/ 鮮度。7 日超（`stale`）は鮮度の行を警告色にする
 - 交易候補と艤装は、直近に検索した方を表示する（両方あるときは保存時刻の新しい方）。結果が無いときは「検索結果はありません」と表示する
-- 新しい結果が保存されたら表を更新する（UiBus のイベント、または既存 UI の更新方式。PLAN CHECK で既存方式を確認して決める）
+- 新しい結果が保存されたら表示を更新する（UiBus のイベント、または既存 UI の更新方式。PLAN CHECK で既存方式を確認して決める）
+- 会話ログ（`HudLogArea`）の表示は変更しない。会話ログは話した文のまま、比較はこのカードで行う
 
 **HUD 要約カード:**
 
@@ -221,7 +241,7 @@ outfitting_updated_at
 | P8-2e | ログ設定の修正（2026-09-26）: `log4j2.xml` の `elite.intel`=error により P8-2b の INFO ログが抑止されていたため、`TradeCandidatesQuery` / `NearestOutfittingQuery` を info で出力 | `app/src/main/resources/log4j2.xml` | 全体テスト | **DONE**（main `f198d21`。実機で出力を確認済み） |
 | P8-4 | `query_trade_candidates` の拡張（2026-09-26 実機確認より）。実機ログ: Synuefe MR-C c29-24 から 50 ly・大型パッド・軌道のみ・10 時間以内で `stations=1, freshStations=1, pairs=0` となり、2 ステーション未満で区間を作れなかった（処理は正常）。(1) 省略可能な文字列パラメータ `referenceSystem` を追加し、指定時はその星系を検索の基準（Spansh の `reference_system`）にする。省略時は現在地。現在地も指定も無い場合のみ `location_unknown`。DataDto に基準星系（`searchedFromSystem`）と、それが指定か現在地か（`referenceSource`: specified / current）を入れ、距離はこの基準からの距離である旨を指示に書く。(2) 市場データ 10 時間以内のステーションが 2 未満のときは状態 `too_few_stations` と、その数（`freshStationCount`）を返し、「条件に合うステーションが N 件しかないため候補を作れない」ことをユーザーの言語で伝えるよう指示する（指定星系が Spansh で見つからない場合もステーション 0 件としてこの状態になる）。(3) EN/JA エイリアスの既存キー `query_trade_candidates` に、基準星系を指定する言い回しを追加する（例: `trade candidates near {referenceSystem:X}`、`{referenceSystem:X} 周辺の交易候補`）。計算内容・並び順は変更しない | `TradeCandidatesQuery.java`、`TradeCandidateCalculator.java`、`TradeCandidatesSearchCriteria.java`、それぞれの既存テスト、`ai_action_aliases.properties` / `ai_action_aliases_ja.properties`（`query_trade_candidates` の行のみ） | `./gradlew --no-daemon :app:test --tests '*TradeCandidatesQueryTest' --tests 'elite.intel.gameapi.search.spansh.tradecandidates.*' --tests '*AllActionParameterSpecsValidTest' --tests '*BundleKeyParityTest' --tests '*AiActionLocalizationsTest' --tests '*AliasPhraseTest' --tests '*AliasVocabularyTest' --tests '*AliasPhraseCollisionTest'` と全体テスト（既知の 10 件以外の失敗 0 件）。実機で「Sol 周辺の交易候補」が Sol 基準で検索されること | **DONE**（2026-09-26、main `23204b3`。EN エイリアスは `near` が既存の音声修復テストと衝突するため `around` / `from` を採用。実機再確認待ち） |
 | P8-5 | 交易候補の答え方の改善（2026-09-26 実機確認より）。実機: Sol 基準で候補 3 件が出たが、Gemma が全項目を読み上げて 323 トークン・生成 17 秒（全体約 21 秒）、総利益を「一七百七万円」と誤記（正しくは 17,070,320 クレジット）、1 位と 2 位が同じ星系（Duamta）の別ステーション → 同じ売却先・同じ商品で実質重複。(1) buildInstructions を「候補 1 件につき 1 文（商品、購入ステーションと星系、売却ステーションと星系、1 回の総利益）で答え、その他の数値はユーザーが尋ねたときだけ答える」に変更し、通貨は必ずクレジット（円などにしない）と明記する。(2) 同じ購入星系・同じ商品・同じ売却ステーションの候補は tripProfit 最大の 1 件にまとめてから上位 3 件を選ぶ（既存の区間単位のまとめに追加）。計算式は変更しない | `TradeCandidatesQuery.java`、`TradeCandidateCalculator.java`、それぞれの既存テスト | `./gradlew --no-daemon :app:test --tests '*TradeCandidatesQueryTest' --tests 'elite.intel.gameapi.search.spansh.tradecandidates.*'` と全体テスト（既知の 10 件以外の失敗 0 件）。実機で応答が短く（目安 100 トークン以下）、3 件が別の購入星系または別の商品・売却先になること | **DONE**（2026-09-26、main `31545c3`。重複判定キーは購入星系・商品・売却星系・売却ステーション。同利益時は区間距離の短い方、次に購入ステーション名。実機再確認待ち） |
-| P8-6 | 検索結果の表示（§7.1）。P8-5 のマージ後に着手する。(1) 結果の保存: 新規マイグレーション（既存の最終番号の次。2026-09-26 時点で `01050`）、DAO、Manager。(2) `TradeCandidatesQuery` / `NearestOutfittingQuery` から、LLM に渡す DataDto をそのまま保存する処理を追加（best-effort。LLM への指示・データ・計算は変更しない）。(3) AI タブの「検索結果」セクションと表。(4) HUD 要約カード（新規 `HudObjectiveSource`、`NativeHudOverlay.defaultSources()` の最後に 1 行追加）。(5) EN/JA 文言 | 新規: `app/src/main/resources/db-migration/01050__query_result_display.sql`（番号は PLAN CHECK 時点の最終番号の次）、`app/src/main/java/elite/intel/db/dao/` に DAO 1 つ、`app/src/main/java/elite/intel/db/managers/` に Manager 1 つ、`app/src/main/java/elite/intel/ui/overlay/` に Source 1 つ、`app/src/main/java/elite/intel/ui/widget/` または `ui/screen/` に表パネル 1 つ、それぞれのテスト。既存: `TradeCandidatesQuery.java`、`NearestOutfittingQuery.java`（保存呼び出しの追加のみ）、`AiTabPanel.java`（セクションの追加のみ。既存セクションの挙動は変えない）、`NativeHudOverlay.java`（`defaultSources()` に 1 行のみ）、`gui.properties` / `gui_ja.properties` と HUD 文言バンドルの EN/JA（新キーのみ）、`app/src/test/resources/i18n-parity-baseline.txt`（他 8 言語の `MISSING` 行のみ）、`TradeCandidatesQueryTest` / `NearestOutfittingQueryTest`（保存の検証の追加のみ）。UiBus のイベントを新設する場合は `app/src/main/java/elite/intel/ui/event/` に 1 クラス。これ以外（`OverlayProtocol`、ネイティブのオーバーレイ本体、`HudLogArea`、既存の Source を含む）が必要なら PLAN CHANGE REQUEST | 新規テスト: (a) Manager の保存・読み出し・種類ごとの上書き・消去、(b) Query の状態ごとの保存/消去（`ok`・`insufficient_fresh_data` → 保存、`no_result` 等 → 消去、艤装 `found` → 保存）と保存失敗時も応答が返ること、(c) HUD Source: 結果無し → empty、10 時間超 → empty、交易候補 3 件 → 1 件目の行と「他 2 件」、艤装 → 5 行、直近の種類が選ばれること、(d) 表パネルのモデル: 列数・見出し・`*Display` がそのまま入ること・鮮度が古い方になること。`./gradlew --no-daemon :app:test --tests '*TradeCandidatesQueryTest' --tests '*NearestOutfittingQueryTest' --tests '*BundleKeyParityTest' --tests '*BundleQuotingTest'` と新規テスト、全体テスト（既知の 10 件以外の失敗 0 件）。実機: 「Sol 周辺の交易候補」の後、AI タブに枠付きの表で 3 行が出て、数値が 3 桁区切りの算用数字であること。アプリ再起動後も表が残ること。HUD に 1 件目の要約カードが出ること（航路未設定時） | 未着手 |
+| P8-6 | 検索結果の表示（§7.1）。P8-5 のマージ後に着手する。(1) 結果の保存: 新規マイグレーション（既存の最終番号の次。2026-09-26 時点で `01050`）、DAO、Manager。(2) `TradeCandidatesQuery` / `NearestOutfittingQuery` から、LLM に渡す DataDto をそのまま保存する処理を追加（best-effort。LLM への指示・データ・計算は変更しない）。(3) AI タブの「検索結果」セクションと、候補ごとの枠（カード、項目名：値の縦並び）。(4) HUD 要約カード（新規 `HudObjectiveSource`、`NativeHudOverlay.defaultSources()` の最後に 1 行追加）。(5) EN/JA 文言 | 新規: `app/src/main/resources/db-migration/01050__query_result_display.sql`（番号は PLAN CHECK 時点の最終番号の次）、`app/src/main/java/elite/intel/db/dao/` に DAO 1 つ、`app/src/main/java/elite/intel/db/managers/` に Manager 1 つ、`app/src/main/java/elite/intel/ui/overlay/` に Source 1 つ、`app/src/main/java/elite/intel/ui/widget/` または `ui/screen/` に結果パネル 1 つ（カード部品を含めて 2 つまで）、それぞれのテスト。既存: `TradeCandidatesQuery.java`、`NearestOutfittingQuery.java`（保存呼び出しの追加のみ）、`AiTabPanel.java`（セクションの追加のみ。既存セクションの挙動は変えない）、`NativeHudOverlay.java`（`defaultSources()` に 1 行のみ）、`gui.properties` / `gui_ja.properties` と HUD 文言バンドルの EN/JA（新キーのみ）、`app/src/test/resources/i18n-parity-baseline.txt`（他 8 言語の `MISSING` 行のみ）、`TradeCandidatesQueryTest` / `NearestOutfittingQueryTest`（保存の検証の追加のみ）。UiBus のイベントを新設する場合は `app/src/main/java/elite/intel/ui/event/` に 1 クラス。これ以外（`OverlayProtocol`、ネイティブのオーバーレイ本体、`HudLogArea`、既存の Source を含む）が必要なら PLAN CHANGE REQUEST | 新規テスト: (a) Manager の保存・読み出し・種類ごとの上書き・消去、(b) Query の状態ごとの保存/消去（`ok`・`insufficient_fresh_data` → 保存、`no_result` 等 → 消去、艤装 `found` → 保存）と保存失敗時も応答が返ること、(c) HUD Source: 結果無し → empty、10 時間超 → empty、交易候補 3 件 → 1 件目の行と「他 2 件」、艤装 → 5 行、直近の種類が選ばれること、(d) カードのモデル: 候補 3 件 → 枠 3 つ・見出し「ランク 1〜3」、各枠の行の順番と項目名、`*Display` がそのまま入ること、鮮度が古い方になること、艤装 → 枠 1 つ。`./gradlew --no-daemon :app:test --tests '*TradeCandidatesQueryTest' --tests '*NearestOutfittingQueryTest' --tests '*BundleKeyParityTest' --tests '*BundleQuotingTest'` と新規テスト、全体テスト（既知の 10 件以外の失敗 0 件）。実機: 「Sol 周辺の交易候補」の後、AI タブにランク 1・2・3 の枠が別々に出て、各枠の中が「項目名：値」の縦並びで、数値が 3 桁区切りの算用数字であること。アプリ再起動後も表示が残ること。HUD に 1 件目の要約カードが出ること（航路未設定時） | 未着手 |
 | P8-3 | 検索結果の候補を選んで航路設定するコマンド（§7） | P8-1/P8-2 後に確定 | 確定時に記載 | 未着手 |
 
 ## 10. 既知のテスト失敗（2026-09-25 時点、main）
