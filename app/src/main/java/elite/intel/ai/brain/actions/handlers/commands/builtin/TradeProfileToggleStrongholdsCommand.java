@@ -40,6 +40,10 @@ public final class TradeProfileToggleStrongholdsCommand implements IntelCommand 
         state.validate();
         return List.of(state);
     }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

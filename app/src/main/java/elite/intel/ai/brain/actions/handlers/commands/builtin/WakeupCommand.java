@@ -24,6 +24,10 @@ public final class WakeupCommand implements IntelCommand {
                 + "or begin accepting voice input. Being told to listen is this action, not conversation - call it "
                 + "even when VEGA appears to be awake already.";
     }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

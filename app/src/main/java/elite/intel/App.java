@@ -15,6 +15,7 @@ import elite.intel.session.LoadSessionEvent;
 import elite.intel.session.PlayerSession;
 import elite.intel.ui.controller.AppController;
 import elite.intel.ui.screen.AppView;
+import elite.intel.ui.support.GameWindowActivator;
 import elite.intel.ui.theme.HudPalette;
 import elite.intel.util.AudioPlayer;
 import elite.intel.util.Cypher;
@@ -83,6 +84,7 @@ public class App {
 
         // spin up the session
         GameEventBus.publish(new LoadSessionEvent());
+        GameWindowActivator.findAndCacheGameWindow();
 
         // init UI
         System.setProperty("awt.useSystemAAFontSettings", "lcd");

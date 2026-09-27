@@ -46,6 +46,11 @@ public final class CustomCommandHandler implements IntelAction {
     }
 
     @Override
+    public boolean sendsGameInput() {
+        return true;
+    }
+
+    @Override
     public JsonObject handle(String action, JsonObject params, String responseText) {
         CUSTOM_COMMAND_LOCK.lock();
         try {

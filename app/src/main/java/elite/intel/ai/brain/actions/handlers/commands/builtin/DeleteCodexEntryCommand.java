@@ -25,6 +25,10 @@ public final class DeleteCodexEntryCommand implements IntelCommand {
 
     private final CodexEntryManager codexEntryManager = CodexEntryManager.getInstance();
     private final PlayerSession playerSession = PlayerSession.getInstance();
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

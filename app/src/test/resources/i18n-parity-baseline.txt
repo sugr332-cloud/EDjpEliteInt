@@ -529,3 +529,12 @@ responses|ptbz|MISSING|handler.tradeCandidates.insufficientFreshData
 responses|ru|MISSING|handler.tradeCandidates.insufficientFreshData
 responses|uk|MISSING|handler.tradeCandidates.insufficientFreshData
 
+# --- H-1: Game window cannot foreground abort message ---
+responses|de|MISSING|handler.gameWindow.cannotForeground
+responses|es|MISSING|handler.gameWindow.cannotForeground
+responses|fr|MISSING|handler.gameWindow.cannotForeground
+responses|it|MISSING|handler.gameWindow.cannotForeground
+responses|pt|MISSING|handler.gameWindow.cannotForeground
+responses|ptbz|MISSING|handler.gameWindow.cannotForeground
+responses|ru|MISSING|handler.gameWindow.cannotForeground
+responses|uk|MISSING|handler.gameWindow.cannotForeground

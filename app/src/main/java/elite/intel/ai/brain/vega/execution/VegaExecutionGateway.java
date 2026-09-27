@@ -11,6 +11,8 @@ import elite.intel.ai.brain.vega.model.execution.ExecutionRequest;
 import elite.intel.ai.brain.vega.tools.SystemFunction;
 import elite.intel.ai.brain.vega.tools.SystemFunctionRegistry;
 import elite.intel.ai.brain.vega.tools.SystemFunctionResultFields;
+import elite.intel.ui.support.GameWindowActivator;
+import elite.intel.util.StringUtls;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -176,6 +178,19 @@ public final class VegaExecutionGateway implements ExecutionGateway {
      * Single execution path: a non-null handle result is the payload; null means a side-effect dispatch.
      */
     private JsonObject execute(IntelAction tool, ExecutionRequest request) throws Exception {
+        if (tool.sendsGameInput()) {
+            boolean foregrounded = GameWindowActivator.ensureGameForeground();
+            if (!foregrounded) {
+                log.warn("Failed to foreground Elite Dangerous window before executing '{}'; aborting command", request.toolName());
+                String abortMessage = StringUtls.localizedResponse("handler.gameWindow.cannotForeground");
+                VegaRuntime.narrator().narrate(abortMessage, "Notify commander that command was not sent because game window could not be brought to the foreground.");
+                JsonObject status = new JsonObject();
+                status.addProperty(SystemFunctionResultFields.STATUS, "aborted");
+                status.addProperty(TOOL, request.toolName());
+                return status;
+            }
+        }
+
         // Pass the commander's raw utterance as originalUserInput so handlers that match a spoken name
         // (e.g. AnalyzeStellarObjectsQuery resolving "is B 1 landable") receive it instead of "".
         JsonObject result = VegaRuntime.callWithinGeneration(request.runtimeGenerationId(),

@@ -7,6 +7,7 @@ import elite.intel.ai.mouth.subscribers.events.MissionCriticalAnnouncementEvent;
 import elite.intel.eventbus.GameControllerBus;
 import elite.intel.eventbus.GameEventBus;
 import elite.intel.session.SystemSession;
+import elite.intel.ui.support.GameWindowActivator;
 import elite.intel.util.StringUtls;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -104,7 +105,15 @@ public class InputSequenceExecutor {
         }
     }
 
+    static boolean shouldDropStep(GameInputStep step) {
+        return step != null && step.isInputProducing() && !GameWindowActivator.isEliteDangerousForeground();
+    }
+
     private boolean executeStep(GameInputStep step) {
+        if (shouldDropStep(step)) {
+            log.warn("Elite Dangerous is not the foreground window; dropping input step: {}", step);
+            return false;
+        }
         return switch (step.getType()) {
             case BINDING_TAP -> executeBindingPress(step.getBindingId());
             case BINDING_FORCED_TAP -> executeForcedTap(step.getBindingId());

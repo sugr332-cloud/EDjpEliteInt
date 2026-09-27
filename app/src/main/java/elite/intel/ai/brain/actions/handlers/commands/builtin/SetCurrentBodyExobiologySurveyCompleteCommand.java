@@ -51,8 +51,8 @@ public final class SetCurrentBodyExobiologySurveyCompleteCommand implements Inte
                 PARAM_STATE, "boolean", true,
                 "True to record this body's biological survey as already complete, false to take that record back.",
                 List.of("true", "false"),
-                "already scanned/already done/nothing left here → true; "
-                        + "undo/cancel/that was wrong/not scanned after all → false. "
+                "already scanned/already done/nothing left here ↁEtrue; "
+                        + "undo/cancel/that was wrong/not scanned after all ↁEfalse. "
                         + "Never guess: if the commander did not say which way, do not call this.");
         state.validate();
         return List.of(state);
@@ -65,6 +65,10 @@ public final class SetCurrentBodyExobiologySurveyCompleteCommand implements Inte
                 + "back. Only affects our own bookkeeping: it removes the body from the sampling overlay and "
                 + "stops it being offered for exobiology. Never use it to report a scan just performed; the "
                 + "journal records those on its own.";
+    }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
     }
 
     @Override

@@ -19,6 +19,10 @@ public final class NextMusicTrackCommand implements IntelCommand {
         return "Skip to the next track in the commander's own music playlist. Use for 'next track' or "
                 + "'skip this song'. Nothing to do with the ship's navigation route.";
     }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

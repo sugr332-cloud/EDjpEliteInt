@@ -46,6 +46,10 @@ public final class SetTimedReminderCommand implements IntelCommand {
         minutes.validate();
         return List.of(key, minutes);
     }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

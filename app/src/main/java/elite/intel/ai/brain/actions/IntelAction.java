@@ -47,6 +47,14 @@ public interface IntelAction {
     }
 
     /**
+     * Whether this action sends key/game inputs into Elite Dangerous.
+     * Actions that send inputs must ensure the game window is in the foreground before dispatching.
+     */
+    default boolean sendsGameInput() {
+        return false;
+    }
+
+    /**
      * Executes this action. For commands the returned value is ignored
      * (side-effect only); for queries it carries the response payload as JSON.
      *

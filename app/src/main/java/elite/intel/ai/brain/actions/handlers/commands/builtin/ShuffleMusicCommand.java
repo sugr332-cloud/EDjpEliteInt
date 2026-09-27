@@ -46,6 +46,10 @@ public final class ShuffleMusicCommand implements IntelCommand {
     public List<ActionParameterSpec> parameters() {
         return PARAMETERS;
     }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

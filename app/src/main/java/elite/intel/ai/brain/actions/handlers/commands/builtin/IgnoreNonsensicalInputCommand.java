@@ -13,7 +13,10 @@ import elite.intel.session.Status;
 @RegisterCommand
 public final class IgnoreNonsensicalInputCommand implements IntelCommand {
     public static final String ID = "ignore_nonsensical_input";
-
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {
