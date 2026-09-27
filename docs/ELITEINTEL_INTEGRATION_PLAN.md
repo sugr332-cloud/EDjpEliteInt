@@ -78,7 +78,7 @@ C-CORE の追加・拡張（v2-P9）はこの 2 トラックの後に回す。�
 | v2-P1 | 日本語化 inventory（表示〜指示） | **完了（数値確定）** | R.4 の件数は `i18n-parity-baseline.txt` と各 `.properties` から計測 |
 | v2-P2 | 既存機能の日本語置換（表示 → 指示） | **進行中** | `Language.JA`（`11907a78`）、P0（`11907a78`）・P1（`5c9716ec`）翻訳済み。残りは R.4 |
 | v2-P3 | AI Provider CLI 化 / `agy` 対応 | **完了（DONE）** | G-1〜G-7、stdin 化（PR #10）、resident agy 化（PR #11）完了。`AgyResidentProcessManager` による常駐プロセス通信（stream-json）、15s/20s 二重タイムアウト、自動復旧、固定 Speak スキーマ、TurnRouting による二重ルーティング（非 speak ツール判定）を実機で実証済み。**2026-09-25、LLM 一本化により実行時の `agy` 経路は廃止。記録は `archive/agy-runtime/`（未運用）へ移動（§R.6、G-8/G-9）** |
-| v2-P3b | LLM 一本化（全ターンを LM Studio + Gemma 4 E4B へ、実行時 `agy` を archive へ移動） | 未着手（2026-09-25 決定） | §R.6。G-8（経路切替）→ G-9（`archive/agy-runtime/` へ移動） |
+| v2-P3b | LLM 一本化（全ターンを LM Studio + Gemma 4 E4B へ、実行時 `agy` を archive へ移動） | **完了（DONE）**（2026-09-27、G-9 main `47fcf41`） | §R.6。G-8（経路切替）→ G-9（`archive/agy-runtime/` へ移動） |
 | v2-P4 | 日本語自然言語による問い合わせ・指示（テキスト） | 一部実装 | 旧 Phase 10（§17）: 日本語テキスト入力・日本語応答方針は実装済み。LLM 一本化後の経路（§R.6）では未確認 |
 | v2-P5 | 音声入出力（STT / TTS / VOICEVOX） | 一部実装 | Kokoro→日本語フォールバック（`334b35b1`）。実機 E2E は未実施（`PHASE11_VOICE_IO_PHASE_UPDATE.md`）。**同梱 STT（`ParakeetSTTImpl`）は日本語語彙を持たず日本語音声を認識できない（§10 で確認済み）。日本語 STT は別バックエンドを新規に選定する（CLI 方式を含めて検証、R.7）** |
 | v2-P6 | Game Action / Ship Control の安全化 | 既存機能あり | 既存 `GameInputStep` / `GameControllerBus` / `KeyProcessor`。System Map 駅選択は未実装（§17） |
@@ -662,8 +662,8 @@ v2-P3（AI Provider CLI化 / agy対応、G-1〜G-7・PR #10・PR #11）の台帳
 
 | ID | 内容 | 変更許可ファイル | TEST GATE / 検証 | 状態 |
 |---|---|---|---|---|
-| G-8 | LLM 一本化: 経路切替（§R.6） | §R.6 の表 | §R.6 の表 | 未着手 |
-| G-9 | LLM 一本化: 実行時 `agy` コード・テストを `archive/agy-runtime/src/` へ移動（未運用） | §R.6 の表 | §R.6 の表 | 未着手（G-8 の後） |
+| G-8 | LLM 一本化: 経路切替（§R.6） | §R.6 の表 | §R.6 の表 | **DONE** |
+| G-9 | LLM 一本化: 実行時 `agy` コード・テストを `archive/agy-runtime/src/` へ移動（未運用） | §R.6 の表 | §R.6 の表 | **DONE**（2026-09-27、main `47fcf41`） |
 
 #### v2-P4 以降の台帳
 

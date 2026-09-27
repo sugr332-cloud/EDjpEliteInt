@@ -25,8 +25,8 @@ v2-P3 で実装・検証した「EliteIntel の実行時 AI Provider として `
 | `docs/RECOVERED_R6_R8_RUNTIME_AGY.md` | Recovered record の §2・§3・§6〜§9（hybrid routing、runtime safety boundary、provider contract、E2E contract、implementation gate） | `docs/RECOVERED_R5_R8_AGY_SAFETY.md`（`665b18071`） |
 | `docs/AGY_RESIDENT_BENCHMARK_REPORT.md` | resident vs one-shot 50 ターン A/B ベンチマーク結果 | `docs/`（`git mv`） |
 | `docs/PHASE11_AI_PROVIDER_CLI_SPEC.md` | Phase 11 AI Provider CLI 仕様（廃止） | `docs/`（`git mv`） |
-| `src/main/java/elite/intel/ai/brain/vega/llm/` | `AgyCliTransport`、`AgyCliProviderAdapter`、`AgyResidentProcessManager`、`TurnRoutingLlmGateway` | G-9 で `app/src/main/java/...` から `git mv` 予定 |
-| `src/test/java/elite/intel/ai/brain/vega/llm/` | `AgyCliTransportTest`、`AgyCliProviderAdapterTest`、`AgyResidentBenchmarkTest`、`AgyResidentProductionVerificationTest`、`TurnRoutingLlmGatewayTest` | G-9 で `app/src/test/java/...` から `git mv` 予定 |
-| `build/benchmarkTest.gradle` | `app/build.gradle` の `benchmarkTest` タスク原文 | G-9 で保存予定 |
+| `src/main/java/elite/intel/ai/brain/vega/llm/` | `AgyCliTransport`、`AgyCliProviderAdapter`、`AgyResidentProcessManager`、`TurnRoutingLlmGateway` | G-9 で `app/src/main/java/...` から `git mv` 済み（main `47fcf41`） |
+| `src/test/java/elite/intel/ai/brain/vega/llm/` | `AgyCliTransportTest`、`AgyCliProviderAdapterTest`、`AgyResidentBenchmarkTest`、`AgyResidentProductionVerificationTest`、`TurnRoutingLlmGatewayTest` | G-9 で `app/src/test/java/...` から `git mv` 済み（main `47fcf41`） |
+| `build/benchmarkTest.gradle` | `app/build.gradle` の `benchmarkTest` タスク原文 | G-9 で保存済み（main `47fcf41`） |
 
-G-9 では、上記のほか `ProviderEnum.AGY("LLM"),` の 1 行を本筋から削除します（原文はこの README に記録: `AGY("LLM"),` — `app/src/main/java/elite/intel/ai/ProviderEnum.java` の列挙の先頭にあった）。
+G-9（main `47fcf41`）で、上記のほか `ProviderEnum.AGY("LLM"),` の 1 行を本筋から削除しました（原文はこの README に記録: `AGY("LLM"),` — `app/src/main/java/elite/intel/ai/ProviderEnum.java` の列挙の先頭にあった）。
