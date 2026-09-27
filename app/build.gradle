@@ -306,22 +306,6 @@ tasks.register('embeddingTest', Test) {
     }
 }
 
-// Run with: ./gradlew benchmarkTest
-// 50-turn A/B benchmark comparing resident vs one-shot agy transport. Long-running (~8 min). Excluded from CI.
-tasks.register('benchmarkTest', Test) {
-    description = '50-turn A/B benchmark comparing resident vs one-shot agy transport. Not for CI.'
-    group = 'verification'
-    useJUnitPlatform {
-        includeTags 'benchmark'
-    }
-    maxParallelForks = 1
-    testLogging {
-        events 'passed', 'failed', 'skipped'
-        exceptionFormat 'full'
-        showStandardStreams = true
-    }
-}
-
 // Ensure only the fat JAR is produced and used by assemble/build
 tasks.named('jar') {
     enabled = false
