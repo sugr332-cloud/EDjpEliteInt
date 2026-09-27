@@ -8,7 +8,6 @@ package elite.intel.ai;
  * The enum provides a mechanism to check if a specific provider supports a given category.
  */
 public enum ProviderEnum {
-    AGY("LLM"),
     GROK("LLM"),
     DEEPSEEK("LLM"),
     MISTRAL("LLM"),
