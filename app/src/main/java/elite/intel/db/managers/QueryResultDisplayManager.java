@@ -153,7 +153,7 @@ public final class QueryResultDisplayManager {
             if (row == null || row.payloadJson() == null || row.payloadJson().isBlank()) {
                 return Optional.empty();
             }
-            Instant savedAt = parseInstantOrNow(row.savedAt());
+            Instant savedAt = parseInstantOrEpoch(row.savedAt());
             T data = gson.fromJson(row.payloadJson(), clazz);
             if (data == null) {
                 return Optional.empty();
@@ -185,7 +185,7 @@ public final class QueryResultDisplayManager {
         if (row == null || row.payloadJson() == null || row.payloadJson().isBlank()) {
             return null;
         }
-        Instant savedAt = parseInstantOrNow(row.savedAt());
+        Instant savedAt = parseInstantOrEpoch(row.savedAt());
         if (TYPE_TRADE_CANDIDATES.equals(row.queryType())) {
             TradeCandidatesDataDto data = gson.fromJson(row.payloadJson(), TradeCandidatesDataDto.class);
             return (data != null) ? new LatestDisplay(TYPE_TRADE_CANDIDATES, savedAt, data, null) : null;
@@ -196,14 +196,16 @@ public final class QueryResultDisplayManager {
         return null;
     }
 
-    private static Instant parseInstantOrNow(String s) {
+    private static Instant parseInstantOrEpoch(String s) {
         if (s == null || s.isBlank()) {
-            return Instant.now();
+            log.warn("Null or blank savedAt timestamp in query_result_display row; defaulting to Instant.EPOCH");
+            return Instant.EPOCH;
         }
         try {
             return Instant.parse(s);
         } catch (Exception e) {
-            return Instant.now();
+            log.warn("Failed to parse savedAt timestamp '{}' in query_result_display row: {}; defaulting to Instant.EPOCH", s, e.getMessage());
+            return Instant.EPOCH;
         }
     }
 }

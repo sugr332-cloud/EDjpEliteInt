@@ -228,4 +228,39 @@ class QueryResultDisplayPanelTest {
         goBtn.doClick();
         assertFalse(goBtn.isEnabled(), "Outfitting button should be disabled after click");
     }
+
+    @Test
+    void rowSeparatorChangesByLanguage() {
+        elite.intel.session.SystemSession session = elite.intel.session.SystemSession.getInstance();
+        elite.intel.i18n.Language orig = session.getLanguage();
+        try {
+            session.setLanguage(elite.intel.i18n.Language.EN);
+            TradeCandidateDto cand = createCandidate(1, "Gold", "Sol", "Galileo", "Alpha Centauri", "Columbus", 7000000L);
+            QueryResultCard cardEn = QueryResultCard.forTradeCandidate(cand, Instant.now());
+            String labelEn = findFirstRowLabel(cardEn);
+            assertNotNull(labelEn);
+            assertTrue(labelEn.endsWith(": "), "EN separator must be ': ' but was: " + labelEn);
+
+            session.setLanguage(elite.intel.i18n.Language.JA);
+            QueryResultCard cardJa = QueryResultCard.forTradeCandidate(cand, Instant.now());
+            String labelJa = findFirstRowLabel(cardJa);
+            assertNotNull(labelJa);
+            assertTrue(labelJa.endsWith("："), "JA separator must be '：' but was: " + labelJa);
+        } finally {
+            session.setLanguage(orig);
+        }
+    }
+
+    private static String findFirstRowLabel(Container container) {
+        for (Component c : container.getComponents()) {
+            if (c instanceof javax.swing.JLabel l && l.getText() != null && (l.getText().endsWith(": ") || l.getText().endsWith("："))) {
+                return l.getText();
+            }
+            if (c instanceof Container child) {
+                String found = findFirstRowLabel(child);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
 }

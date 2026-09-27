@@ -396,4 +396,75 @@ class NavigateToSearchResultCommandTest {
         assertTrue(command.isVisibleForLLM(elite.intel.session.Status.detached(elite.intel.session.PlayerSituation.UNKNOWN)));
         assertTrue(command.isVisibleForLLM(null));
     }
+
+    @Test
+    void reminderUsesSpecificTextWithCommodityAndModule() {
+        // 1. Trade Buy
+        TradeCandidatesDataDto tradeDto = new TradeCandidatesDataDto(
+                "ok", "Sol", "Sol", "current", 1, "profit", 30,
+                List.of(createTradeCandidate(1, "Sol", "Galileo", "Barnard's Star", "Boston Base"))
+        );
+        displayManager.saveTradeCandidates(tradeDto);
+
+        JsonObject pBuy = new JsonObject();
+        pBuy.addProperty("rank", 1);
+        pBuy.addProperty("leg", "buy");
+        command.execute(pBuy, "");
+        assertEquals(1, reminders.size());
+        assertTrue(reminders.get(0).text().contains("金") || reminders.get(0).text().contains("Gold"),
+                "Reminder text must contain commodity name: " + reminders.get(0).text());
+        assertTrue(reminders.get(0).text().contains("Galileo"));
+        reminders.clear();
+
+        // 2. Trade Sell
+        JsonObject pSell = new JsonObject();
+        pSell.addProperty("rank", 1);
+        pSell.addProperty("leg", "sell");
+        command.execute(pSell, "");
+        assertEquals(1, reminders.size());
+        assertTrue(reminders.get(0).text().contains("金") || reminders.get(0).text().contains("Gold"),
+                "Reminder text must contain commodity name: " + reminders.get(0).text());
+        assertTrue(reminders.get(0).text().contains("Boston Base"));
+        reminders.clear();
+
+        // 3. Outfitting
+        OutfittingDataDto outfittingDto = createOutfittingDto("Sol", "Daedalus");
+        displayManager.saveOutfitting(outfittingDto);
+
+        JsonObject pOutfitting = new JsonObject();
+        pOutfitting.addProperty("rank", 1);
+        command.execute(pOutfitting, "");
+        assertEquals(1, reminders.size());
+        assertTrue(reminders.get(0).text().contains("5A FSD") || reminders.get(0).text().contains("Frame Shift Drive"),
+                "Reminder text must contain module name: " + reminders.get(0).text());
+        assertTrue(reminders.get(0).text().contains("Daedalus"));
+    }
+
+    @Test
+    void rejectsWhenSavedAtIsEpochOrCorrupt() {
+        OutfittingDataDto dto = createOutfittingDto("Sol", "Daedalus");
+        NavigateToSearchResultCommand cmdEpoch = new NavigateToSearchResultCommand(
+                () -> Optional.of(new LatestDisplay(
+                        QueryResultDisplayManager.TYPE_OUTFITTING,
+                        Instant.EPOCH,
+                        null,
+                        dto
+                )),
+                () -> true,
+                (t, s, st, c) -> reminders.add(new ReminderRecord(t, s, st, c)),
+                (a, d) -> {
+                    plottedRoutes.add(new RoutePlotRecord(a, d));
+                    return a;
+                },
+                publishedEvents::add
+        );
+
+        JsonObject p = new JsonObject();
+        p.addProperty("rank", 1);
+        String res = cmdEpoch.execute(p, "");
+        assertNotNull(res);
+        assertTrue(res.contains("直近の検索結果") || res.contains("recent search"));
+        assertTrue(plottedRoutes.isEmpty());
+        assertTrue(reminders.isEmpty());
+    }
 }
