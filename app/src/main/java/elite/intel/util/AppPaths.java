@@ -29,6 +29,13 @@ public final class AppPaths {
         return dbDir.resolve("database.db");
     }
 
+    /** Returns the path for extracted STT hotwords file, creating parent directories if needed. */
+    public static Path getSttHotwordsJaPath() throws IOException {
+        Path dir = getAppDataBase().resolve("elite-intel/stt");
+        Files.createDirectories(dir);
+        return dir.resolve("hotwords_ja.txt");
+    }
+
     /** Returns the custom command JSON file path, creating the custom command data directory if needed. */
     public static Path getCustomCommandsFilePath() throws IOException {
         Path dir = getAppDataBase().resolve("elite-intel/custom-commands");

@@ -25,11 +25,19 @@ import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.NonNull;
 
 import javax.sound.sampled.*;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -378,33 +386,196 @@ public class ParakeetSTTImpl implements EarsInterface {
         if (!Files.exists(spec.joinerFile())) throw new IllegalStateException("Joiner missing at: " + spec.joinerFile());
         if (!Files.exists(spec.tokensFile())) throw new IllegalStateException("Tokens missing at: " + spec.tokensFile());
 
+        int threads = Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(), systemSession.getSttThreads()));
+        OfflineRecognizerConfig config = buildRecognizerConfig(systemSession.getLanguage(), spec, threads);
+        return new OfflineRecognizer(config);
+    }
+
+    static class HotwordsValidationResult {
+        final List<String> validWords;
+        final List<String> skippedWords;
+
+        HotwordsValidationResult(List<String> validWords, List<String> skippedWords) {
+            this.validWords = validWords;
+            this.skippedWords = skippedWords;
+        }
+    }
+
+    static Set<String> loadTokens(Path tokensFile) {
+        if (tokensFile == null || !Files.exists(tokensFile)) {
+            return Collections.emptySet();
+        }
+        Set<String> tokens = new HashSet<>();
+        try (BufferedReader reader = Files.newBufferedReader(tokensFile, StandardCharsets.UTF_8)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty()) continue;
+                int lastSpace = line.lastIndexOf(' ');
+                int lastTab = line.lastIndexOf('\t');
+                int splitIdx = Math.max(lastSpace, lastTab);
+                String token = (splitIdx > 0) ? line.substring(0, splitIdx) : line;
+                tokens.add(token);
+            }
+        } catch (IOException e) {
+            log.warn("Failed to read tokens from {}: {}", tokensFile, e.getMessage());
+        }
+        return tokens;
+    }
+
+    static HotwordsValidationResult filterHotwords(List<String> rawLines, Set<String> validTokens) {
+        List<String> validWords = new ArrayList<>();
+        List<String> skippedWords = new ArrayList<>();
+
+        if (rawLines == null || rawLines.isEmpty() || validTokens == null || validTokens.isEmpty()) {
+            return new HotwordsValidationResult(validWords, skippedWords);
+        }
+
+        for (String line : rawLines) {
+            if (line == null) continue;
+            String trimmed = line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                continue;
+            }
+            String word = trimmed;
+            int colonIdx = trimmed.indexOf(':');
+            if (colonIdx >= 0) {
+                word = trimmed.substring(0, colonIdx).trim();
+            }
+
+            String missingChar = null;
+            for (int i = 0; i < word.length(); ) {
+                int cp = word.codePointAt(i);
+                String ch = new String(Character.toChars(cp));
+                if (!validTokens.contains(ch)) {
+                    missingChar = ch;
+                    break;
+                }
+                i += Character.charCount(cp);
+            }
+
+            if (missingChar != null) {
+                log.warn("STT hotword '{}' skipped: character '{}' not in tokens.txt", word, missingChar);
+                skippedWords.add(trimmed);
+            } else {
+                validWords.add(trimmed);
+            }
+        }
+        return new HotwordsValidationResult(validWords, skippedWords);
+    }
+
+    static InputStream openHotwordsStream() {
+        InputStream is = ParakeetSTTImpl.class.getResourceAsStream("/stt/hotwords_ja.txt");
+        if (is != null) {
+            return is;
+        }
+        Path[] fallbacks = new Path[] {
+                Path.of("app/src/main/resources/stt/hotwords_ja.txt"),
+                Path.of("src/main/resources/stt/hotwords_ja.txt"),
+                Path.of("../app/src/main/resources/stt/hotwords_ja.txt")
+        };
+        for (Path p : fallbacks) {
+            if (Files.exists(p)) {
+                try {
+                    return Files.newInputStream(p);
+                } catch (IOException e) {
+                    log.warn("Failed to open fallback hotwords file {}: {}", p, e.getMessage());
+                }
+            }
+        }
+        return null;
+    }
+
+    static Path prepareJapaneseHotwords(Path tokensFile) {
+        return prepareJapaneseHotwords(tokensFile, null);
+    }
+
+    static Path prepareJapaneseHotwords(Path tokensFile, Path destinationPath) {
+        try {
+            Set<String> validTokens = loadTokens(tokensFile);
+            if (validTokens.isEmpty()) {
+                log.warn("Cannot load Japanese hotwords: tokens.txt missing or empty at {}", tokensFile);
+                return null;
+            }
+
+            List<String> rawLines;
+            try (InputStream is = openHotwordsStream()) {
+                if (is == null) {
+                    log.warn("Japanese hotwords resource /stt/hotwords_ja.txt not found");
+                    return null;
+                }
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                    rawLines = reader.lines().toList();
+                }
+            }
+
+            HotwordsValidationResult result = filterHotwords(rawLines, validTokens);
+            if (result.validWords.isEmpty()) {
+                log.info("STT JA hotwords: 0 valid words found ({} skipped), falling back to greedy_search",
+                        result.skippedWords.size());
+                return null;
+            }
+
+            Path target = (destinationPath != null) ? destinationPath : AppPaths.getSttHotwordsJaPath();
+            if (target.getParent() != null) {
+                Files.createDirectories(target.getParent());
+            }
+            Files.write(target, result.validWords, StandardCharsets.UTF_8);
+
+            log.info("STT JA hotwords loaded: {} valid words, {} skipped words",
+                    result.validWords.size(), result.skippedWords.size());
+            return target;
+        } catch (Exception e) {
+            log.warn("Failed to prepare Japanese hotwords: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+
+    static OfflineRecognizerConfig buildRecognizerConfig(Language language, ModelSpec spec, int numThreads) {
+        Path hotwordsFile = null;
+        if (language == Language.JA) {
+            hotwordsFile = prepareJapaneseHotwords(spec.tokensFile());
+        }
+        return buildRecognizerConfig(language, spec, numThreads, hotwordsFile);
+    }
+
+    static OfflineRecognizerConfig buildRecognizerConfig(
+            Language language, ModelSpec spec, int numThreads, Path hotwordsFile) {
         OfflineTransducerModelConfig transducer = OfflineTransducerModelConfig.builder()
                 .setEncoder(AppPaths.toNativePath(spec.encoderFile()))
                 .setDecoder(AppPaths.toNativePath(spec.decoderFile()))
                 .setJoiner(AppPaths.toNativePath(spec.joinerFile()))
                 .build();
 
-        OfflineModelConfig modelConfig = OfflineModelConfig.builder()
+        OfflineModelConfig.Builder modelConfigBuilder = OfflineModelConfig.builder()
                 .setTransducer(transducer)
                 .setTokens(AppPaths.toNativePath(spec.tokensFile()))
-                .setNumThreads(Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(), systemSession.getSttThreads())))
+                .setNumThreads(numThreads)
                 .setDebug(false)
-                .setProvider("cpu")
-                .build();
+                .setProvider("cpu");
 
         FeatureConfig featureConfig = FeatureConfig.builder()
                 .setSampleRate(SAMPLE_RATE)
                 .setFeatureDim(spec.featureDim())
                 .build();
 
-
         OfflineRecognizerConfig.Builder configBuilder = OfflineRecognizerConfig.builder()
                 .setFeatureConfig(featureConfig)
-                .setOfflineModelConfig(modelConfig)
-                .setDecodingMethod("greedy_search")
-                .setMaxActivePaths(50)  /// slightly slower, but more accurate
-                .setBlankPenalty(-2.0f); /// low value prevents trash in transcriptions for short utterances
-        return new OfflineRecognizer(configBuilder.build());
+                .setBlankPenalty(-2.0f);
+
+        if (language == Language.JA && hotwordsFile != null && Files.exists(hotwordsFile)) {
+            modelConfigBuilder.setModelingUnit("cjkchar");
+            configBuilder.setDecodingMethod("modified_beam_search")
+                    .setMaxActivePaths(4)
+                    .setHotwordsFile(hotwordsFile.toAbsolutePath().toString())
+                    .setHotwordsScore(1.5f);
+        } else {
+            configBuilder.setDecodingMethod("greedy_search")
+                    .setMaxActivePaths(50);
+        }
+
+        configBuilder.setOfflineModelConfig(modelConfigBuilder.build());
+        return configBuilder.build();
     }
 
     private void captureLoop() {
@@ -642,7 +813,7 @@ public class ParakeetSTTImpl implements EarsInterface {
                 recognizer.decode(stream);
                 OfflineRecognizerResult result = recognizer.getResult(stream);
                 String transcript = sanitizeTranscript(result.getText(), systemSession.getLanguage());
-                log.debug("Parakeet transcription took {} ms", System.currentTimeMillis() - timeStart);
+                log.info("Parakeet transcription took {} ms", System.currentTimeMillis() - timeStart);
 
                 if (!isTranscriptUsable(transcript, systemSession.getLanguage())) {
                     log.info("STT dropped (nothing a phrase could be made of): [{}] - {}", transcript, capture);

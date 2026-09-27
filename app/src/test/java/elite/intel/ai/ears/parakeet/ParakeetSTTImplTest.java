@@ -5,19 +5,26 @@ import elite.intel.eventbus.UiBus;
 import elite.intel.i18n.Language;
 import elite.intel.session.SystemSession;
 import elite.intel.ui.event.AppLogEvent;
+import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -374,6 +381,146 @@ class ParakeetSTTImplTest {
         assertFalse(ParakeetSTTImpl.isFillerToDrop("yes", Language.EN));
         assertFalse(ParakeetSTTImpl.isFillerToDrop("open galaxy map", Language.EN));
         assertFalse(ParakeetSTTImpl.isFillerToDrop("a", Language.EN));
+    }
+
+    @Test
+    void hotwordsJaResourceContainsNoAsciiLetters() throws Exception {
+        try (InputStream is = ParakeetSTTImpl.openHotwordsStream()) {
+            assertNotNull(is, "Resource /stt/hotwords_ja.txt must exist");
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                Pattern asciiPattern = Pattern.compile("[a-zA-Z]");
+                List<String> words = new ArrayList<>();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String trimmed = line.trim();
+                    if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                        continue;
+                    }
+                    assertFalse(asciiPattern.matcher(trimmed).find(),
+                            "Hotword must not contain ASCII letters (use katakana instead): " + trimmed);
+                    words.add(trimmed);
+                }
+                assertFalse(words.isEmpty(), "hotwords_ja.txt must contain at least one word");
+                assertTrue(words.contains("フレームシフトドライブ"), "Expected Katakana FSD in hotwords");
+                assertTrue(words.contains("ランディングギア"), "Expected landing gear in hotwords");
+                assertTrue(words.contains("ギャラクシーマップ"), "Expected galaxy map in hotwords");
+            }
+        }
+    }
+
+    @Test
+    void loadTokensReadsTokensProperly(@TempDir Path tempDir) throws Exception {
+        Path tokenFile = tempDir.resolve("tokens.txt");
+        Files.writeString(tokenFile, "<blk>\t0\nあ\t1\nい 2\nカ\t3\n", StandardCharsets.UTF_8);
+
+        Set<String> tokens = ParakeetSTTImpl.loadTokens(tokenFile);
+        assertEquals(4, tokens.size());
+        assertTrue(tokens.contains("<blk>"));
+        assertTrue(tokens.contains("あ"));
+        assertTrue(tokens.contains("い"));
+        assertTrue(tokens.contains("カ"));
+        assertFalse(tokens.contains("う"));
+    }
+
+    @Test
+    void filterHotwordsDropsWordsWithMissingTokens() {
+        Set<String> validTokens = Set.of("あ", "い", "う", "え", "お", "ー", "ッ", "ア", "イ");
+        List<String> rawLines = List.of(
+                "# comment",
+                "",
+                "あい",
+                "あいうえお",
+                "あか",       // 'か' is missing -> skipped
+                "アイ : 2.0",  // with score
+                "アイウ"      // 'ウ' is missing -> skipped
+        );
+
+        ParakeetSTTImpl.HotwordsValidationResult result = ParakeetSTTImpl.filterHotwords(rawLines, validTokens);
+        assertEquals(3, result.validWords.size());
+        assertTrue(result.validWords.contains("あい"));
+        assertTrue(result.validWords.contains("あいうえお"));
+        assertTrue(result.validWords.contains("アイ : 2.0"));
+
+        assertEquals(2, result.skippedWords.size());
+        assertTrue(result.skippedWords.contains("あか"));
+        assertTrue(result.skippedWords.contains("アイウ"));
+    }
+
+    @Test
+    void buildRecognizerConfigJapaneseWithHotwords(@TempDir Path tempDir) throws Exception {
+        Path hotwordsFile = tempDir.resolve("hotwords.txt");
+        Files.writeString(hotwordsFile, "テスト", StandardCharsets.UTF_8);
+
+        ParakeetSTTImpl.ModelSpec spec = new ParakeetSTTImpl.ModelSpec(
+                tempDir,
+                tempDir.resolve("encoder.onnx"),
+                tempDir.resolve("decoder.onnx"),
+                tempDir.resolve("joiner.onnx"),
+                tempDir.resolve("tokens.txt"),
+                80
+        );
+
+        OfflineRecognizerConfig config = ParakeetSTTImpl.buildRecognizerConfig(Language.JA, spec, 4, hotwordsFile);
+        assertNotNull(config);
+
+        // Verify OfflineModelConfig modelingUnit == "cjkchar"
+        assertEquals("cjkchar", config.getModelConfig().getModelingUnit());
+
+        // Verify OfflineRecognizerConfig fields via reflection
+        assertEquals("modified_beam_search", getField(config, "decodingMethod"));
+        assertEquals(4, getField(config, "maxActivePaths"));
+        assertEquals(1.5f, (Float) getField(config, "hotwordsScore"), 0.001f);
+        assertEquals(hotwordsFile.toAbsolutePath().toString(), getField(config, "hotwordsFile"));
+    }
+
+    @Test
+    void buildRecognizerConfigJapaneseFallbackWhenNoHotwords(@TempDir Path tempDir) throws Exception {
+        ParakeetSTTImpl.ModelSpec spec = new ParakeetSTTImpl.ModelSpec(
+                tempDir,
+                tempDir.resolve("encoder.onnx"),
+                tempDir.resolve("decoder.onnx"),
+                tempDir.resolve("joiner.onnx"),
+                tempDir.resolve("tokens.txt"),
+                80
+        );
+
+        OfflineRecognizerConfig config = ParakeetSTTImpl.buildRecognizerConfig(Language.JA, spec, 4, null);
+        assertNotNull(config);
+
+        // Greedy search fallback
+        assertEquals("greedy_search", getField(config, "decodingMethod"));
+        assertEquals(50, getField(config, "maxActivePaths"));
+        String hotwords = (String) getField(config, "hotwordsFile");
+        assertTrue(hotwords == null || hotwords.isEmpty(), "hotwordsFile should be null or empty");
+    }
+
+    @Test
+    void buildRecognizerConfigEnglishAlwaysUsesGreedySearch(@TempDir Path tempDir) throws Exception {
+        Path dummyHotwords = tempDir.resolve("hotwords.txt");
+        Files.writeString(dummyHotwords, "test", StandardCharsets.UTF_8);
+
+        ParakeetSTTImpl.ModelSpec spec = new ParakeetSTTImpl.ModelSpec(
+                tempDir,
+                tempDir.resolve("encoder.onnx"),
+                tempDir.resolve("decoder.onnx"),
+                tempDir.resolve("joiner.onnx"),
+                tempDir.resolve("tokens.txt"),
+                128
+        );
+
+        OfflineRecognizerConfig config = ParakeetSTTImpl.buildRecognizerConfig(Language.EN, spec, 4, dummyHotwords);
+        assertNotNull(config);
+
+        assertEquals("greedy_search", getField(config, "decodingMethod"));
+        assertEquals(50, getField(config, "maxActivePaths"));
+        String hotwords = (String) getField(config, "hotwordsFile");
+        assertTrue(hotwords == null || hotwords.isEmpty(), "hotwordsFile should be null or empty");
+    }
+
+    private static Object getField(Object obj, String fieldName) throws Exception {
+        Field f = obj.getClass().getDeclaredField(fieldName);
+        f.setAccessible(true);
+        return f.get(obj);
     }
 
     private static class EventRecorder {
