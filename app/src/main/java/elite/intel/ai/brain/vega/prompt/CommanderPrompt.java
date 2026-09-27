@@ -80,7 +80,7 @@ final class CommanderPrompt {
               call speak for truthful text-only answers using reasoning or general knowledge; decline only requests
               requiring unavailable external data or actions.
 
-                    Treat single-word or very short ship-context phrases as likely commands, not conversation; never echo or
+                    Casual talk, greetings, standby orders ("stand by", "at ease", "スタンバイ", "待機"), and status queries answered by <facts> do not fit functions: use speak. Named ship systems (supercruise, FSD, landing gear) are commands. Treat single-word or very short ship-context phrases as likely commands, not conversation; never echo or
                     restate the input. Game-data questions require their matching function, never a guessed answer. Only
                             request_input opens a continuation.
             </function_calling>
