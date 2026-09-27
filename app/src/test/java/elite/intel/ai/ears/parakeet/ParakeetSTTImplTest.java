@@ -385,8 +385,9 @@ class ParakeetSTTImplTest {
 
     @Test
     void hotwordsJaResourceContainsNoAsciiLetters() throws Exception {
-        try (InputStream is = ParakeetSTTImpl.openHotwordsStream()) {
-            assertNotNull(is, "Resource /stt/hotwords_ja.txt must exist");
+        // Must be readable directly from classpath via getResourceAsStream
+        try (InputStream is = ParakeetSTTImpl.class.getResourceAsStream("/stt/hotwords_ja.txt")) {
+            assertNotNull(is, "Resource /stt/hotwords_ja.txt must exist directly on classpath");
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
                 Pattern asciiPattern = Pattern.compile("[a-zA-Z]");
                 List<String> words = new ArrayList<>();
@@ -404,8 +405,31 @@ class ParakeetSTTImplTest {
                 assertTrue(words.contains("フレームシフトドライブ"), "Expected Katakana FSD in hotwords");
                 assertTrue(words.contains("ランディングギア"), "Expected landing gear in hotwords");
                 assertTrue(words.contains("ギャラクシーマップ"), "Expected galaxy map in hotwords");
+                assertTrue(words.contains("マップ"), "Expected 'マップ' in hotwords");
+                assertTrue(words.contains("ランク"), "Expected 'ランク' in hotwords");
             }
         }
+    }
+
+    @Test
+    void prepareJapaneseHotwordsWhenResourceMissingFallsBackToGreedy(@TempDir Path tempDir) throws Exception {
+        // When hotwords are absent or cannot be prepared, buildRecognizerConfig uses greedy_search
+        ParakeetSTTImpl.ModelSpec spec = new ParakeetSTTImpl.ModelSpec(
+                tempDir,
+                tempDir.resolve("encoder.onnx"),
+                tempDir.resolve("decoder.onnx"),
+                tempDir.resolve("joiner.onnx"),
+                tempDir.resolve("tokens.txt"),
+                80
+        );
+
+        // Explicit null hotwords file (e.g. resource missing / 0 valid words)
+        OfflineRecognizerConfig config = ParakeetSTTImpl.buildRecognizerConfig(Language.JA, spec, 4, null);
+        assertNotNull(config);
+        assertEquals("greedy_search", getField(config, "decodingMethod"));
+        assertEquals(50, getField(config, "maxActivePaths"));
+        String hotwords = (String) getField(config, "hotwordsFile");
+        assertTrue(hotwords == null || hotwords.isEmpty());
     }
 
     @Test

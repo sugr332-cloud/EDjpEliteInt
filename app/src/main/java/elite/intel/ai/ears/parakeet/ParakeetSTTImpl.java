@@ -466,24 +466,10 @@ public class ParakeetSTTImpl implements EarsInterface {
 
     static InputStream openHotwordsStream() {
         InputStream is = ParakeetSTTImpl.class.getResourceAsStream("/stt/hotwords_ja.txt");
-        if (is != null) {
-            return is;
+        if (is == null) {
+            log.warn("Japanese hotwords resource /stt/hotwords_ja.txt not found on classpath");
         }
-        Path[] fallbacks = new Path[] {
-                Path.of("app/src/main/resources/stt/hotwords_ja.txt"),
-                Path.of("src/main/resources/stt/hotwords_ja.txt"),
-                Path.of("../app/src/main/resources/stt/hotwords_ja.txt")
-        };
-        for (Path p : fallbacks) {
-            if (Files.exists(p)) {
-                try {
-                    return Files.newInputStream(p);
-                } catch (IOException e) {
-                    log.warn("Failed to open fallback hotwords file {}: {}", p, e.getMessage());
-                }
-            }
-        }
-        return null;
+        return is;
     }
 
     static Path prepareJapaneseHotwords(Path tokensFile) {
@@ -501,7 +487,6 @@ public class ParakeetSTTImpl implements EarsInterface {
             List<String> rawLines;
             try (InputStream is = openHotwordsStream()) {
                 if (is == null) {
-                    log.warn("Japanese hotwords resource /stt/hotwords_ja.txt not found");
                     return null;
                 }
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
