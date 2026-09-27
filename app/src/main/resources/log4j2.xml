@@ -115,6 +115,9 @@
              of those lines, and at error level none of them were written down. Edge-triggered
              on a failed or salvaged turn, never per turn. -->
         <Logger name="elite.intel.ai.brain.vega" level="warn"/>
+        <!-- VEGA runtime diagnostics (D-1): mirrors VegaDiagnostics (intake, reduce, llm: response, exec, etc.)
+             to logs/elite-intel.log at DEBUG so full turn traces are searchable via PowerShell/tools. -->
+        <Logger name="elite.intel.vega.diag" level="debug"/>
         <Logger name="elite.intel.search" level="debug"/>
         <Logger name="elite.intel.db" level="error"/>
         <Logger name="elite.intel.db.managers.SubSystemsManager" level="error"/>
