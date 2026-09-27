@@ -75,9 +75,10 @@
              at all. Edge-triggered: one line per failed batch, not per record. -->
         <Logger name="elite.intel.ai.brain.vega.memory" level="debug"/>
         <Logger name="elite.intel.gameapi.JournalParser" level="error"/>
-        <!-- warn, on purpose: a file caught mid-write is retried rather than dropped, and seeing how
-             often that happens is the only way to tell a slow disk from a stuck market. -->
-        <Logger name="elite.intel.gameapi.AuxiliaryFilesMonitor" level="warn"/>
+        <!-- info (D-2): logs directory monitoring status and stale Status.json alerts, as well as mid-write retries -->
+        <Logger name="elite.intel.gameapi.AuxiliaryFilesMonitor" level="info"/>
+        <!-- info (D-2): logs game situation transition to UNKNOWN with flags and timestamp diagnostics -->
+        <Logger name="elite.intel.gameapi.gamestate.subscribers.StatusEventSubscriber" level="info"/>
         <Logger name="elite.intel.gameapi.journal.subscribers" level="error"/>
         <!-- info, and louder than elite.intel, or this logger writes nothing at all. Exobiology
              payouts are fixed game constants that the journal states only at the moment of sale, so
