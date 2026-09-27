@@ -50,5 +50,5 @@
 
 | ID | 内容 | 変更許可ファイル | TEST GATE | 状態 |
 |---|---|---|---|---|
-| H-1 | §1 | PLAN CHECK で確定（ウィンドウを覚える部品、コマンド実行の入口、キー送信の入口、`GameWindowActivator` の共通化先、読み上げ文言の `responses` / `responses_ja` と baseline、テスト） | 新規テストと全体テスト（失敗 0 件）。実機: 文字入力「マップ開いて」でゲームが前面に出てギャラクシーマップが開くこと。ゲームを起動していないとき、キーが送られず中止メッセージが出ること | 未着手 |
-| J-19 | §2 | `responses_ja.properties`、`gui_ja.properties`（該当キーの値のみ） | `BundleKeyParityTest`、`BundleQuotingTest`、全体テスト（失敗 0 件） | 未着手 |
+| H-1 | §1 | PLAN CHECK で確定（ウィンドウを覚える部品、コマンド実行の入口、キー送信の入口、`GameWindowActivator` の共通化先、読み上げ文言の `responses` / `responses_ja` と baseline、テスト） | 新規テストと全体テスト（失敗 0 件）。実機: 文字入力「マップ開いて」でゲームが前面に出てギャラクシーマップが開くこと。ゲームを起動していないとき、キーが送られず中止メッセージが出ること | **DONE**（2026-09-27、main `0394afd`。IntelCommand の既定は「キーを送る」、キーを送らない 33 コマンドのみ false。保険の判定はタイトル一致でも可。実機確認待ち） |
+| J-19 | §2 | `responses_ja.properties`、`gui_ja.properties`（該当キーの値のみ） | `BundleKeyParityTest`、`BundleQuotingTest`、全体テスト（失敗 0 件） | **DONE**（2026-09-27、main `2e4fb0c`。automation は 6 キー） |
