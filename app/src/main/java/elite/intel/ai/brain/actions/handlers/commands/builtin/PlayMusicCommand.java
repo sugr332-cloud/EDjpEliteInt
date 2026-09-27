@@ -20,6 +20,10 @@ public final class PlayMusicCommand implements IntelCommand {
                 + "was paused. Use for 'play music' or 'resume the music'. This is their personal music "
                 + "library, nothing to do with the ship or the game.";
     }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

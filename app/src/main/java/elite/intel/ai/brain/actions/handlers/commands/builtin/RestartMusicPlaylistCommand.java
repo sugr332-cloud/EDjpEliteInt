@@ -25,6 +25,10 @@ public final class RestartMusicPlaylistCommand implements IntelCommand {
                 + "the playlist' or 'play from the top'. Unlike play_music this does not resume where the "
                 + "music was paused - it goes back to the beginning of the list.";
     }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

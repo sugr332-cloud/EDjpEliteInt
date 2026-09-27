@@ -32,9 +32,13 @@ public final class ToggleRouteAnnouncementsCommand implements IntelCommand {
                 PARAM_STATE, "boolean", true,
                 "Whether to turn it on (true) or off (false).",
                 List.of("true", "false"),
-                "on/enable/activate → true; off/disable/deactivate → false.");
+                "on/enable/activate ↁEtrue; off/disable/deactivate ↁEfalse.");
         state.validate();
         return List.of(state);
+    }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
     }
 
     @Override

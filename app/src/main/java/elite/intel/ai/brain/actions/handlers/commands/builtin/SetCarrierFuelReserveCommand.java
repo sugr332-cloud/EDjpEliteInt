@@ -41,6 +41,10 @@ public final class SetCarrierFuelReserveCommand implements IntelCommand {
         key.validate();
         return List.of(key);
     }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

@@ -16,6 +16,11 @@ public interface IntelCommand extends IntelAction {
         return false;
     }
 
+    @Override
+    default boolean sendsGameInput() {
+        return true;
+    }
+
     default VoiceStrategy voiceStrategy() {
         return VoiceStrategy.CANNED;
     }

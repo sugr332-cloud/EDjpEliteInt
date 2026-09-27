@@ -40,6 +40,10 @@ public final class TradeProfileTogglePlanetaryPortsCommand implements IntelComma
         state.validate();
         return List.of(state);
     }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

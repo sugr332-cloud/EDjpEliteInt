@@ -40,6 +40,10 @@ public final class TradeProfileTogglePermitSystemsCommand implements IntelComman
         state.validate();
         return List.of(state);
     }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

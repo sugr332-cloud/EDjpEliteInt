@@ -19,6 +19,10 @@ public final class PreviousMusicTrackCommand implements IntelCommand {
         return "Go back to the previous track in the commander's own music playlist. Use for 'previous "
                 + "track' or 'go back a song'.";
     }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

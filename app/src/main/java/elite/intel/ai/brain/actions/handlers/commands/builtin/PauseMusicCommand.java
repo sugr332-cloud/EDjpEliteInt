@@ -25,6 +25,10 @@ public final class PauseMusicCommand implements IntelCommand {
                 + "resumed. Use for 'pause the music' and also for 'stop the music' - spoken, both mean "
                 + "silence it, not restart it.";
     }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

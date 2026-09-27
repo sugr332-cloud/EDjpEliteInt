@@ -21,6 +21,10 @@ public final class ClearActiveMissionsCommand implements IntelCommand {
 
 
     private final MissionManager missionManager = MissionManager.getInstance();
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

@@ -40,6 +40,10 @@ public final class TradeProfileToggleProhibitedCargoCommand implements IntelComm
         state.validate();
         return List.of(state);
     }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

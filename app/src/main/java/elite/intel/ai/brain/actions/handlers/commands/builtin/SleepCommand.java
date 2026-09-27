@@ -22,6 +22,10 @@ public final class SleepCommand implements IntelCommand {
     public String llmDescription() {
         return "Put VEGA to sleep so it stops listening and responding until explicitly woken.";
     }
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

@@ -20,7 +20,10 @@ public final class InterruptCommand implements IntelCommand {
     public String llmDescription() {
         return "Interrupt and immediately stop VEGA's current speech.";
     }
-
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {

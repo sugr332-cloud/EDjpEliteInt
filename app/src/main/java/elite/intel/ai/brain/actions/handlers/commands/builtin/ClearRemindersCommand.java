@@ -28,6 +28,10 @@ public final class ClearRemindersCommand implements IntelCommand {
     private final ReminderManager destinationReminder = ReminderManager.getInstance();
     private final MonetizeRouteManager monetizeRouteManager = MonetizeRouteManager.getInstance();
     private final CommoditySearchResultManager commoditySearchResult = CommoditySearchResultManager.getInstance();
+    @Override
+    public boolean sendsGameInput() {
+        return false;
+    }
 
     @Override
     public String id() {
