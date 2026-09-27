@@ -161,17 +161,17 @@ class TagScannerTest {
      * A tag reader with scripted answers, so the scanner can be tested with no audio on disk.
      */
     private static final class RecordingReader implements TrackTagReader {
-        private final java.util.Map<String, TrackTags> answers = new ConcurrentHashMap<>();
-        private final Set<String> failures = ConcurrentHashMap.newKeySet();
-        private final Set<String> opened = ConcurrentHashMap.newKeySet();
+        private final java.util.Map<Path, TrackTags> answers = new ConcurrentHashMap<>();
+        private final Set<Path> failures = ConcurrentHashMap.newKeySet();
+        private final Set<Path> opened = ConcurrentHashMap.newKeySet();
         private final java.util.concurrent.atomic.AtomicInteger reads = new java.util.concurrent.atomic.AtomicInteger();
 
         void willReport(String path, TrackTags tags) {
-            answers.put(path, tags);
+            answers.put(Path.of(path).normalize(), tags);
         }
 
         void willFail(String path) {
-            failures.add(path);
+            failures.add(Path.of(path).normalize());
         }
 
         int readCount() {
@@ -180,7 +180,7 @@ class TagScannerTest {
 
         @Override
         public TrackTags read(Path file) throws IOException {
-            String path = file.toString();
+            Path path = file.normalize();
             reads.incrementAndGet();
             opened.add(path);
             if (failures.contains(path)) throw new IOException("cannot read " + path);

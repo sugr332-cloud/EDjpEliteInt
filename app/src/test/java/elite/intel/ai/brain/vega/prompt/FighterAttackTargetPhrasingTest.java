@@ -62,10 +62,10 @@ class FighterAttackTargetPhrasingTest {
             entry(Language.IT, List.of(List.of("attacc", "concentr"), List.of("mio"), List.of("bersaglio"))),
             entry(Language.PT, List.of(List.of("atac"), List.of("meu"), List.of("alvo"))),
             entry(Language.PTBZ, List.of(List.of("atac"), List.of("meu"), List.of("alvo"))),
-            // AiActionLocalizations routes JA to EnglishAiActionAliases (Parakeet cannot transcribe
-            // Japanese speech at all yet, see ParakeetSTTImpl.toLangCode()), so its aliases are the
-            // English ones and the same stems apply.
-            entry(Language.JA, List.of(List.of("attack"), List.of("my"), List.of("target")))
+            // Japanese drops possessives ("my") in natural orders; requiring both "攻撃" (attack)
+            // and either "ターゲット" or "標的" (target) guarantees the order specifies an explicit target
+            // without matching generic fighter commands.
+            entry(Language.JA, List.of(List.of("攻撃"), List.of("ターゲット", "標的")))
     );
 
     @ParameterizedTest(name = "{0} orders the attack in full words")
@@ -83,7 +83,10 @@ class FighterAttackTargetPhrasingTest {
         for (String phrase : phrases) {
             List<String> tokens = AliasVocabulary.tokenize(AliasPhrase.parse(phrase).spokenText());
             for (List<String> group : required) {
-                assertTrue(tokens.stream().anyMatch(token -> startsWithAny(token, group)),
+                boolean matched = language == Language.JA
+                        ? tokens.stream().anyMatch(token -> containsAny(token, group))
+                        : tokens.stream().anyMatch(token -> startsWithAny(token, group));
+                assertTrue(matched,
                         () -> language + " alias \"" + phrase + "\" for " + FighterAttackTargetCommand.ID
                                 + " is missing " + group + ". A phrase short of a full \"attack my target\" "
                                 + "becomes a magnet for damaged transcripts of the other fighter orders.");
@@ -94,5 +97,10 @@ class FighterAttackTargetPhrasingTest {
     private static boolean startsWithAny(String token, List<String> stems) {
         String lower = token.toLowerCase(Locale.ROOT);
         return stems.stream().anyMatch(lower::startsWith);
+    }
+
+    private static boolean containsAny(String token, List<String> stems) {
+        String lower = token.toLowerCase(Locale.ROOT);
+        return stems.stream().anyMatch(lower::contains);
     }
 }
