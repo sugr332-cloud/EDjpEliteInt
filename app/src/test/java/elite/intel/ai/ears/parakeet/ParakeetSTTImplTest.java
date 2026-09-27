@@ -328,6 +328,54 @@ class ParakeetSTTImplTest {
         return total;
     }
 
+    @Test
+    void japaneseFillerDropsFillersAndSingleChars() {
+        // Specified test cases to drop
+        assertTrue(ParakeetSTTImpl.isJapaneseFiller("あっ"), "「あっ」 must be dropped");
+        assertTrue(ParakeetSTTImpl.isJapaneseFiller("はっ"), "「はっ」 must be dropped");
+        assertTrue(ParakeetSTTImpl.isJapaneseFiller("えーと"), "「えーと」 must be dropped");
+        assertTrue(ParakeetSTTImpl.isJapaneseFiller("うーん"), "「うーん」 must be dropped");
+        assertTrue(ParakeetSTTImpl.isJapaneseFiller("ん"), "「ん」 must be dropped");
+        assertTrue(ParakeetSTTImpl.isJapaneseFiller("あ、"), "「あ、」 must be dropped");
+
+        // Additional common fillers from logs/spec
+        assertTrue(ParakeetSTTImpl.isJapaneseFiller("えっ"), "「えっ」 must be dropped");
+        assertTrue(ParakeetSTTImpl.isJapaneseFiller("うん"), "「うん」 must be dropped");
+        assertTrue(ParakeetSTTImpl.isJapaneseFiller("あれ"), "「あれ」 must be dropped");
+        assertTrue(ParakeetSTTImpl.isJapaneseFiller("あのー"), "「あのー」 must be dropped");
+        assertTrue(ParakeetSTTImpl.isJapaneseFiller("ほう"), "「ほう」 must be dropped");
+        assertTrue(ParakeetSTTImpl.isJapaneseFiller("へえ"), "「へえ」 must be dropped");
+    }
+
+    @Test
+    void japaneseFillerPreservesMeaningfulWords() {
+        // Specified test cases to preserve
+        assertFalse(ParakeetSTTImpl.isJapaneseFiller("はい"), "「はい」 must NOT be dropped");
+        assertFalse(ParakeetSTTImpl.isJapaneseFiller("いいえ"), "「いいえ」 must NOT be dropped");
+        assertFalse(ParakeetSTTImpl.isJapaneseFiller("了解"), "「了解」 must NOT be dropped");
+        assertFalse(ParakeetSTTImpl.isJapaneseFiller("発進"), "「発進」 must NOT be dropped");
+        assertFalse(ParakeetSTTImpl.isJapaneseFiller("脚を下ろして"), "「脚を下ろして」 must NOT be dropped");
+        assertFalse(ParakeetSTTImpl.isJapaneseFiller("マップ開いて"), "「マップ開いて」 must NOT be dropped");
+
+        // Additional phrases
+        assertFalse(ParakeetSTTImpl.isJapaneseFiller("ギャラクシーマップ開いて"));
+        assertFalse(ParakeetSTTImpl.isJapaneseFiller("閉じて"));
+    }
+
+    @Test
+    void fillerToDropOnlyAppliesToJapanese() {
+        // Japanese: fillers dropped, commands preserved
+        assertTrue(ParakeetSTTImpl.isFillerToDrop("あっ", Language.JA));
+        assertFalse(ParakeetSTTImpl.isFillerToDrop("はい", Language.JA));
+
+        // English and others: never dropped by this filter
+        assertFalse(ParakeetSTTImpl.isFillerToDrop("あっ", Language.EN));
+        assertFalse(ParakeetSTTImpl.isFillerToDrop("uh", Language.EN));
+        assertFalse(ParakeetSTTImpl.isFillerToDrop("yes", Language.EN));
+        assertFalse(ParakeetSTTImpl.isFillerToDrop("open galaxy map", Language.EN));
+        assertFalse(ParakeetSTTImpl.isFillerToDrop("a", Language.EN));
+    }
+
     private static class EventRecorder {
         private final List<AppLogEvent> logEvents = new ArrayList<>();
 

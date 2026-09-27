@@ -32,7 +32,9 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -172,6 +174,50 @@ public class ParakeetSTTImpl implements EarsInterface {
         if (transcript == null || transcript.isBlank()) return false;
         int minLength = (language == Language.JA) ? 2 : 3;
         return transcript.length() >= minLength;
+    }
+
+    /**
+     * Pattern matching characters to strip before testing for Japanese fillers:
+     * punctuation, whitespace, prolonged sound marks (ー/―/−), sokuon (っ/ッ), and wave marks (~/〜/～).
+     */
+    private static final Pattern JA_FILLER_STRIP_PATTERN =
+            Pattern.compile("[\\s\\p{Punct}、。！？ー―−〜～~っッ]+");
+
+    /**
+     * Set of Japanese fillers/interjections that should be dropped when the stripped utterance
+     * consists only of them.
+     */
+    private static final Set<String> JA_FILLER_WORDS = Set.of(
+            "あれ", "うん", "えと", "あの", "ほう", "へえ", "はあ", "おお",
+            "ふむ", "ふん", "うむ", "おい", "まあ", "ええ", "おや", "ほほう",
+            "アレ", "ウン", "エト", "アノ", "ホウ", "ヘエ", "ハア", "オオ",
+            "フム", "フン", "ウム", "オイ", "マア", "エエ", "オヤ", "ホホウ"
+    );
+
+    /**
+     * Checks if a Japanese transcript consists solely of fillers, interjections, or a single character
+     * after stripping punctuation, whitespace, prolonged marks, sokuon, and wave dashes.
+     */
+    static boolean isJapaneseFiller(String transcript) {
+        if (transcript == null || transcript.isBlank()) {
+            return false;
+        }
+        String stripped = JA_FILLER_STRIP_PATTERN.matcher(transcript).replaceAll("");
+        if (stripped.length() <= 1) {
+            return true;
+        }
+        return JA_FILLER_WORDS.contains(stripped);
+    }
+
+    /**
+     * Drops Japanese filler utterances before sending them to the LLM.
+     * Non-Japanese languages are never affected by this check.
+     */
+    static boolean isFillerToDrop(String transcript, Language language) {
+        if (language != Language.JA) {
+            return false;
+        }
+        return isJapaneseFiller(transcript);
     }
 
     static void trimPreRoll(Deque<byte[]> preRoll, Language language) {
@@ -621,6 +667,11 @@ public class ParakeetSTTImpl implements EarsInterface {
                 // never something the commander said - drop it before it costs an AI round trip.
                 if (LaughterFilter.isLaughter(finalTranscript)) {
                     log.info("STT dropped (laughter): [{}] - {}", finalTranscript, capture);
+                    return;
+                }
+
+                if (isFillerToDrop(finalTranscript, systemSession.getLanguage())) {
+                    log.info("STT dropped (JA filler): [{}] - {}", finalTranscript, capture);
                     return;
                 }
 
