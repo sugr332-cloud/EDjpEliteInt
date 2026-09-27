@@ -246,4 +246,34 @@ class QueryResultDisplayManagerTest {
             return null;
         }));
     }
+
+    @Test
+    void unparseableOrBlankSavedAtDefaultsToEpoch() {
+        TradeCandidateDto c = new TradeCandidateDto(
+                1, "Gold", "Sol", "Galileo", 50000, "50,000", 1000L, "1,000", 100.0, "100",
+                "2026-09-26 10:00:00+00", "Sol", "Columbus", 60000, "60,000", 2000L, "2,000",
+                200.0, "200", "2026-09-26 10:00:00+00", 10000, "10,000", 100, "100",
+                1000000L, "1,000,000", 0.0, "0.0", 0.0, "0.0"
+        );
+        String json = new com.google.gson.Gson().toJson(new TradeCandidatesDataDto("ok", "Sol", "profit", 30, List.of(c)));
+        Database.withDao(QueryResultDisplayDao.class, dao -> {
+            dao.save(QueryResultDisplayManager.TYPE_TRADE_CANDIDATES, "corrupt-timestamp", json);
+            return null;
+        });
+
+        var latestOpt = manager.getLatest();
+        assertTrue(latestOpt.isPresent());
+        assertEquals(java.time.Instant.EPOCH, latestOpt.get().savedAt(), "Corrupt timestamp must default to Instant.EPOCH");
+
+        var tcOpt = manager.getTradeCandidates();
+        assertTrue(tcOpt.isPresent());
+        assertEquals(java.time.Instant.EPOCH, tcOpt.get().savedAt());
+
+        // Blank timestamp
+        Database.withDao(QueryResultDisplayDao.class, dao -> {
+            dao.save(QueryResultDisplayManager.TYPE_TRADE_CANDIDATES, "   ", json);
+            return null;
+        });
+        assertEquals(java.time.Instant.EPOCH, manager.getLatest().orElseThrow().savedAt());
+    }
 }

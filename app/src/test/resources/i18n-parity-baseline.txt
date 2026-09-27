@@ -274,6 +274,15 @@ gui|ptbz|MISSING|ai.queryResult.row.price
 gui|ru|MISSING|ai.queryResult.row.price
 gui|uk|MISSING|ai.queryResult.row.price
 
+gui|de|MISSING|ai.queryResult.rowSeparator
+gui|es|MISSING|ai.queryResult.rowSeparator
+gui|fr|MISSING|ai.queryResult.rowSeparator
+gui|it|MISSING|ai.queryResult.rowSeparator
+gui|pt|MISSING|ai.queryResult.rowSeparator
+gui|ptbz|MISSING|ai.queryResult.rowSeparator
+gui|ru|MISSING|ai.queryResult.rowSeparator
+gui|uk|MISSING|ai.queryResult.rowSeparator
+
 gui|de|MISSING|overlay.card.title.tradeCandidates
 gui|es|MISSING|overlay.card.title.tradeCandidates
 gui|fr|MISSING|overlay.card.title.tradeCandidates
@@ -463,6 +472,33 @@ responses|pt|MISSING|handler.navigateToSearchResult.invalidLeg
 responses|ptbz|MISSING|handler.navigateToSearchResult.invalidLeg
 responses|ru|MISSING|handler.navigateToSearchResult.invalidLeg
 responses|uk|MISSING|handler.navigateToSearchResult.invalidLeg
+
+responses|de|MISSING|handler.navigateToSearchResult.reminderTradeBuy
+responses|es|MISSING|handler.navigateToSearchResult.reminderTradeBuy
+responses|fr|MISSING|handler.navigateToSearchResult.reminderTradeBuy
+responses|it|MISSING|handler.navigateToSearchResult.reminderTradeBuy
+responses|pt|MISSING|handler.navigateToSearchResult.reminderTradeBuy
+responses|ptbz|MISSING|handler.navigateToSearchResult.reminderTradeBuy
+responses|ru|MISSING|handler.navigateToSearchResult.reminderTradeBuy
+responses|uk|MISSING|handler.navigateToSearchResult.reminderTradeBuy
+
+responses|de|MISSING|handler.navigateToSearchResult.reminderTradeSell
+responses|es|MISSING|handler.navigateToSearchResult.reminderTradeSell
+responses|fr|MISSING|handler.navigateToSearchResult.reminderTradeSell
+responses|it|MISSING|handler.navigateToSearchResult.reminderTradeSell
+responses|pt|MISSING|handler.navigateToSearchResult.reminderTradeSell
+responses|ptbz|MISSING|handler.navigateToSearchResult.reminderTradeSell
+responses|ru|MISSING|handler.navigateToSearchResult.reminderTradeSell
+responses|uk|MISSING|handler.navigateToSearchResult.reminderTradeSell
+
+responses|de|MISSING|handler.navigateToSearchResult.reminderOutfitting
+responses|es|MISSING|handler.navigateToSearchResult.reminderOutfitting
+responses|fr|MISSING|handler.navigateToSearchResult.reminderOutfitting
+responses|it|MISSING|handler.navigateToSearchResult.reminderOutfitting
+responses|pt|MISSING|handler.navigateToSearchResult.reminderOutfitting
+responses|ptbz|MISSING|handler.navigateToSearchResult.reminderOutfitting
+responses|ru|MISSING|handler.navigateToSearchResult.reminderOutfitting
+responses|uk|MISSING|handler.navigateToSearchResult.reminderOutfitting
 
 # --- P5-1: Japanese STT (ReazonSpeech) ---
 gui|de|MISSING|log.sttJaModelMissing

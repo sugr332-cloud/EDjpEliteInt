@@ -187,7 +187,7 @@ public class QueryResultCard extends JPanel {
             rowPanel.setOpaque(false);
             rowPanel.setBorder(new EmptyBorder(1, 4, 1, 4));
 
-            JLabel labelComp = new JLabel(r.label() + "：");
+            JLabel labelComp = new JLabel(r.label() + getText("ai.queryResult.rowSeparator"));
             labelComp.setFont(labelComp.getFont().deriveFont(11.0f));
             labelComp.setForeground(HUD_COLOR_ROLE_READOUT_LABEL);
 

@@ -10,6 +10,7 @@ import elite.intel.ai.brain.actions.handlers.queries.NearestOutfittingQuery.Outf
 import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeCandidateDto;
 import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeCandidatesDataDto;
 import elite.intel.ai.mouth.subscribers.events.AiVoxResponseEvent;
+import elite.intel.db.FuzzySearch;
 import elite.intel.db.managers.QueryResultDisplayManager;
 import elite.intel.db.managers.QueryResultDisplayManager.LatestDisplay;
 import elite.intel.db.managers.ReminderManager;
@@ -180,6 +181,7 @@ public final class NavigateToSearchResultCommand implements IntelCommand {
         String targetSystem;
         String targetStation;
         String message;
+        String reminderMessage;
 
         if (latest.isOutfitting()) {
             if (rank != 1) {
@@ -194,6 +196,8 @@ public final class NavigateToSearchResultCommand implements IntelCommand {
             targetSystem = dto.starSystem();
             targetStation = dto.stationName();
             message = StringUtls.localizedResponse("handler.navigateToSearchResult.outfitting", targetStation, targetSystem);
+            String modName = dto.module() != null && dto.module().name() != null ? dto.module().name() : dto.rawModuleInput();
+            reminderMessage = StringUtls.localizedResponse("handler.navigateToSearchResult.reminderOutfitting", targetStation, targetSystem, modName != null ? modName : "-");
         } else if (latest.isTradeCandidates()) {
             TradeCandidatesDataDto dto = latest.tradeCandidates();
             if (dto == null || dto.candidates() == null || dto.candidates().isEmpty()) {
@@ -205,14 +209,17 @@ public final class NavigateToSearchResultCommand implements IntelCommand {
                 return returnOrVoice(answer, isGui);
             }
             TradeCandidateDto candidate = dto.candidates().get(rank - 1);
+            String commodityName = candidate.commodity() != null ? FuzzySearch.localizedCommodityName(candidate.commodity()) : "-";
             if ("buy".equals(leg)) {
                 targetSystem = candidate.buySystem();
                 targetStation = candidate.buyStation();
                 message = StringUtls.localizedResponse("handler.navigateToSearchResult.tradeBuy", rank, targetStation, targetSystem);
+                reminderMessage = StringUtls.localizedResponse("handler.navigateToSearchResult.reminderTradeBuy", rank, targetStation, targetSystem, commodityName);
             } else {
                 targetSystem = candidate.sellSystem();
                 targetStation = candidate.sellStation();
                 message = StringUtls.localizedResponse("handler.navigateToSearchResult.tradeSell", rank, targetStation, targetSystem);
+                reminderMessage = StringUtls.localizedResponse("handler.navigateToSearchResult.reminderTradeSell", rank, targetStation, targetSystem, commodityName);
             }
         } else {
             String answer = StringUtls.localizedResponse("handler.navigateToSearchResult.noRecentResult");
@@ -220,7 +227,7 @@ public final class NavigateToSearchResultCommand implements IntelCommand {
         }
 
         // 6. Set reminder and plot route
-        reminderSetter.setReminder(message, targetSystem, targetStation, null);
+        reminderSetter.setReminder(reminderMessage, targetSystem, targetStation, null);
         String plottedAnswer = routePlotterFunction.plotRouteAnd(message, targetSystem);
         String finalAnswer = (plottedAnswer != null && !plottedAnswer.isBlank()) ? plottedAnswer : message;
 
