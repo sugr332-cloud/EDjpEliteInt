@@ -415,10 +415,10 @@ class JukeboxPlayerTest {
      * Stands in for the MP3 decoder: constant-amplitude audio of a chosen length.
      */
     private static final class FakeLibraryOfTracks implements JukeboxPlayer.SourceFactory {
-        private final Set<String> openedPaths = ConcurrentHashMap.newKeySet();
-        private final Set<String> unopenable = ConcurrentHashMap.newKeySet();
+        private final Set<Path> openedPaths = ConcurrentHashMap.newKeySet();
+        private final Set<Path> unopenable = ConcurrentHashMap.newKeySet();
         private final AtomicLong attempts = new AtomicLong();
-        private final Map<String, Integer> blocksByPath = new ConcurrentHashMap<>();
+        private final Map<Path, Integer> blocksByPath = new ConcurrentHashMap<>();
         private volatile int blocks = Integer.MAX_VALUE;
         private volatile short sample = 8_000;
 
@@ -434,7 +434,7 @@ class JukeboxPlayerTest {
          * How long one named track runs, leaving the rest of the list endless.
          */
         void lengthInBlocks(String path, int count) {
-            blocksByPath.put(path, count);
+            blocksByPath.put(Path.of(path).normalize(), count);
         }
 
         void sampleValue(short value) {
@@ -442,11 +442,15 @@ class JukeboxPlayerTest {
         }
 
         void failToOpen(String... paths) {
-            unopenable.addAll(Set.of(paths));
+            for (String p : paths) {
+                unopenable.add(Path.of(p).normalize());
+            }
         }
 
         Set<String> opened() {
-            return openedPaths;
+            return openedPaths.stream()
+                    .map(p -> p.toString().replace('\\', '/'))
+                    .collect(java.util.stream.Collectors.toSet());
         }
 
         long openAttempts() {
@@ -456,7 +460,7 @@ class JukeboxPlayerTest {
         @Override
         public AudioSource open(Path file, long startMs) throws IOException {
             attempts.incrementAndGet();
-            String path = file.toString();
+            Path path = file.normalize();
             if (unopenable.contains(path)) {
                 throw new IOException("no such file: " + path);
             }
