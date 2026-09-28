@@ -1,6 +1,6 @@
 # ドッキング履歴とピストン輸送（PT-1〜PT-4）
 
-**Status:** Draft（2026-09-28）
+**Status:** PT-1・PT-2 DONE（2026-09-28）。PT-3 は実機確認待ち
 **正本との関係:** `docs/ELITEINTEL_INTEGRATION_PLAN.md` §R.13 の統制手順に従う。全体テストの判定は「失敗 0 件」。
 
 ## 0. 目的と決定事項（2026-09-28）
@@ -92,6 +92,6 @@
 | ID | 内容 | 変更許可ファイル | TEST GATE | 状態 |
 |---|---|---|---|---|
 | PT-1 | §1 ドッキング履歴の記録 | 新規: `01051__docking_history.sql`、`DockingHistoryDao`、`DockingHistoryManager`、`DockingHistoryManagerTest`。変更: `DockedSubscriber`、`LocationSubscriber` | 新規テスト（追加・同じ MarketID の更新・50 件上限・n 件前・直近の別々の 2 ステーション・`Location` の重複防止）、全体テスト（失敗 0 件） | DONE（`2010067`） |
-| PT-2 | §2 「前のステーションへ」 | PLAN CHECK で確定（新規コマンドとテスト、EN/JA エイリアス、`responses` と baseline、`AiActionMapGeneratorTest` のスナップショット 1 件） | 新規テスト（別星系→航路設定、同じ星系→航路なし、履歴不足→断る、本船外→断る、back=2）、エイリアス関連テスト、全体テスト（失敗 0 件）。実機: 「前のステーションへ」で航路が設定されること | PLAN CHECK 承認済み（`v2/pt-2`） |
+| PT-2 | §2 「前のステーションへ」 | PLAN CHECK で確定（新規コマンドとテスト、EN/JA エイリアス、`responses` と baseline、`AiActionMapGeneratorTest` のスナップショット 1 件） | 新規テスト（別星系→航路設定、同じ星系→航路なし、履歴不足→断る、本船外→断る、back=2）、エイリアス関連テスト、全体テスト（失敗 0 件）。実機: 「前のステーションへ」で航路が設定されること | DONE（`a94c5ba`）。実機確認待ち |
 | PT-3 | §3 到着後の自動ターゲット | 実機確認の後、PLAN CHECK で確定 | 閉ループの単体テスト（一致で終了、不一致で次の行、上限で中止、状況変化で中止）、全体テスト（失敗 0 件）。実機: 到着後にステーションがターゲットされること | 未着手 |
 | PT-4 | §4 ピストンモード | PT-3 の後に確定 | 確定時に記載 | 未着手 |
