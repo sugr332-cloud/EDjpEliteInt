@@ -39,9 +39,8 @@ public final class RequestDockingCommand implements IntelCommand {
         return status.isInMainShip() || status.isInFighter() || status.isInSrv(); ///Nomad is a flying SRV
     }
 
-    @Override
-    public String execute(JsonObject params, String responseText) {
-        if(status.isInMainShip()){
+    public static void sendDockingRequest(UINavigator navigator, Status status) {
+        if (status.isInMainShip()) {
             navigator.assumeDefaultState(StatusFlags.GuiFocus.EXTERNAL_PANEL);
             // Open contacts before navigating to the station docking request.
             navigator.openAndNavigate(StatusFlags.GuiFocus.EXTERNAL_PANEL, LeftPanel.CONTACTS);
@@ -56,8 +55,7 @@ public final class RequestDockingCommand implements IntelCommand {
             ));
             // Exit the panel and restore the assumed UI state.
             navigator.closeAndRestore(StatusFlags.GuiFocus.EXTERNAL_PANEL);
-        }
-        else {
+        } else {
             GameControllerBus.publish(GameInputSequenceEvent.of(
                     GameInputStep.bindingTap(Bindings.GameCommand.BINDING_FOCUS_ROLE_PANEL.getGameBinding()),
                     GameInputStep.bindingTap(Bindings.GameCommand.BINDING_UI_LEFT.getGameBinding()),
@@ -67,6 +65,11 @@ public final class RequestDockingCommand implements IntelCommand {
                     GameInputStep.bindingTap(Bindings.GameCommand.BINDING_FOCUS_ROLE_PANEL.getGameBinding())
             ));
         }
+    }
+
+    @Override
+    public String execute(JsonObject params, String responseText) {
+        sendDockingRequest(navigator, status);
         return null;
     }
 }

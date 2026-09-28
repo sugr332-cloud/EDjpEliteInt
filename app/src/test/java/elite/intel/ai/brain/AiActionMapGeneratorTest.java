@@ -67,6 +67,7 @@ class AiActionMapGeneratorTest {
             "restart_music_playlist_from_first_track",
             "activate_ui_control",
             "add_mining_target",
+            "auto_dock",
             "calculate_fleet_carrier_route",
             "calculate_neutron_star_route",
             "calculate_trade_route",
