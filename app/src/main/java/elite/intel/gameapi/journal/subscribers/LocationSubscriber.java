@@ -1,6 +1,7 @@
 package elite.intel.gameapi.journal.subscribers;
 
 import com.google.common.eventbus.Subscribe;
+import elite.intel.db.managers.DockingHistoryManager;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.LocationEvent;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
@@ -49,6 +50,10 @@ public class LocationSubscriber {
         dto.setSecurity(event.getSystemSecurityLocalised());
 
         if (event.getSystemFaction() != null) dto.setSystemFaction(event.getSystemFaction().getName());
+
+        if (event.isDocked()) {
+            DockingHistoryManager.getInstance().recordLocation(event);
+        }
 
         Thread.ofVirtual().start(() -> {
             dto.setTrafficDto(EdsmApiClient.searchTraffic(event.getStarSystem()));
