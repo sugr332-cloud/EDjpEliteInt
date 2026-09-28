@@ -44,6 +44,16 @@
 - 本船外の判定は P8-3（`navigate_to_search_result`）と同じ（`isVisibleForLLM` は常に true、`execute` 内で断る）。GUI から呼ぶ場合の読み上げも P8-3 と同じ方式。
 - EN/JA エイリアス: 例「前のステーションへ」「前のステーションに戻って」「さっきのステーションへ」「2 つ前のステーションへ」「ピストン先へ」。
 - H-1（ゲームを前面にしてからキーを送る）の対象コマンド（キーを送る）として扱う。
+- PLAN CHECK で確定（2026-09-28）:
+  - コマンド `navigate_to_previous_station`、新規 `NavigateToPreviousStationCommand`（`NavigateToSearchResultCommand` と同じく、航路設定・本船判定などを差し替えられる形にしてテストする）。
+  - `back` は省略時 1。1 未満や小数は断る。履歴の件数を超えるときは「履歴不足」で断る。
+  - 数え方: 基本は「履歴の `back` 件目（最新を 0 件目）」。例: A→B とドッキングして B にいる／B から出航した後、どちらも back=1 は A。
+    - ただし**ドッキング中で、最新の履歴が今いるステーションと一致しないとき**（履歴が取れていない等）は、今いるステーションは履歴に無いものとして `back - 1` 件目を使う。
+  - 同じ星系かどうかは、今いる星系の `SystemAddress` と履歴の `systemAddress` で比べる（取れないときだけ星系名で比べる）。
+  - 同じ星系でも `ReminderManager` に星系名・ステーション名を残す（HUD の目標表示のため）。航路は設定しない。
+  - フリートキャリア: 自分のキャリア（コールサインがステーション名と一致）なら `PlayerSession.getCurrentFleetCarrierSystem()` の星系へ航路を設定し、記録の星系と違えばその旨を伝える。他人のキャリアは記録の星系へ航路を設定し「移動している可能性があります」と添える。
+  - 答えの文言（JA）: 別の星系「前のステーション、{0}（{1} 星系）へ航路を設定します。」、同じ星系「前のステーションは同じ星系の {0} です。」
+  - 日本語のエイリアスは、音声認識で数字が漢数字・かなになる場合に備え「二つ前」「ふたつ前」も入れる。
 
 ## 3. PT-3: 到着後にステーションを自動でターゲットする
 
@@ -81,7 +91,7 @@
 
 | ID | 内容 | 変更許可ファイル | TEST GATE | 状態 |
 |---|---|---|---|---|
-| PT-1 | §1 ドッキング履歴の記録 | 新規: `01051__docking_history.sql`、`DockingHistoryDao`、`DockingHistoryManager`、`DockingHistoryManagerTest`。変更: `DockedSubscriber`、`LocationSubscriber` | 新規テスト（追加・同じ MarketID の更新・50 件上限・n 件前・直近の別々の 2 ステーション・`Location` の重複防止）、全体テスト（失敗 0 件） | PLAN CHECK 承認済み（`v2/pt-1`） |
-| PT-2 | §2 「前のステーションへ」 | PLAN CHECK で確定（新規コマンドとテスト、EN/JA エイリアス、`responses` と baseline、`AiActionMapGeneratorTest` のスナップショット 1 件） | 新規テスト（別星系→航路設定、同じ星系→航路なし、履歴不足→断る、本船外→断る、back=2）、エイリアス関連テスト、全体テスト（失敗 0 件）。実機: 「前のステーションへ」で航路が設定されること | 未着手 |
+| PT-1 | §1 ドッキング履歴の記録 | 新規: `01051__docking_history.sql`、`DockingHistoryDao`、`DockingHistoryManager`、`DockingHistoryManagerTest`。変更: `DockedSubscriber`、`LocationSubscriber` | 新規テスト（追加・同じ MarketID の更新・50 件上限・n 件前・直近の別々の 2 ステーション・`Location` の重複防止）、全体テスト（失敗 0 件） | DONE（`2010067`） |
+| PT-2 | §2 「前のステーションへ」 | PLAN CHECK で確定（新規コマンドとテスト、EN/JA エイリアス、`responses` と baseline、`AiActionMapGeneratorTest` のスナップショット 1 件） | 新規テスト（別星系→航路設定、同じ星系→航路なし、履歴不足→断る、本船外→断る、back=2）、エイリアス関連テスト、全体テスト（失敗 0 件）。実機: 「前のステーションへ」で航路が設定されること | PLAN CHECK 承認済み（`v2/pt-2`） |
 | PT-3 | §3 到着後の自動ターゲット | 実機確認の後、PLAN CHECK で確定 | 閉ループの単体テスト（一致で終了、不一致で次の行、上限で中止、状況変化で中止）、全体テスト（失敗 0 件）。実機: 到着後にステーションがターゲットされること | 未着手 |
 | PT-4 | §4 ピストンモード | PT-3 の後に確定 | 確定時に記載 | 未着手 |
