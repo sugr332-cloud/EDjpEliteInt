@@ -78,6 +78,7 @@ public final class PistonModeManager {
     private final Supplier<String> currentStarSystemSupplier;
     private final Supplier<Long> currentSystemAddressSupplier;
     private final Supplier<Long> dockedMarketIdSupplier;
+    private final Supplier<String> dockedStationNameSupplier;
 
     private PistonModeManager() {
         this(
@@ -96,7 +97,8 @@ public final class PistonModeManager {
                     var data = PlayerSession.getInstance().getLocationData();
                     return data != null ? data.getSystemAddress() : null;
                 },
-                () -> DockedMarket.getInstance().marketId()
+                () -> DockedMarket.getInstance().marketId(),
+                () -> DockedMarket.getInstance().stationName()
         );
     }
 
@@ -113,7 +115,8 @@ public final class PistonModeManager {
             Supplier<QueryResultDisplayManager> queryResultDisplaySupplier,
             Supplier<String> currentStarSystemSupplier,
             Supplier<Long> currentSystemAddressSupplier,
-            Supplier<Long> dockedMarketIdSupplier) {
+            Supplier<Long> dockedMarketIdSupplier,
+            Supplier<String> dockedStationNameSupplier) {
         this.routePlotterFunction = Objects.requireNonNull(routePlotterFunction, "routePlotterFunction");
         this.reminderSetter = Objects.requireNonNull(reminderSetter, "reminderSetter");
         this.voicePublisher = Objects.requireNonNull(voicePublisher, "voicePublisher");
@@ -127,6 +130,7 @@ public final class PistonModeManager {
         this.currentStarSystemSupplier = Objects.requireNonNull(currentStarSystemSupplier, "currentStarSystemSupplier");
         this.currentSystemAddressSupplier = Objects.requireNonNull(currentSystemAddressSupplier, "currentSystemAddressSupplier");
         this.dockedMarketIdSupplier = Objects.requireNonNull(dockedMarketIdSupplier, "dockedMarketIdSupplier");
+        this.dockedStationNameSupplier = Objects.requireNonNull(dockedStationNameSupplier, "dockedStationNameSupplier");
     }
 
     public static PistonModeManager getInstance() {
@@ -482,8 +486,12 @@ public final class PistonModeManager {
         if (expectedMarketId != 0 && curMarketId != 0) {
             return curMarketId == expectedMarketId;
         }
+        String curStation = dockedStationNameSupplier.get();
+        if (curStation == null || curStation.isBlank()) {
+            return false;
+        }
         String currentSystem = currentStarSystemSupplier.get();
-        return isStationMatch(expectedStation, currentSystem, expectedStation, expectedSystem);
+        return isStationMatch(curStation, currentSystem, expectedStation, expectedSystem);
     }
 
     private boolean isStationMatch(String stn1, String sys1, String stn2, String sys2) {

@@ -16,6 +16,7 @@ import elite.intel.session.PlayerSituation;
 import elite.intel.session.Status;
 import elite.intel.session.StatusFlags;
 import elite.intel.util.Cypher;
+import elite.intel.util.StringUtls;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +44,7 @@ class PistonModeManagerTest {
     private final AtomicReference<String> mockStarSystem = new AtomicReference<>("Shinrarta Dezhra");
     private final AtomicReference<Long> mockSystemAddress = new AtomicReference<>(12345678L);
     private final AtomicLong mockDockedMarketId = new AtomicLong(0L);
+    private final AtomicReference<String> mockDockedStationName = new AtomicReference<>();
 
     private PistonModeManager manager;
 
@@ -64,6 +66,7 @@ class PistonModeManagerTest {
         mockStarSystem.set("Shinrarta Dezhra");
         mockSystemAddress.set(12345678L);
         mockDockedMarketId.set(0L);
+        mockDockedStationName.set(null);
 
         Database.withDao(PistonModeDao.class, dao -> {
             dao.clear();
@@ -98,7 +101,8 @@ class PistonModeManagerTest {
                 QueryResultDisplayManager::getInstance,
                 mockStarSystem::get,
                 mockSystemAddress::get,
-                mockDockedMarketId::get
+                mockDockedMarketId::get,
+                mockDockedStationName::get
         );
     }
 
@@ -159,6 +163,7 @@ class PistonModeManagerTest {
         // Docked at Station A
         mockStatus.set(Status.detached(PlayerSituation.IN_SHIP_DOCKED));
         mockDockedMarketId.set(5555L);
+        mockDockedStationName.set("Station A");
         mockStarSystem.set("System A");
         mockSystemAddress.set(500L);
 
@@ -372,7 +377,8 @@ class PistonModeManagerTest {
                 QueryResultDisplayManager::getInstance,
                 mockStarSystem::get,
                 mockSystemAddress::get,
-                mockDockedMarketId::get
+                mockDockedMarketId::get,
+                mockDockedStationName::get
         );
 
         assertTrue(newManager.isActive());
@@ -470,5 +476,110 @@ class PistonModeManagerTest {
         json.addProperty("StationName", stationName);
         json.addProperty("MarketID", marketId);
         return json;
+    }
+
+    // --- Docked-state tests ---
+
+    // 1. 交易候補から開始、A と同じ星系の別のステーションにドッキング中 → 「A にいる」とみなさず、A へは同じ星系扱い（航路なし、リマインダーあり、sameSystem を含む文言）
+    @Test
+    void startFromTradeCandidatesWhenDockedAtDifferentStationInSameSystemAsA() {
+        seedTradeCandidates("Station A", "System A", "Station B", "System B", "Gold");
+
+        mockStatus.set(Status.detached(PlayerSituation.IN_SHIP_DOCKED));
+        mockDockedMarketId.set(0L);
+        mockDockedStationName.set("Other Station");
+        mockStarSystem.set("System A");
+        mockSystemAddress.set(100L);
+
+        PistonModeManager.StartResult result = manager.startFromTradeCandidates(1);
+        assertTrue(result.success());
+        assertTrue(plottedRoutes.isEmpty(), "No route should be plotted when in the same system as A");
+        assertEquals(1, reminders.size());
+        assertEquals("Station A@System A", reminders.get(0));
+        String samePart = StringUtls.localizedResponse("handler.pistonMode.sameSystem", "Station A");
+        assertTrue(result.message().contains(samePart),
+                "Message must contain sameSystem text: " + result.message());
+    }
+
+    // 2. 交易候補から開始、A にドッキング中（名前と星系が一致）→ 待つ（startTradeWait）
+    @Test
+    void startFromTradeCandidatesWhenDockedAtStationA() {
+        seedTradeCandidates("Station A", "System A", "Station B", "System B", "Gold");
+
+        mockStatus.set(Status.detached(PlayerSituation.IN_SHIP_DOCKED));
+        mockDockedMarketId.set(0L);
+        mockDockedStationName.set("Station A");
+        mockStarSystem.set("System A");
+        mockSystemAddress.set(100L);
+
+        PistonModeManager.StartResult result = manager.startFromTradeCandidates(1);
+        assertTrue(result.success());
+        assertTrue(plottedRoutes.isEmpty(), "No route should be plotted when docked at A");
+        assertTrue(reminders.isEmpty(), "No reminder should be set yet when waiting at A");
+        String waitPart = StringUtls.localizedResponse("handler.pistonMode.startTradeWait", "Station A", "System A", "Station B", "System B");
+        assertEquals(waitPart, result.message());
+    }
+
+    // 3. 交易候補から開始、別の星系のステーションにドッキング中 → A へ航路（startTradeRoute）
+    @Test
+    void startFromTradeCandidatesWhenDockedAtDifferentSystem() {
+        seedTradeCandidates("Station A", "System A", "Station B", "System B", "Gold");
+
+        mockStatus.set(Status.detached(PlayerSituation.IN_SHIP_DOCKED));
+        mockDockedMarketId.set(0L);
+        mockDockedStationName.set("Station C");
+        mockStarSystem.set("System C");
+        mockSystemAddress.set(300L);
+
+        PistonModeManager.StartResult result = manager.startFromTradeCandidates(1);
+        assertTrue(result.success());
+        assertEquals(1, plottedRoutes.size());
+        assertEquals("System A", plottedRoutes.get(0));
+        assertEquals(1, reminders.size());
+        assertEquals("Station A@System A", reminders.get(0));
+        String routePart = StringUtls.localizedResponse("handler.pistonMode.startTradeRoute", "Station A", "System A", "Station B", "System B");
+        assertTrue(result.message().contains(routePart),
+                "Message must contain startTradeRoute text: " + result.message());
+    }
+
+    // 4. 履歴から開始、MarketID が取れない状態で X と同じ星系の別のステーションにドッキング中 → X にいるとみなさない
+    @Test
+    void startFromHistoryWhenDockedAtDifferentStationInSameSystemAsXWithoutMarketId() {
+        seedDockingHistory("Station Y", "System Y", 200L, 2000L);
+        seedDockingHistory("Station X", "System X", 100L, 0L);
+
+        mockStatus.set(Status.detached(PlayerSituation.IN_SHIP_DOCKED));
+        mockDockedMarketId.set(0L);
+        mockDockedStationName.set("Other Station In X");
+        mockStarSystem.set("System X");
+        mockSystemAddress.set(100L);
+
+        PistonModeManager.StartResult result = manager.startFromHistory();
+        assertTrue(result.success());
+        assertEquals(1, plottedRoutes.size(), "Should plot route to Y since player is not deemed docked at X");
+        assertEquals("System Y", plottedRoutes.get(0));
+        assertEquals(1, reminders.size());
+        assertEquals("Station Y@System Y", reminders.get(0));
+    }
+
+    // 5. 現在ドッキングしているステーション名が null → ドッキング中とみなさない
+    @Test
+    void startFromTradeCandidatesWhenDockedStationNameIsNullDoesNotTreatAsDockedAtA() {
+        seedTradeCandidates("Station A", "System A", "Station B", "System B", "Gold");
+
+        mockStatus.set(Status.detached(PlayerSituation.IN_SHIP_DOCKED));
+        mockDockedMarketId.set(0L);
+        mockDockedStationName.set(null);
+        mockStarSystem.set("System A");
+        mockSystemAddress.set(100L);
+
+        PistonModeManager.StartResult result = manager.startFromTradeCandidates(1);
+        assertTrue(result.success());
+        assertTrue(plottedRoutes.isEmpty(), "No route should be plotted when in the same system as A");
+        assertEquals(1, reminders.size());
+        assertEquals("Station A@System A", reminders.get(0));
+        String samePart = StringUtls.localizedResponse("handler.pistonMode.sameSystem", "Station A");
+        assertTrue(result.message().contains(samePart),
+                "Message must contain sameSystem text: " + result.message());
     }
 }
