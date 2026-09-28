@@ -52,6 +52,9 @@ public class EventRegistry {
         registerEvent("Docked", DockedEvent.class);
         registerEvent("Undocked", UndockedEvent.class);
         registerEvent("DockingGranted", DockingGrantedEvent.class);
+        registerEvent("DockingDenied", DockingDeniedEvent.class);
+        registerEvent("DockingTimeout", DockingTimeoutEvent.class);
+        registerEvent("DockingCancelled", DockingCancelledEvent.class);
         registerEvent("DockSRV", DockSRVEvent.class);
         registerEvent("LaunchSRV", LaunchSRVEvent.class);
         registerEvent("FSSBodySignals", FSSBodySignalsEvent.class);
