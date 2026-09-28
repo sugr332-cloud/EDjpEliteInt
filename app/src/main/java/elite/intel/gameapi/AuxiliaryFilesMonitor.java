@@ -80,6 +80,19 @@ public class AuxiliaryFilesMonitor implements Runnable, ManagedService {
      */
     private final Map<String, String> parsed = new HashMap<>();
 
+    public static final long STATUS_STALE_THRESHOLD_MS = 30_000L;
+    static java.util.function.LongSupplier timeSupplier = System::currentTimeMillis;
+
+    private long lastSuccessfulStatusReadTime = -1L;
+    private String lastStatusStamp = null;
+    private boolean statusStaleLogged = false;
+
+    void resetStatusDiagnosticsForTesting() {
+        lastSuccessfulStatusReadTime = -1L;
+        lastStatusStamp = null;
+        statusStaleLogged = false;
+    }
+
     public AuxiliaryFilesMonitor() {
     }
 
@@ -151,7 +164,7 @@ public class AuxiliaryFilesMonitor implements Runnable, ManagedService {
             UiBus.publish(new AppLogEvent("Check Journal directory settings. Stopping services."));
             return;
         }
-        log.info("Auxiliary files monitor started, watching directory: {}", directory);
+        logStartupDiagnostics();
 
         while (isRunning) {
             Thread.sleep(120);
@@ -168,12 +181,59 @@ public class AuxiliaryFilesMonitor implements Runnable, ManagedService {
                 publishIfChanged(fileName);
             }
 
-            Path statusPath = directory.resolve("Status.json");
-            if (Files.exists(statusPath)) {
-                Object statusEvent = readAndParseFile(statusPath, "Status.json");
-                if (statusEvent != null) {
-                    GameEventBus.publish(statusEvent);
+            checkStatusFile();
+        }
+    }
+
+    void logStartupDiagnostics() {
+        Path statusPath = directory != null ? directory.resolve("Status.json") : null;
+        boolean exists = statusPath != null && Files.exists(statusPath);
+        String modifiedStr = "null";
+        if (exists) {
+            try {
+                modifiedStr = Files.getLastModifiedTime(statusPath).toInstant().toString();
+            } catch (IOException ignored) {
+            }
+        }
+        log.info("Auxiliary files monitor started, watching directory: {} — Status.json exists={} modified={}",
+                directory, exists, modifiedStr);
+    }
+
+    void checkStatusFile() {
+        Path statusPath = directory != null ? directory.resolve("Status.json") : null;
+        if (statusPath == null) return;
+
+        long now = timeSupplier.getAsLong();
+        if (lastSuccessfulStatusReadTime < 0) {
+            lastSuccessfulStatusReadTime = now;
+        }
+
+        boolean exists = Files.exists(statusPath);
+        if (exists) {
+            String currentStamp = stampOf(statusPath);
+            Object statusEvent = readAndParseFile(statusPath, "Status.json");
+            if (statusEvent != null) {
+                GameEventBus.publish(statusEvent);
+                if (currentStamp != null && !currentStamp.equals(lastStatusStamp)) {
+                    lastStatusStamp = currentStamp;
+                    lastSuccessfulStatusReadTime = now;
+                    statusStaleLogged = false;
                 }
+            }
+        }
+
+        if (now - lastSuccessfulStatusReadTime >= STATUS_STALE_THRESHOLD_MS) {
+            if (!statusStaleLogged) {
+                String modifiedStr = "null";
+                if (exists) {
+                    try {
+                        modifiedStr = Files.getLastModifiedTime(statusPath).toInstant().toString();
+                    } catch (IOException ignored) {
+                    }
+                }
+                log.info("Status.json has not been read for {}ms — path={} exists={} modified={}",
+                        now - lastSuccessfulStatusReadTime, statusPath, exists, modifiedStr);
+                statusStaleLogged = true;
             }
         }
     }
