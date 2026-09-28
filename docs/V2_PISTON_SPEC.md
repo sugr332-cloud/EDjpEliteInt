@@ -21,6 +21,15 @@
 - フリートキャリア（種類 `FleetCarrier`）も記録する。ただし位置が変わるため、PT-2 以降で使うときは別途現在地を確かめる。
 - 読み出し: 「n 件前のステーション」（今いるステーションを 0 件前とする）、「直近の別々の 2 ステーション」（ピストンの両端）。
 - 過去の Journal からの取り込みは今回行わない（必要なら別途）。
+- PLAN CHECK で確定（2026-09-28）:
+  - テーブル `docking_history`（マイグレーション `01051__docking_history.sql`）。列: `id`（INTEGER PRIMARY KEY AUTOINCREMENT）、`stationName`、`starSystem`、`systemAddress`、`marketId`、`stationType`、`distFromStarLS`、`dockedAt`（Journal の timestamp の ISO-8601 文字列）。並び順は `id`。
+  - 新規 `DockingHistoryDao`／`DockingHistoryManager`（`QueryResultDisplayDao`／`QueryResultDisplayManager` に倣う）。「直前の行を見て追加／更新し、50 件を超えたら古い順に削除」は 1 回の呼び出しの中でまとめて行い、同時に呼ばれても崩れないようにする。
+  - 直前と同じ `MarketID` のときは行を足さず、その行の全項目（日時・名前・種類・距離・星系・`SystemAddress`）を新しい値で更新する（キャリアは同じ `MarketID` のまま星系が変わるため）。
+  - `MarketID` が 0（欠けている）のときは、ステーション名と `SystemAddress` の組で「同じステーション」を判定する。
+  - ドッキング中の `Location` で直前と違う `MarketID` のときは、新しい行を 1 件足す（ツールを起動していない間の移動、撃墜後の再開など。今いる場所を 0 件前に保つため）。
+  - 記録の呼び出しは `DockedSubscriber`／`LocationSubscriber` で行う。`LocationSubscriber` では EDSM への問い合わせより前に記録する（通信の待ち時間で順序が崩れないように）。
+  - 起動時に読み返す古い Journal のイベント（replay／期限切れ）は既存の `JournalParser` が流さないため、重複の心配はない。
+  - 読み出し: `getNthPreviousStation(back)`（0 = 最新、負や範囲外は空）、`getRecentDistinctStations()`（最新と、それと違う `MarketID` の直近 1 件。無ければ空）、`getHistory(limit)`。`DockingHistoryEntry.isFleetCarrier()`（種類 `FleetCarrier`）。
 
 ## 2. PT-2: 「前のステーションへ」
 
@@ -72,7 +81,7 @@
 
 | ID | 内容 | 変更許可ファイル | TEST GATE | 状態 |
 |---|---|---|---|---|
-| PT-1 | §1 ドッキング履歴の記録 | PLAN CHECK で確定（新規マイグレーション、DAO、Manager、`Docked`／`Location` の購読箇所、テスト） | 新規テスト（追加・同じ MarketID の更新・50 件上限・n 件前・直近の別々の 2 ステーション・`Location` の重複防止）、全体テスト（失敗 0 件） | 未着手 |
+| PT-1 | §1 ドッキング履歴の記録 | 新規: `01051__docking_history.sql`、`DockingHistoryDao`、`DockingHistoryManager`、`DockingHistoryManagerTest`。変更: `DockedSubscriber`、`LocationSubscriber` | 新規テスト（追加・同じ MarketID の更新・50 件上限・n 件前・直近の別々の 2 ステーション・`Location` の重複防止）、全体テスト（失敗 0 件） | PLAN CHECK 承認済み（`v2/pt-1`） |
 | PT-2 | §2 「前のステーションへ」 | PLAN CHECK で確定（新規コマンドとテスト、EN/JA エイリアス、`responses` と baseline、`AiActionMapGeneratorTest` のスナップショット 1 件） | 新規テスト（別星系→航路設定、同じ星系→航路なし、履歴不足→断る、本船外→断る、back=2）、エイリアス関連テスト、全体テスト（失敗 0 件）。実機: 「前のステーションへ」で航路が設定されること | 未着手 |
 | PT-3 | §3 到着後の自動ターゲット | 実機確認の後、PLAN CHECK で確定 | 閉ループの単体テスト（一致で終了、不一致で次の行、上限で中止、状況変化で中止）、全体テスト（失敗 0 件）。実機: 到着後にステーションがターゲットされること | 未着手 |
 | PT-4 | §4 ピストンモード | PT-3 の後に確定 | 確定時に記載 | 未着手 |

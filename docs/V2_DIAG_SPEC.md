@@ -1,6 +1,6 @@
 # マップの言い回し・診断ログ・ゲーム状況 Unknown（J-20 / D-1 / D-2）
 
-**Status:** J-20 DONE / D-1・D-2 レビュー済み・マージ待ち（2026-09-28）
+**Status:** J-20・D-1・D-2 DONE（2026-09-28）。D-3 は実機ログ待ち
 **正本との関係:** `docs/ELITEINTEL_INTEGRATION_PLAN.md` §R.13 の統制手順に従う。全体テストの判定は「失敗 0 件」。
 
 ## J-20: 「マップ開いて」をギャラクシーマップにする
@@ -34,5 +34,5 @@
 | ID | 内容 | 変更許可ファイル | TEST GATE | 状態 |
 |---|---|---|---|---|
 | J-20 | 上記 J-20 | `ai_action_aliases_ja.properties`（`display_open_galaxy_map` の行のみ）、新規ルーティングテスト 1 つ | 新規ルーティングテスト（`embeddingTest`）、`AliasPhraseTest`、`AliasVocabularyTest`、`AliasPhraseCollisionTest`、`AiActionLocalizationsTest`、全体テスト（失敗 0 件） | DONE（`1aaeb8a`） |
-| D-1 | 上記 D-1 | PLAN CHECK で確定（`VegaDiagnostics` と `log4j2.xml`、テスト） | 新規テスト（画面向けの出力と同じ内容がログにも渡ること）、全体テスト（失敗 0 件）。実機: `logs/elite-intel.log` に `STT:` や `llm: response` の行が出ること | レビュー済み・マージ待ち（`v2/d-1` @ `645acf3`） |
-| D-2 | 上記 D-2（調査＋診断ログ） | PLAN CHECK で確定（Status の読み込み箇所、`log4j2.xml`、テスト） | 新規テスト（UNKNOWN への変化時だけ 1 回出ること）、全体テスト（失敗 0 件） | レビュー済み・マージ待ち（`v2/d-2` @ `1c4be91`） |
+| D-1 | 上記 D-1 | PLAN CHECK で確定（`VegaDiagnostics` と `log4j2.xml`、テスト） | 新規テスト（画面向けの出力と同じ内容がログにも渡ること）、全体テスト（失敗 0 件）。実機: `logs/elite-intel.log` に `STT:` や `llm: response` の行が出ること | DONE（`8e6766f`） |
+| D-2 | 上記 D-2（調査＋診断ログ） | PLAN CHECK で確定（Status の読み込み箇所、`log4j2.xml`、テスト） | 新規テスト（UNKNOWN への変化時だけ 1 回出ること）、全体テスト（失敗 0 件） | DONE（`2c09de1`） |
