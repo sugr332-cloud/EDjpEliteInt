@@ -8,6 +8,8 @@ import elite.intel.ai.brain.vega.prompt.Fact;
 import elite.intel.eventbus.UiBus;
 import elite.intel.ui.event.AppLogDebugEvent;
 import elite.intel.ui.event.AppLogEvent;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -51,6 +53,9 @@ public final class VegaDiagnostics {
      * {@code Thought.run()}. Lets leaf components invoked synchronously on that thread (the reducer, the memory
      * gateway) tag their lines with the owning thought's trace without threading it through their contracts.
      */
+    public static final String LOGGER_NAME = "elite.intel.vega.diag";
+    private static final Logger log = LogManager.getLogger(LOGGER_NAME);
+
     private static final ThreadLocal<String> AMBIENT_TRACE = new ThreadLocal<>();
 
     private VegaDiagnostics() {
@@ -74,7 +79,9 @@ public final class VegaDiagnostics {
      * A per-turn headline the operator should always see (intake, settle outcome, dangerous confirmation).
      */
     public static void info(String tag, String stage, String detail) {
-        UiBus.publish(new AppLogEvent(format(tag, stage, detail)));
+        String line = format(tag, stage, detail);
+        log.info(line);
+        UiBus.publish(new AppLogEvent(line));
     }
 
     /**
@@ -83,6 +90,7 @@ public final class VegaDiagnostics {
      */
     public static void debug(String tag, String stage, String detail) {
         String line = format(tag, stage, detail);
+        log.debug(line);
         UiBus.publish(VegaConfig.diagnosticsVerbose() ? new AppLogEvent(line) : new AppLogDebugEvent(line));
     }
 
