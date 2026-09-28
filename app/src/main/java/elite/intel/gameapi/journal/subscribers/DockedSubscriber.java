@@ -2,6 +2,7 @@ package elite.intel.gameapi.journal.subscribers;
 
 import com.google.common.eventbus.Subscribe;
 import elite.intel.db.dao.LocationDao;
+import elite.intel.db.managers.DockingHistoryManager;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.DockedEvent;
 import elite.intel.gameapi.journal.events.dto.CarrierDataDto;
@@ -19,6 +20,7 @@ public class DockedSubscriber {
             // the body as the station standing next to it. See DockedStationRecord.
             DockedStationRecord station = DockedStationRecord.of(event);
             station.store();
+            DockingHistoryManager.getInstance().recordDocked(event);
 
             if (station.isFleetCarrier()) {
                 rememberCarrierPosition(event);
