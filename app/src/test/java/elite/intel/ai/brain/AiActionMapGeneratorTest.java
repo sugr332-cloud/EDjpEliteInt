@@ -229,6 +229,8 @@ class AiActionMapGeneratorTest {
             "show_storage_panel",
             "show_transactions_panel",
             "sleep_ignore_do_not_monitor",
+            "start_piston_mode",
+            "stop_piston_mode",
             "switch_to_analysis_mode",
             "switch_to_combat_mode",
             "target_destination",
