@@ -213,9 +213,9 @@ class AutoDockCommandTest {
         assertEquals(StringUtls.localizedResponse("handler.autoDock.cancelled"), voxResponses.get(0).getText());
     }
 
-    // 6. Already granted -> no request keys, sets throttle zero immediately, returns alreadyGranted
+    // 6. Already granted tests
     @Test
-    void executeWhenAlreadyGrantedSendsThrottleZeroImmediately() {
+    void executeWhenAlreadyGrantedWithDockingComputerSendsThrottleZeroAndReturnsAlreadyGranted() {
         // Pre-grant docking
         JsonObject json = createEventJson("DockingGranted");
         json.addProperty("StationName", "Jameson Memorial");
@@ -236,6 +236,78 @@ class AutoDockCommandTest {
         assertNull(backgroundTask.get());
         assertTrue(voxResponses.isEmpty());
         // No request docking keystrokes published to GameControllerBus
+        assertTrue(statusCapture.events.isEmpty());
+    }
+
+    @Test
+    void executeWhenAlreadyGrantedWithoutDockingComputerSendsNoInputAndReturnsNoDockingComputer() {
+        // Pre-grant docking
+        JsonObject json = createEventJson("DockingGranted");
+        json.addProperty("StationName", "Jameson Memorial");
+        dockingStateTracker.onDockingGranted(new DockingGrantedEvent(json));
+
+        Status status = Status.detached(PlayerSituation.IN_SHIP_DEEP_SPACE);
+        // Definitely no docking computer
+        ShipLoadOutDto loadout = new ShipLoadOutDto();
+        ModuleDto mod = new ModuleDto();
+        mod.setItem("Int_ShieldGenerator_Size3_Class1");
+        mod.setOn(true);
+        loadout.setModules(List.of(mod));
+
+        AutoDockCommand command = createCommand(status, null, loadout, 20);
+
+        String result = command.execute(new JsonObject(), null);
+        assertEquals(StringUtls.localizedResponse("handler.autoDock.noDockingComputer"), result);
+
+        // Neither throttle zero nor request keys should be sent
+        assertTrue(gameInputs.isEmpty(), "Throttle zero must not be sent");
+        assertTrue(statusCapture.events.isEmpty(), "Docking request keys must not be sent");
+        assertNull(backgroundTask.get());
+        assertTrue(voxResponses.isEmpty());
+    }
+
+    @Test
+    void executeWhenAlreadyGrantedWithDockingComputerPoweredOffSendsNoInputAndReturnsNoDockingComputer() {
+        // Pre-grant docking
+        JsonObject json = createEventJson("DockingGranted");
+        json.addProperty("StationName", "Jameson Memorial");
+        dockingStateTracker.onDockingGranted(new DockingGrantedEvent(json));
+
+        Status status = Status.detached(PlayerSituation.IN_SHIP_DEEP_SPACE);
+        // Docking computer powered off
+        ShipLoadOutDto loadout = withDockingComputer(false);
+
+        AutoDockCommand command = createCommand(status, null, loadout, 20);
+
+        String result = command.execute(new JsonObject(), null);
+        assertEquals(StringUtls.localizedResponse("handler.autoDock.noDockingComputer"), result);
+
+        assertTrue(gameInputs.isEmpty(), "Throttle zero must not be sent");
+        assertTrue(statusCapture.events.isEmpty(), "Docking request keys must not be sent");
+        assertNull(backgroundTask.get());
+    }
+
+    @Test
+    void executeWhenAlreadyGrantedWithUnknownLoadoutSendsThrottleZeroAndReturnsAlreadyGranted() {
+        // Pre-grant docking
+        JsonObject json = createEventJson("DockingGranted");
+        json.addProperty("StationName", "Jameson Memorial");
+        dockingStateTracker.onDockingGranted(new DockingGrantedEvent(json));
+
+        Status status = Status.detached(PlayerSituation.IN_SHIP_DEEP_SPACE);
+        // Loadout unknown (null)
+        AutoDockCommand command = createCommand(status, null, null, 20);
+
+        String result = command.execute(new JsonObject(), null);
+        assertEquals(StringUtls.localizedResponse("handler.autoDock.alreadyGranted"), result);
+
+        // Immediate throttle zero
+        assertEquals(1, gameInputs.size());
+        GameInputSequenceEvent seq = (GameInputSequenceEvent) gameInputs.get(0);
+        assertEquals(Bindings.GameCommand.BINDING_SET_SPEED_ZERO.getGameBinding(), seq.getSteps().get(0).getBindingId());
+
+        assertNull(backgroundTask.get());
+        assertTrue(voxResponses.isEmpty());
         assertTrue(statusCapture.events.isEmpty());
     }
 

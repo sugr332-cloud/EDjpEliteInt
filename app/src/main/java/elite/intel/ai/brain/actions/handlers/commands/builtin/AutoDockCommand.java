@@ -119,18 +119,19 @@ public final class AutoDockCommand implements IntelCommand {
             return StringUtls.localizedResponse("handler.autoDock.inSupercruise");
         }
 
-        // 2. Already granted check
+        // 2. Docking computer check
+        Boolean hasComputer = checkDockingComputerInstalled();
+        if (Boolean.FALSE.equals(hasComputer)) {
+            if (!dockingStateTracker.isDockingGranted()) {
+                RequestDockingCommand.sendDockingRequest(navigator, status);
+            }
+            return StringUtls.localizedResponse("handler.autoDock.noDockingComputer");
+        }
+
+        // 3. Already granted check
         if (dockingStateTracker.isDockingGranted()) {
             sendThrottleZero();
             return StringUtls.localizedResponse("handler.autoDock.alreadyGranted");
-        }
-
-        // 3. Docking computer check
-        Boolean hasComputer = checkDockingComputerInstalled();
-        if (Boolean.FALSE.equals(hasComputer)) {
-            // Definitely no docking computer or turned off: request only, do not wait, do not zero throttle
-            RequestDockingCommand.sendDockingRequest(navigator, status);
-            return StringUtls.localizedResponse("handler.autoDock.noDockingComputer");
         }
 
         // 4. Register event listener BEFORE sending docking request to avoid race condition
