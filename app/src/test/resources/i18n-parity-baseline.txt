@@ -958,3 +958,13 @@ ai_action_aliases|ptbz|MISSING|query_key_binding
 ai_action_aliases|ru|MISSING|query_key_binding
 ai_action_aliases|uk|MISSING|query_key_binding
 
+# --- LF-3: Single modifier conflict warning ---
+gui|de|MISSING|speech.bindingSingleModifierConflict
+gui|es|MISSING|speech.bindingSingleModifierConflict
+gui|fr|MISSING|speech.bindingSingleModifierConflict
+gui|it|MISSING|speech.bindingSingleModifierConflict
+gui|pt|MISSING|speech.bindingSingleModifierConflict
+gui|ptbz|MISSING|speech.bindingSingleModifierConflict
+gui|ru|MISSING|speech.bindingSingleModifierConflict
+gui|uk|MISSING|speech.bindingSingleModifierConflict
+

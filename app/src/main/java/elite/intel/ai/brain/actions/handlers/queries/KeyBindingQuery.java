@@ -172,6 +172,7 @@ public class KeyBindingQuery extends BaseQueryAnalyzer implements IntelQuery {
                 - query: original user query
                 - message: summary message
                 - conflicts: list of detected binding conflicts (actionA, actionAName, actionB, actionBName, chord, description, blocking)
+                - singleModifierConflicts: list of bare modifier conflicts (bareAction, bareActionName, modifierKey, modifierSpoken, chordAction, chordActionName, chordSpoken, description)
                 - results: list of matched actions with primary and secondary slots (actionId, label, section, group, primary, secondary)
                 
                 Rules:
@@ -218,10 +219,37 @@ public class KeyBindingQuery extends BaseQueryAnalyzer implements IntelQuery {
                 String spokenChord = BindingChordSpeech.describe(c.chord());
                 conflictItems.add(new ConflictItemDto(c.actionA(), nameA, c.actionB(), nameB, spokenChord, c.description(), c.blocking()));
             }
-            String message = conflictItems.isEmpty()
-                    ? "キーの重なり（コンフリクト）は検出されませんでした。"
-                    : conflictItems.size() + " 件のキーの重なりが検出されました。";
-            return new DataDto("conflict", rawQuery, message, conflictItems, List.of());
+
+            List<BindingConflictScanner.SingleModifierConflict> singleModifierConflicts =
+                    BindingConflictScanner.scanSingleModifierConflicts(executableBindings, BindingsMonitor.appDrivenActions());
+            List<SingleModifierConflictItemDto> singleModifierItems = new ArrayList<>();
+            for (BindingConflictScanner.SingleModifierConflict sc : singleModifierConflicts) {
+                String bareName = BindingDisplayNames.label(sc.bareAction());
+                String chordName = BindingDisplayNames.label(sc.chordAction());
+                String modifierSpoken = BindingChordSpeech.describe(Set.of(sc.modifierKey()));
+                String chordSpoken = BindingChordSpeech.describe(sc.chord());
+                singleModifierItems.add(new SingleModifierConflictItemDto(
+                        sc.bareAction(), bareName, sc.modifierKey(), modifierSpoken,
+                        sc.chordAction(), chordName, chordSpoken, sc.description()));
+            }
+
+            StringBuilder sb = new StringBuilder();
+            if (conflictItems.isEmpty() && singleModifierItems.isEmpty()) {
+                sb.append("キーの重なり（コンフリクト）は検出されませんでした。");
+            } else {
+                if (!conflictItems.isEmpty()) {
+                    sb.append(conflictItems.size()).append(" 件のキーの重なり");
+                }
+                if (!singleModifierItems.isEmpty()) {
+                    if (!conflictItems.isEmpty()) {
+                        sb.append("、および ");
+                    }
+                    sb.append(singleModifierItems.size()).append(" 件の単独修飾キーの干渉");
+                }
+                sb.append("が検出されました。");
+            }
+
+            return new DataDto("conflict", rawQuery, sb.toString(), conflictItems, singleModifierItems, List.of());
         }
 
         // 照合優先順 (2): キー名から逆引き
@@ -445,14 +473,23 @@ public class KeyBindingQuery extends BaseQueryAnalyzer implements IntelQuery {
         private final String query;
         private final String message;
         private final List<ConflictItemDto> conflicts;
+        private final List<SingleModifierConflictItemDto> singleModifierConflicts;
         private final List<BindingSlotResultDto> results;
 
         public DataDto(String type, String query, String message,
                        List<ConflictItemDto> conflicts, List<BindingSlotResultDto> results) {
+            this(type, query, message, conflicts, List.of(), results);
+        }
+
+        public DataDto(String type, String query, String message,
+                       List<ConflictItemDto> conflicts,
+                       List<SingleModifierConflictItemDto> singleModifierConflicts,
+                       List<BindingSlotResultDto> results) {
             this.type = type;
             this.query = query;
             this.message = message;
             this.conflicts = conflicts != null ? conflicts : List.of();
+            this.singleModifierConflicts = singleModifierConflicts != null ? singleModifierConflicts : List.of();
             this.results = results != null ? results : List.of();
         }
 
@@ -460,6 +497,7 @@ public class KeyBindingQuery extends BaseQueryAnalyzer implements IntelQuery {
         public String query() { return query; }
         public String message() { return message; }
         public List<ConflictItemDto> conflicts() { return conflicts; }
+        public List<SingleModifierConflictItemDto> singleModifierConflicts() { return singleModifierConflicts; }
         public List<BindingSlotResultDto> results() { return results; }
 
         @Override
@@ -476,6 +514,18 @@ public class KeyBindingQuery extends BaseQueryAnalyzer implements IntelQuery {
             String chord,
             String description,
             boolean blocking
+    ) {
+    }
+
+    public record SingleModifierConflictItemDto(
+            String bareAction,
+            String bareActionName,
+            String modifierKey,
+            String modifierSpoken,
+            String chordAction,
+            String chordActionName,
+            String chordSpoken,
+            String description
     ) {
     }
 
