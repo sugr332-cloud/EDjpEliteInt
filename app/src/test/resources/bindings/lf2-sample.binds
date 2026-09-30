@@ -17,6 +17,10 @@
 		<Primary Device="Keyboard" Key="Key_X" />
 		<Secondary Device="{NoDevice}" Key="" />
 	</SetSpeedZero>
+	<SetSpeed50>
+		<Primary Device="Keyboard" Key="Key_LeftShift" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</SetSpeed50>
 	<SelectTargetsTarget>
 		<Primary Device="Keyboard" Key="Key_T" />
 		<Secondary Device="{NoDevice}" Key="" />

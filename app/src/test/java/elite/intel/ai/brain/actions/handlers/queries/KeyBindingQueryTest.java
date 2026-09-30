@@ -130,4 +130,23 @@ class KeyBindingQueryTest {
         assertEquals("Mouse", result.secondary().device());
         assertEquals("Mouse_3", result.secondary().key());
     }
+
+    @Test
+    void test7_searchConflicts_includesSingleModifierConflicts() {
+        // "キーの重なりを教えて" -> should include bare modifier conflict for SetSpeed50 (Key_LeftShift) and Hyperspace (Key_LeftShift + Key_F4)
+        DataDto data = runQuery("キーの重なりを教えて");
+        assertEquals("conflict", data.type());
+        assertFalse(data.singleModifierConflicts().isEmpty(), "Should detect single modifier conflict");
+
+        KeyBindingQuery.SingleModifierConflictItemDto item = data.singleModifierConflicts().stream()
+                .filter(sc -> "SetSpeed50".equals(sc.bareAction()) && "Hyperspace".equals(sc.chordAction()))
+                .findFirst()
+                .orElse(null);
+
+        assertNotNull(item, "Should find single modifier conflict between SetSpeed50 and Hyperspace");
+        assertEquals("Key_LeftShift", item.modifierKey());
+        assertEquals("Left Shift", item.modifierSpoken());
+        assertEquals("Left Shift plus F 4", item.chordSpoken());
+        assertTrue(data.message().contains("単独修飾キーの干渉"));
+    }
 }

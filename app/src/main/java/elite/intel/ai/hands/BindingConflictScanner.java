@@ -40,6 +40,13 @@ public final class BindingConflictScanner {
     }
 
     /**
+     * A bare modifier conflict where a control has a bare modifier key (Ctrl/Shift/Alt) bound in a ship
+     * context, and an app-driven action has a shortcut including that same modifier in the same context (LF-3).
+     */
+    public record SingleModifierConflict(String bareAction, String modifierKey, String chordAction, Set<String> chord, String description) {
+    }
+
+    /**
      * The conflict a candidate chord would create, naming the binding it collides with.
      */
     public record CandidateConflict(String otherBinding) {
@@ -200,5 +207,94 @@ public final class BindingConflictScanner {
             }
         }
         return keysets;
+    }
+
+    private static final Set<String> MODIFIER_KEYS = Set.of(
+            "Key_LeftControl", "Key_RightControl",
+            "Key_LeftShift", "Key_RightShift",
+            "Key_LeftAlt", "Key_RightAlt"
+    );
+
+    /**
+     * Scans for bare modifier key bindings in a ship context that clash with app-driven combination shortcuts (LF-3).
+     *
+     * @param bindings         action name -> parsed binding
+     * @param appDrivenActions set of action names driven by the app
+     * @return all detected bare modifier conflicts in deterministic order
+     */
+    public static List<SingleModifierConflict> scanSingleModifierConflicts(
+            Map<String, KeyBindingsParser.KeyBinding> bindings,
+            Set<String> appDrivenActions) {
+        if (bindings == null || appDrivenActions == null || bindings.isEmpty() || appDrivenActions.isEmpty()) {
+            return List.of();
+        }
+
+        List<SingleModifierConflict> conflicts = new ArrayList<>();
+        Map<String, KeyBindingsParser.KeyBinding> sortedBindings = new TreeMap<>(bindings);
+
+        for (Map.Entry<String, KeyBindingsParser.KeyBinding> entry : sortedBindings.entrySet()) {
+            String bareAction = entry.getKey();
+            KeyBindingsParser.KeyBinding bareKb = entry.getValue();
+            if (bareKb == null || !isShipContext(bareAction)) {
+                continue;
+            }
+            String modifierKey = bareKb.key;
+            if (!MODIFIER_KEYS.contains(modifierKey)) {
+                continue;
+            }
+            if (bareKb.modifiers != null && bareKb.modifiers.length > 0) {
+                continue;
+            }
+
+            for (String chordAction : new TreeSet<>(appDrivenActions)) {
+                if (chordAction.equals(bareAction) || !isShipContext(chordAction)) {
+                    continue;
+                }
+                KeyBindingsParser.KeyBinding chordKb = bindings.get(chordAction);
+                if (chordKb == null || chordKb.modifiers == null) {
+                    continue;
+                }
+                boolean hasModifier = false;
+                for (String mod : chordKb.modifiers) {
+                    if (modifierKey.equals(mod)) {
+                        hasModifier = true;
+                        break;
+                    }
+                }
+                if (hasModifier) {
+                    Set<String> chord = keysetOf(chordKb);
+                    String description = elite.intel.util.StringUtls.humanizeBindingName(bareAction)
+                            + " uses bare " + modifierKey + ", conflicting with "
+                            + elite.intel.util.StringUtls.humanizeBindingName(chordAction);
+                    conflicts.add(new SingleModifierConflict(bareAction, modifierKey, chordAction, chord, description));
+                }
+            }
+        }
+        return conflicts;
+    }
+
+    static boolean isShipContext(String action) {
+        if (action == null || action.startsWith("UI_") || action.contains("Construction")) {
+            return false;
+        }
+        if (isSubStateModeAction(action)) {
+            return false;
+        }
+        return switch (BindingDisplayNames.lookup(action).section()) {
+            case SHIP -> true;
+            case SRV, ON_FOOT -> false;
+            case GENERAL, OTHER -> !action.contains("Buggy") && !action.contains("Humanoid");
+        };
+    }
+
+    private static boolean isSubStateModeAction(String action) {
+        return action.contains("Cam")
+                || action.equals("GalaxyMapHome")
+                || action.contains("Wheel")
+                || action.startsWith("Vanity")
+                || action.startsWith("MovePlacement") || action.startsWith("Placement")
+                || action.startsWith("GalnetAudio")
+                || action.startsWith("MultiCrew") || action.startsWith("Store")
+                || action.startsWith("ExplorationFSS") || action.startsWith("ExplorationSAA");
     }
 }

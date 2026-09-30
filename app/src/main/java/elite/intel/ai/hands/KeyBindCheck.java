@@ -61,6 +61,29 @@ public class KeyBindCheck {
             });
         }
 
+        // Bare modifier key bound alone in ship context that clashes with an app shortcut (LF-3).
+        // Announced on every start, and logged as ERROR.
+        List<BindingConflictScanner.SingleModifierConflict> singleConflicts = monitor.singleModifierConflicts();
+        if (!singleConflicts.isEmpty()) {
+            List<String> spokenPairs = singleConflicts.stream()
+                    .map(c -> BindingChordSpeech.describe(Set.of(c.modifierKey())) + " ("
+                            + StringUtls.humanizeBindingName(c.bareAction()) + ")")
+                    .distinct()
+                    .toList();
+            GameEventBus.publish(new AiVoxResponseEvent(
+                    StringUtls.localizedSpeech("speech.bindingSingleModifierConflict",
+                            spokenPairs.size(), String.join(", ", spokenPairs))
+            ));
+            singleConflicts.forEach(c -> {
+                String line = "[" + BindingChordSpeech.describe(Set.of(c.modifierKey())) + "] "
+                        + StringUtls.humanizeBindingName(c.bareAction())
+                        + " conflicts with " + StringUtls.humanizeBindingName(c.chordAction())
+                        + " [" + BindingChordSpeech.describe(c.chord()) + "]";
+                UiBus.publish(new AppLogEvent("SINGLE MODIFIER binding conflict: " + line));
+                log.error("Single modifier binding conflict: {}", line);
+            });
+        }
+
         // Second, and also unconditionally: UI direction keys a focused text field eats as text. Same
         // class of problem as a blocking conflict - route plotting cannot work and playing the game will
         // never reveal it - but it is a property of one binding rather than a clash between two, so it is

@@ -94,7 +94,7 @@ public class BindingsMonitor {
      */
     private static final Set<String> APP_DRIVEN_ACTIONS = appDrivenActions();
 
-    private static Set<String> appDrivenActions() {
+    public static Set<String> appDrivenActions() {
         Set<String> actions = new LinkedHashSet<>();
         for (Bindings.GameCommand cmd : Bindings.GameCommand.values()) {
             if (cmd.isDrivenByApp()) {
@@ -295,6 +295,14 @@ public class BindingsMonitor {
         return detectConflicts().stream()
                 .filter(BindingConflictScanner.Conflict::blocking)
                 .toList();
+    }
+
+    /**
+     * Bare modifier key assignments that clash with app-driven combination shortcuts (LF-3).
+     * Announced on every start, like blocking conflicts.
+     */
+    public List<BindingConflictScanner.SingleModifierConflict> singleModifierConflicts() {
+        return BindingConflictScanner.scanSingleModifierConflicts(getBindings(), APP_DRIVEN_ACTIONS);
     }
 
     /**
