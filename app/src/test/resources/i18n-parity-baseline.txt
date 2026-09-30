@@ -649,6 +649,15 @@ responses|ptbz|MISSING|handler.autoDock.throttleZero
 responses|ru|MISSING|handler.autoDock.throttleZero
 responses|uk|MISSING|handler.autoDock.throttleZero
 
+responses|de|MISSING|handler.autoDock.throttleAxis
+responses|es|MISSING|handler.autoDock.throttleAxis
+responses|fr|MISSING|handler.autoDock.throttleAxis
+responses|it|MISSING|handler.autoDock.throttleAxis
+responses|pt|MISSING|handler.autoDock.throttleAxis
+responses|ptbz|MISSING|handler.autoDock.throttleAxis
+responses|ru|MISSING|handler.autoDock.throttleAxis
+responses|uk|MISSING|handler.autoDock.throttleAxis
+
 responses|de|MISSING|handler.autoDock.alreadyGranted
 responses|es|MISSING|handler.autoDock.alreadyGranted
 responses|fr|MISSING|handler.autoDock.alreadyGranted

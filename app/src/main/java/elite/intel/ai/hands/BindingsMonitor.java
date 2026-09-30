@@ -64,6 +64,7 @@ public class BindingsMonitor {
     private File currentBindsFile;
     private Thread processingThread;
     private volatile boolean running;
+    private volatile boolean throttleAxisBound;
     /**
      * Identity of the file contents behind the current {@link #bindings}, so the watch loop can tell a
      * second notification about a write it already read from a genuinely new one. Elite writes the
@@ -215,6 +216,7 @@ public class BindingsMonitor {
         try {
             currentBindsFile = bindingsLoader.getLatestBindsFile();
             bindings = parser.parseBindings(currentBindsFile);
+            throttleAxisBound = parser.hasThrottleAxis(currentBindsFile);
             parsedFileFingerprint = fingerprintOf(currentBindsFile);
             GameEventBus.publish(
                     new AppLogEvent("SYSTEM: Key bindings updated from file " + currentBindsFile.getAbsolutePath()));
@@ -223,6 +225,7 @@ public class BindingsMonitor {
         } catch (Exception e) {
             log.error("Failed to parse key bindings from: {}",
                     currentBindsFile != null ? currentBindsFile.getName() : "null", e);
+            throttleAxisBound = false;
             GameEventBus.publish(
                     new AiVoxResponseEvent(localizedSpeech("speech.warning.bindingsUpdateFailed")));
         }
@@ -246,6 +249,16 @@ public class BindingsMonitor {
 
     public Map<String, KeyBindingsParser.KeyBinding> getBindings() {
         return bindings;
+    }
+
+    /**
+     * Returns true if a physical hardware throttle axis is bound in the active bindings file.
+     */
+    public boolean hasThrottleAxis() {
+        if (bindings == null) {
+            ensureBindingsLoaded();
+        }
+        return throttleAxisBound;
     }
 
     /**

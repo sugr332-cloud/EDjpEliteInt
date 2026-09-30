@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import elite.intel.ai.brain.actions.handlers.commands.IntelCommand;
 import elite.intel.ai.brain.actions.handlers.commands.RegisterCommand;
 import elite.intel.ai.hands.Bindings;
+import elite.intel.ai.hands.BindingsMonitor;
 import elite.intel.ai.hands.events.GameInputSequenceEvent;
 import elite.intel.ai.hands.events.GameInputStep;
 import elite.intel.ai.mouth.subscribers.events.AiVoxResponseEvent;
@@ -26,6 +27,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.Objects;
 import java.util.concurrent.*;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -50,6 +52,7 @@ public final class AutoDockCommand implements IntelCommand {
     private final Consumer<Object> voicePublisher;
     private final Executor backgroundExecutor;
     private final int timeoutSeconds;
+    private final BooleanSupplier throttleAxisSupplier;
 
     public AutoDockCommand() {
         this(
@@ -60,7 +63,8 @@ public final class AutoDockCommand implements IntelCommand {
                 GameControllerBus::publish,
                 GameEventBus::publish,
                 Executors.newVirtualThreadPerTaskExecutor(),
-                DOCKING_TIMEOUT_SECONDS
+                DOCKING_TIMEOUT_SECONDS,
+                () -> BindingsMonitor.getInstance().hasThrottleAxis()
         );
     }
 
@@ -73,6 +77,29 @@ public final class AutoDockCommand implements IntelCommand {
             Consumer<Object> voicePublisher,
             Executor backgroundExecutor,
             int timeoutSeconds) {
+        this(
+                status,
+                navigator,
+                dockingStateTracker,
+                shipLoadoutSupplier,
+                gameInputPublisher,
+                voicePublisher,
+                backgroundExecutor,
+                timeoutSeconds,
+                () -> false
+        );
+    }
+
+    AutoDockCommand(
+            Status status,
+            UINavigator navigator,
+            DockingStateTracker dockingStateTracker,
+            Supplier<ShipLoadOutDto> shipLoadoutSupplier,
+            Consumer<Object> gameInputPublisher,
+            Consumer<Object> voicePublisher,
+            Executor backgroundExecutor,
+            int timeoutSeconds,
+            BooleanSupplier throttleAxisSupplier) {
         this.status = Objects.requireNonNull(status, "status");
         this.navigator = Objects.requireNonNull(navigator, "navigator");
         this.dockingStateTracker = Objects.requireNonNull(dockingStateTracker, "dockingStateTracker");
@@ -81,6 +108,7 @@ public final class AutoDockCommand implements IntelCommand {
         this.voicePublisher = Objects.requireNonNull(voicePublisher, "voicePublisher");
         this.backgroundExecutor = Objects.requireNonNull(backgroundExecutor, "backgroundExecutor");
         this.timeoutSeconds = timeoutSeconds;
+        this.throttleAxisSupplier = Objects.requireNonNull(throttleAxisSupplier, "throttleAxisSupplier");
     }
 
     @Override
@@ -131,6 +159,9 @@ public final class AutoDockCommand implements IntelCommand {
         // 3. Already granted check
         if (dockingStateTracker.isDockingGranted()) {
             sendThrottleZero();
+            if (throttleAxisSupplier.getAsBoolean()) {
+                return StringUtls.localizedResponse("handler.autoDock.throttleAxis");
+            }
             return StringUtls.localizedResponse("handler.autoDock.alreadyGranted");
         }
 
@@ -163,7 +194,11 @@ public final class AutoDockCommand implements IntelCommand {
                     return;
                 }
                 sendThrottleZero();
-                speak(StringUtls.localizedResponse("handler.autoDock.throttleZero"));
+                if (throttleAxisSupplier.getAsBoolean()) {
+                    speak(StringUtls.localizedResponse("handler.autoDock.throttleAxis"));
+                } else {
+                    speak(StringUtls.localizedResponse("handler.autoDock.throttleZero"));
+                }
             } else if (event instanceof DockingDeniedEvent denied) {
                 speak(deniedMessage(denied.getReason()));
             } else if (event instanceof DockingCancelledEvent) {
