@@ -938,6 +938,25 @@ responses|ptbz|MISSING|handler.pistonMode.reminder
 responses|ru|MISSING|handler.pistonMode.reminder
 responses|uk|MISSING|handler.pistonMode.reminder
 
+# --- LF-5: Hyperspace jump fallback ---
+responses|de|MISSING|handler.fsd.noJumpBinding
+responses|es|MISSING|handler.fsd.noJumpBinding
+responses|fr|MISSING|handler.fsd.noJumpBinding
+responses|it|MISSING|handler.fsd.noJumpBinding
+responses|pt|MISSING|handler.fsd.noJumpBinding
+responses|ptbz|MISSING|handler.fsd.noJumpBinding
+responses|ru|MISSING|handler.fsd.noJumpBinding
+responses|uk|MISSING|handler.fsd.noJumpBinding
+
+responses|de|MISSING|handler.fsd.noRouteForJump
+responses|es|MISSING|handler.fsd.noRouteForJump
+responses|fr|MISSING|handler.fsd.noRouteForJump
+responses|it|MISSING|handler.fsd.noRouteForJump
+responses|pt|MISSING|handler.fsd.noRouteForJump
+responses|ptbz|MISSING|handler.fsd.noRouteForJump
+responses|ru|MISSING|handler.fsd.noRouteForJump
+responses|uk|MISSING|handler.fsd.noRouteForJump
+
 # --- LF-1: Station queries ---
 ai_action_aliases|de|MISSING|query_previous_station
 ai_action_aliases|es|MISSING|query_previous_station
