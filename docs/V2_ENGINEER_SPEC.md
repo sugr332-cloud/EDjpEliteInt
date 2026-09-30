@@ -1,6 +1,6 @@
 # エンジニア（開放条件・場所・進み具合・案内）EG-0〜EG-4
 
-**Status:** Draft（2026-09-30）。実装は LF-1〜LF-6 の後
+**Status:** EG-0 DONE（2026-10-01）。EG-1〜EG-4 は PLAN CHECK 待ち
 **正本との関係:** `docs/ELITEINTEL_INTEGRATION_PLAN.md` §R.13 の統制手順に従う。全体テストの判定は「失敗 0 件」。
 
 ## 0. 目的（2026-09-30 TP 要望）
@@ -26,7 +26,7 @@
 ## 2. EG-0: 固定データを作る（Claude 担当）
 
 - 宇宙船のエンジニア（Horizons）と徒歩のエンジニア（Odyssey）について、次を 1 つの JSON（例: `app/src/main/resources/engineers/engineers.json`）にまとめる。
-  - `engineerId`（Journal の `EngineerID`）、名前、種類（ship／onfoot）、星系名、基地名、星系の座標（距離の計算用）
+  - 名前、種類（ship／onfoot）、星系名、基地名、天体、星系の座標（距離の計算用）。Journal とは**名前（大文字小文字を区別しない）**でつなぐ（公開データに `EngineerID` の一覧が無いため。EG-1 で初めて見た `EngineerID` を名前と一緒に保存してよい）
   - 招待の条件、開放の条件、紹介元（どのエンジニアから紹介されるか）
   - 得意分野: 改造できるモジュールと最大グレード（例: Frame Shift Drive → 5）
   - 日本語で読むための表示名（モジュール名など）は、既存の日本語化の表と合わせる
@@ -42,7 +42,7 @@
 
 - `EngineerProgress` の 2 つの形（全員の一覧、1 人分の更新）を両方読み、エンジニアごとに「進み具合・ランク・ランクの進み・更新日時」を DB に保存する（新規テーブル）。
 - アプリの起動前にゲームが書いた `EngineerProgress` も取り込めること（既存の起動時の読み込みの仕組みで届くかを PLAN CHECK で確かめる。届かなければ、最新の Journal から探して取り込む）。
-- 固定データ（EG-0）と `engineerId` でつなぐ。
+- 固定データ（EG-0）とは名前でつなぐ（大文字小文字を区別しない。`Tod 'The Blaster' McQuinn` のような引用符の違いに注意）。
 
 ## 4. EG-2: 声で聞く（クエリ）
 
@@ -78,7 +78,7 @@
 
 | ID | 内容 | 変更許可ファイル | TEST GATE | 状態 |
 |---|---|---|---|---|
-| EG-0 | 固定データの JSON（Claude 作成） | `app/src/main/resources/engineers/engineers.json`（Claude が作成） | JSON の形式チェック（EG-1 のテストで読み込めること） | 未着手 |
+| EG-0 | 固定データの JSON（Claude 作成） | `app/src/main/resources/engineers/engineers.json`（Claude が作成） | JSON の形式チェック（EG-1 のテストで読み込めること） | DONE（2026-10-01。38 人: 宇宙船 25・徒歩 13。出どころ・食い違いは JSON の `meta` と各項目の `notes`） |
 | EG-1 | 進み具合の保存 | PLAN CHECK で確定 | 新規テスト（一覧の形・1 人分の形・更新・起動前の取り込み・固定データとの対応）、全体テスト（失敗 0 件） | 未着手 |
 | EG-2 | 声で聞く | PLAN CHECK で確定 | 新規テスト（得意分野から・名前から・一覧）、エイリアス関連テスト、埋め込みルーティングテスト、全体テスト（失敗 0 件） | 未着手 |
 | EG-3 | カードとチェックリスト | PLAN CHECK で確定 | 新規テスト（表示内容・自動チェック・手動チェックの保存）、全体テスト（失敗 0 件）。実機: AI タブに枠とチェックリストが出ること | 未着手 |

@@ -1,0 +1,1655 @@
+{
+  "meta": {
+    "description": "Elite Dangerous engineers reference data (locations, invite/unlock requirements, referral, specialties). Journal EngineerProgress gives progress only; this file supplies the rest.",
+    "checkedAt": "2026-10-01",
+    "sources": [
+      "https://inara.cz/elite/engineers/",
+      "https://elite-dangerous.fandom.com/wiki/Engineers",
+      "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+      "EDDiscovery EliteDangerousCore Engineers.cs (Apache License 2.0, coordinates and requirements cross-check): https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+      "EDEngineer blueprints.json (MIT License, grade cross-check): https://github.com/msarilar/EDEngineer",
+      "ED Odyssey Materials Helper locale CSV (on-foot requirement text cross-check): https://github.com/jixxed/ed-odyssey-materials-helper"
+    ],
+    "matching": "Match journal EngineerProgress entries by engineer name (case-insensitive). EngineerID is not stored here.",
+    "notes": "Where sources disagreed, the value used and the alternative are written in each entry's notes. Regenerate after game updates that move or add engineers."
+  },
+  "engineers": [
+    {
+      "name": "Felicity Farseer",
+      "type": "ship",
+      "system": "Deciat",
+      "base": "Farseer Inc",
+      "body": "Deciat 6 A",
+      "invite": "Gain exploration rank Scout or higher",
+      "unlock": "Provide 1 unit of Meta-Alloys",
+      "referral": null,
+      "specialties": [
+        {
+          "module": "Frame Shift Drive",
+          "maxGrade": 5
+        },
+        {
+          "module": "Detailed Surface Scanner",
+          "maxGrade": 3
+        },
+        {
+          "module": "Sensors",
+          "maxGrade": 3
+        },
+        {
+          "module": "Thrusters",
+          "maxGrade": 3
+        },
+        {
+          "module": "Frame Shift Drive Interdictor",
+          "maxGrade": 1
+        },
+        {
+          "module": "Power Plant",
+          "maxGrade": 1
+        },
+        {
+          "module": "Shield Booster",
+          "maxGrade": 1
+        }
+      ],
+      "notes": "Discovery: public knowledge (INARA: 'Public data sources'). Refers Juri Ishmaak.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 122.625,
+        "y": -0.8125,
+        "z": -47.28125
+      }
+    },
+    {
+      "name": "Elvira Martuuk",
+      "type": "ship",
+      "system": "Khun",
+      "base": "Long Sight Base",
+      "body": "Khun 5",
+      "invite": "Attain a maximum distance from your career start location of at least 300 light years",
+      "unlock": "Provide 3 units of Soontill Relics",
+      "referral": null,
+      "specialties": [
+        {
+          "module": "Frame Shift Drive",
+          "maxGrade": 5
+        },
+        {
+          "module": "Shield Generator",
+          "maxGrade": 3
+        },
+        {
+          "module": "Thrusters",
+          "maxGrade": 2
+        },
+        {
+          "module": "Shield Cell Bank",
+          "maxGrade": 1
+        }
+      ],
+      "notes": "Discovery: public knowledge. Refers Marco Qwent, Zacariah Nemo and Mel Brandon (Colonia).",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": -171.59375,
+        "y": 19.96875,
+        "z": -56.96875
+      }
+    },
+    {
+      "name": "The Dweller",
+      "type": "ship",
+      "system": "Wyrd",
+      "base": "Black Hide",
+      "body": "Wyrd A 2",
+      "invite": "Deal with at least 5 black markets",
+      "unlock": "Pay 500,000 credits",
+      "referral": null,
+      "specialties": [
+        {
+          "module": "Power Distributor",
+          "maxGrade": 5
+        },
+        {
+          "module": "Pulse Laser",
+          "maxGrade": 4
+        },
+        {
+          "module": "Beam Laser",
+          "maxGrade": 3
+        },
+        {
+          "module": "Burst Laser",
+          "maxGrade": 3
+        }
+      ],
+      "notes": "Discovery: common knowledge. Refers Lei Cheung and Marsha Hicks (Colonia).",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": -11.625,
+        "y": 31.53125,
+        "z": -3.9375
+      }
+    },
+    {
+      "name": "Tod 'The Blaster' McQuinn",
+      "type": "ship",
+      "system": "Wolf 397",
+      "base": "Trophy Camp",
+      "body": "Trus Madi",
+      "invite": "Earn more than 15 bounty vouchers",
+      "unlock": "Provide 100,000 credits worth of bounty vouchers",
+      "referral": null,
+      "specialties": [
+        {
+          "module": "Multi-cannon",
+          "maxGrade": 5
+        },
+        {
+          "module": "Rail Gun",
+          "maxGrade": 5
+        },
+        {
+          "module": "Fragment Cannon",
+          "maxGrade": 3
+        },
+        {
+          "module": "Cannon",
+          "maxGrade": 2
+        }
+      ],
+      "notes": "Discovery: common knowledge. Journal/EDDiscovery spelling uses single quotes: Tod 'The Blaster' McQuinn (INARA displays double quotes). Fandom states 100,001 CR of vouchers. Refers Selene Jean and Petra Olmanova (Colonia).",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 40.0,
+        "y": 79.21875,
+        "z": -10.40625
+      }
+    },
+    {
+      "name": "Liz Ryder",
+      "type": "ship",
+      "system": "Eurybia",
+      "base": "Demolition Unlimited",
+      "body": "Makalu",
+      "invite": "Gain Cordial or Friendly status with Eurybia Blue Mafia",
+      "unlock": "Provide 200 units of Landmines",
+      "referral": null,
+      "specialties": [
+        {
+          "module": "Missile Rack",
+          "maxGrade": 5
+        },
+        {
+          "module": "Seeker Missile Rack",
+          "maxGrade": 5
+        },
+        {
+          "module": "Torpedo Pylon",
+          "maxGrade": 5
+        },
+        {
+          "module": "Abrasion Blaster",
+          "maxGrade": 3
+        },
+        {
+          "module": "Enzyme Missile Rack",
+          "maxGrade": 3
+        },
+        {
+          "module": "Mine Launcher",
+          "maxGrade": 3
+        },
+        {
+          "module": "Mining Laser",
+          "maxGrade": 3
+        },
+        {
+          "module": "Armour",
+          "maxGrade": 1
+        },
+        {
+          "module": "Hull Reinforcement Package",
+          "maxGrade": 1
+        }
+      ],
+      "notes": "Discovery: public sources. Fandom says Friendly with Eurybia Blue Mafia (INARA/EDDiscovery/Black Box: Cordial or Friendly). Makalu is the body name in Eurybia. Refers Hera Tani and Etienne Dorn (Colonia).",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 51.40625,
+        "y": -54.40625,
+        "z": -30.5
+      }
+    },
+    {
+      "name": "Juri Ishmaak",
+      "type": "ship",
+      "system": "Giryak",
+      "base": "Pater's Memorial",
+      "body": "Giryak 2 A",
+      "invite": "Earn more than 50 combat bonds (INARA: federal combat bonds)",
+      "unlock": "Provide 100,000 or 1,000,000 credits worth of combat bonds",
+      "referral": "Felicity Farseer",
+      "specialties": [
+        {
+          "module": "Abrasion Blaster",
+          "maxGrade": 5
+        },
+        {
+          "module": "Detailed Surface Scanner",
+          "maxGrade": 5
+        },
+        {
+          "module": "Enzyme Missile Rack",
+          "maxGrade": 5
+        },
+        {
+          "module": "Mine Launcher",
+          "maxGrade": 5
+        },
+        {
+          "module": "Mining Laser",
+          "maxGrade": 5
+        },
+        {
+          "module": "Sensors",
+          "maxGrade": 5
+        },
+        {
+          "module": "Frame Shift Wake Scanner",
+          "maxGrade": 3
+        },
+        {
+          "module": "Kill Warrant Scanner",
+          "maxGrade": 3
+        },
+        {
+          "module": "Manifest Scanner",
+          "maxGrade": 3
+        },
+        {
+          "module": "Missile Rack",
+          "maxGrade": 3
+        },
+        {
+          "module": "Seeker Missile Rack",
+          "maxGrade": 3
+        },
+        {
+          "module": "Torpedo Pylon",
+          "maxGrade": 3
+        }
+      ],
+      "notes": "Referred by Felicity Farseer at grade 3-4 reputation. Refers The Sarge and Colonel Bris Dekker.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 14.6875,
+        "y": 27.65625,
+        "z": 108.65625
+      }
+    },
+    {
+      "name": "Selene Jean",
+      "type": "ship",
+      "system": "Kuk",
+      "base": "Prospector's Rest",
+      "body": "Kuk B 3",
+      "invite": "Mine at least 500 tons of ore",
+      "unlock": "Provide 10 units of Painite",
+      "referral": "Tod 'The Blaster' McQuinn",
+      "specialties": [
+        {
+          "module": "Armour",
+          "maxGrade": 5
+        },
+        {
+          "module": "Hull Reinforcement Package",
+          "maxGrade": 5
+        },
+        {
+          "module": "Module Reinforcement Package",
+          "maxGrade": 5
+        }
+      ],
+      "notes": "Refers Didi Vatermann and Bill Turner. Module Reinforcement listed by INARA only.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": -21.28125,
+        "y": 69.09375,
+        "z": -16.3125
+      }
+    },
+    {
+      "name": "Hera Tani",
+      "type": "ship",
+      "system": "Kuwemaki",
+      "base": "The Jet's Hole",
+      "body": "Kuwemaki A 3 A",
+      "invite": "Gain rank Outsider or higher with the Empire (Imperial Navy)",
+      "unlock": "Provide 50 units of Kamitra Cigars",
+      "referral": "Liz Ryder",
+      "specialties": [
+        {
+          "module": "Detailed Surface Scanner",
+          "maxGrade": 5
+        },
+        {
+          "module": "Power Plant",
+          "maxGrade": 5
+        },
+        {
+          "module": "Power Distributor",
+          "maxGrade": 3
+        },
+        {
+          "module": "Sensors",
+          "maxGrade": 3
+        }
+      ],
+      "notes": "Refers Broo Tarquin and Tiana Fortune.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 134.65625,
+        "y": -226.90625,
+        "z": -7.8125
+      }
+    },
+    {
+      "name": "Lei Cheung",
+      "type": "ship",
+      "system": "Laksak",
+      "base": "Trader's Rest",
+      "body": "Laksak A 1",
+      "invite": "Trade in at least 50 markets",
+      "unlock": "Provide 200 units of Gold",
+      "referral": "The Dweller",
+      "specialties": [
+        {
+          "module": "Detailed Surface Scanner",
+          "maxGrade": 5
+        },
+        {
+          "module": "Sensors",
+          "maxGrade": 5
+        },
+        {
+          "module": "Shield Generator",
+          "maxGrade": 5
+        },
+        {
+          "module": "Shield Booster",
+          "maxGrade": 3
+        }
+      ],
+      "notes": "Refers Ram Tah.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": -21.53125,
+        "y": -6.3125,
+        "z": 116.03125
+      }
+    },
+    {
+      "name": "Marco Qwent",
+      "type": "ship",
+      "system": "Sirius",
+      "base": "Qwent Research Base",
+      "body": "Lucifer",
+      "invite": "Gain invitation from Sirius Corporation",
+      "unlock": "Provide 25 units of Modular Terminals",
+      "referral": "Elvira Martuuk",
+      "specialties": [
+        {
+          "module": "Power Plant",
+          "maxGrade": 4
+        },
+        {
+          "module": "Power Distributor",
+          "maxGrade": 3
+        }
+      ],
+      "notes": "Sirius is permit-locked. Body 'Lucifer' in Sirius. Refers Professor Palin, Lori Jameson and Chloe Sedesi (INARA/fandom/EDDiscovery list Chloe Sedesi as 'From Marco Qwent'; Black Box lists only Palin and Jameson).",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 6.25,
+        "y": -1.28125,
+        "z": -5.75
+      }
+    },
+    {
+      "name": "Zacariah Nemo",
+      "type": "ship",
+      "system": "Yoru",
+      "base": "Nemo Cyber Party Base",
+      "body": "Yoru 4",
+      "invite": "Gain invitation from Party of Yoru",
+      "unlock": "Provide 25 units of Xihe Biomorphic Companions",
+      "referral": "Elvira Martuuk",
+      "specialties": [
+        {
+          "module": "Fragment Cannon",
+          "maxGrade": 5
+        },
+        {
+          "module": "Multi-cannon",
+          "maxGrade": 3
+        },
+        {
+          "module": "Plasma Accelerator",
+          "maxGrade": 2
+        }
+      ],
+      "notes": "Commodity is 'Xihe Biomorphic Companions' (INARA/EDDiscovery abbreviate as Xihe Companions).",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 97.875,
+        "y": -86.90625,
+        "z": 64.125
+      }
+    },
+    {
+      "name": "The Sarge",
+      "type": "ship",
+      "system": "Beta-3 Tucani",
+      "base": "The Beach",
+      "body": "Beta-3 Tucani 2 B A",
+      "invite": "Gain rank Midshipman or higher with the Federal Navy",
+      "unlock": "Provide 50 units of Aberrant Shield Pattern Analysis",
+      "referral": "Juri Ishmaak",
+      "specialties": [
+        {
+          "module": "Cannon",
+          "maxGrade": 5
+        },
+        {
+          "module": "Collector Limpet Controller",
+          "maxGrade": 5
+        },
+        {
+          "module": "Fuel Transfer Limpet Controller",
+          "maxGrade": 5
+        },
+        {
+          "module": "Hatch Breaker Limpet Controller",
+          "maxGrade": 5
+        },
+        {
+          "module": "Prospector Limpet Controller",
+          "maxGrade": 5
+        },
+        {
+          "module": "Rail Gun",
+          "maxGrade": 3
+        }
+      ],
+      "notes": null,
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 32.25,
+        "y": -55.1875,
+        "z": 23.875
+      }
+    },
+    {
+      "name": "Colonel Bris Dekker",
+      "type": "ship",
+      "system": "Sol",
+      "base": "Dekker's Yard",
+      "body": "Iapetus",
+      "invite": "Friendly with the Federation",
+      "unlock": "Provide 1,000,000 or 10,000,000 credits worth of federal combat bonds",
+      "referral": "Juri Ishmaak",
+      "specialties": [
+        {
+          "module": "Frame Shift Drive Interdictor",
+          "maxGrade": 4
+        },
+        {
+          "module": "Frame Shift Drive",
+          "maxGrade": 3
+        }
+      ],
+      "notes": "Sol is permit-locked. Fandom states 1,000,000 CR of combat bonds.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      }
+    },
+    {
+      "name": "Didi Vatermann",
+      "type": "ship",
+      "system": "Leesti",
+      "base": "Vatermann LLC",
+      "body": "Leesti 1 A",
+      "invite": "Gain trade rank Merchant or higher",
+      "unlock": "Provide 50 units of Lavian Brandy",
+      "referral": "Selene Jean",
+      "specialties": [
+        {
+          "module": "Shield Booster",
+          "maxGrade": 5
+        },
+        {
+          "module": "Shield Generator",
+          "maxGrade": 3
+        }
+      ],
+      "notes": null,
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 72.75,
+        "y": 48.75,
+        "z": 68.25
+      }
+    },
+    {
+      "name": "Bill Turner",
+      "type": "ship",
+      "system": "Alioth",
+      "base": "Turner Metallics Inc",
+      "body": "Alioth 4 A",
+      "invite": "Gain Friendly status with the Alliance (plus Allied with Alioth Independents for the Alioth permit)",
+      "unlock": "Provide 50 units of Bromellite",
+      "referral": "Selene Jean",
+      "specialties": [
+        {
+          "module": "Detailed Surface Scanner",
+          "maxGrade": 5
+        },
+        {
+          "module": "Plasma Accelerator",
+          "maxGrade": 5
+        },
+        {
+          "module": "Sensors",
+          "maxGrade": 5
+        },
+        {
+          "module": "Cargo Rack",
+          "maxGrade": 4
+        },
+        {
+          "module": "Auto Field-Maintenance Unit",
+          "maxGrade": 3
+        },
+        {
+          "module": "Frame Shift Wake Scanner",
+          "maxGrade": 3
+        },
+        {
+          "module": "Fuel Scoop",
+          "maxGrade": 3
+        },
+        {
+          "module": "Kill Warrant Scanner",
+          "maxGrade": 3
+        },
+        {
+          "module": "Life Support",
+          "maxGrade": 3
+        },
+        {
+          "module": "Manifest Scanner",
+          "maxGrade": 3
+        },
+        {
+          "module": "Refinery",
+          "maxGrade": 3
+        }
+      ],
+      "notes": "Alioth is permit-locked. DISCREPANCY: INARA, fandom and Black Box say referred by Selene Jean; EDDiscovery data says discovery is 'Common knowledge'.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": -33.65625,
+        "y": 72.46875,
+        "z": -20.65625
+      }
+    },
+    {
+      "name": "Broo Tarquin",
+      "type": "ship",
+      "system": "Muang",
+      "base": "Broo's Legacy",
+      "body": "Muang 5 A",
+      "invite": "Gain combat rank Competent or higher",
+      "unlock": "Provide 50 units of Fujin Tea",
+      "referral": "Hera Tani",
+      "specialties": [
+        {
+          "module": "Beam Laser",
+          "maxGrade": 5
+        },
+        {
+          "module": "Burst Laser",
+          "maxGrade": 5
+        },
+        {
+          "module": "Pulse Laser",
+          "maxGrade": 5
+        }
+      ],
+      "notes": null,
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 17.03125,
+        "y": -172.78125,
+        "z": -3.46875
+      }
+    },
+    {
+      "name": "Tiana Fortune",
+      "type": "ship",
+      "system": "Achenar",
+      "base": "Fortune's Loss",
+      "body": "Achenar 4 A",
+      "invite": "Friendly with the Empire",
+      "unlock": "Provide 50 units of Decoded Emission Data",
+      "referral": "Hera Tani",
+      "specialties": [
+        {
+          "module": "Collector Limpet Controller",
+          "maxGrade": 5
+        },
+        {
+          "module": "Frame Shift Wake Scanner",
+          "maxGrade": 5
+        },
+        {
+          "module": "Fuel Transfer Limpet Controller",
+          "maxGrade": 5
+        },
+        {
+          "module": "Hatch Breaker Limpet Controller",
+          "maxGrade": 5
+        },
+        {
+          "module": "Kill Warrant Scanner",
+          "maxGrade": 5
+        },
+        {
+          "module": "Manifest Scanner",
+          "maxGrade": 5
+        },
+        {
+          "module": "Prospector Limpet Controller",
+          "maxGrade": 5
+        },
+        {
+          "module": "Sensors",
+          "maxGrade": 5
+        },
+        {
+          "module": "Cargo Rack",
+          "maxGrade": 4
+        },
+        {
+          "module": "Detailed Surface Scanner",
+          "maxGrade": 3
+        },
+        {
+          "module": "Frame Shift Drive Interdictor",
+          "maxGrade": 3
+        }
+      ],
+      "notes": "Achenar is permit-locked. Cargo Rack grade: INARA G4, fandom summary G5.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 67.5,
+        "y": -119.46875,
+        "z": 24.84375
+      }
+    },
+    {
+      "name": "Ram Tah",
+      "type": "ship",
+      "system": "Meene",
+      "base": "Phoenix Base",
+      "body": "Meene AB 5 D",
+      "invite": "Gain exploration rank Surveyor or higher",
+      "unlock": "Provide 50 units of Classified Scan Databanks",
+      "referral": "Lei Cheung",
+      "specialties": [
+        {
+          "module": "Chaff Launcher",
+          "maxGrade": 5
+        },
+        {
+          "module": "Electronic Countermeasure",
+          "maxGrade": 5
+        },
+        {
+          "module": "Heat Sink Launcher",
+          "maxGrade": 5
+        },
+        {
+          "module": "Point Defence",
+          "maxGrade": 5
+        },
+        {
+          "module": "Collector Limpet Controller",
+          "maxGrade": 4
+        },
+        {
+          "module": "Fuel Transfer Limpet Controller",
+          "maxGrade": 4
+        },
+        {
+          "module": "Prospector Limpet Controller",
+          "maxGrade": 4
+        },
+        {
+          "module": "Cargo Rack",
+          "maxGrade": 4
+        },
+        {
+          "module": "Hatch Breaker Limpet Controller",
+          "maxGrade": 3
+        },
+        {
+          "module": "Guardian Gauss Cannon",
+          "maxGrade": 1
+        },
+        {
+          "module": "Guardian Plasma Charger",
+          "maxGrade": 1
+        },
+        {
+          "module": "Guardian Shard Cannon",
+          "maxGrade": 1
+        }
+      ],
+      "notes": "DISCREPANCY: INARA lists Collector/Fuel Transfer/Prospector limpets at G5; fandom and EDEngineer blueprint data say G4 (G4 used here). Cargo Rack G4 and Guardian weapon G1 entries are from INARA only.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 118.78125,
+        "y": -56.4375,
+        "z": -97.1875
+      }
+    },
+    {
+      "name": "Professor Palin",
+      "type": "ship",
+      "system": "Arque",
+      "base": "Abel Laboratory",
+      "body": "Arque 4 E",
+      "invite": "Attain a maximum distance from your career start location of at least 5,000 light years",
+      "unlock": "Provide 25 units of Sensor Fragments",
+      "referral": "Marco Qwent",
+      "specialties": [
+        {
+          "module": "Thrusters",
+          "maxGrade": 5
+        },
+        {
+          "module": "Frame Shift Drive",
+          "maxGrade": 3
+        }
+      ],
+      "notes": "RELOCATED: originally based in Maia (Pleiades); moved to Arque (Abel Laboratory). All current sources (INARA, fandom, Black Box, EDDiscovery 2026 data) give Arque. Former Maia base name/body not re-verified in this research.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 66.5,
+        "y": 38.0625,
+        "z": 61.125
+      }
+    },
+    {
+      "name": "Lori Jameson",
+      "type": "ship",
+      "system": "Shinrarta Dezhra",
+      "base": "Jameson Base",
+      "body": "Shinrarta Dezhra A 1",
+      "invite": "Gain combat rank Dangerous or higher",
+      "unlock": "Provide 25 units of Kongga Ale",
+      "referral": "Marco Qwent",
+      "specialties": [
+        {
+          "module": "Detailed Surface Scanner",
+          "maxGrade": 5
+        },
+        {
+          "module": "Sensors",
+          "maxGrade": 5
+        },
+        {
+          "module": "Auto Field-Maintenance Unit",
+          "maxGrade": 4
+        },
+        {
+          "module": "Fuel Scoop",
+          "maxGrade": 4
+        },
+        {
+          "module": "Life Support",
+          "maxGrade": 4
+        },
+        {
+          "module": "Refinery",
+          "maxGrade": 4
+        },
+        {
+          "module": "Frame Shift Wake Scanner",
+          "maxGrade": 3
+        },
+        {
+          "module": "Kill Warrant Scanner",
+          "maxGrade": 3
+        },
+        {
+          "module": "Manifest Scanner",
+          "maxGrade": 3
+        },
+        {
+          "module": "Shield Cell Bank",
+          "maxGrade": 3
+        }
+      ],
+      "notes": "Shinrarta Dezhra is permit-locked (Elite rank / Founders World). Life Support: INARA and fandom G4, EDEngineer data G5 (G4 used). Fandom also lists Cargo Rack G3 (not on INARA).",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 55.71875,
+        "y": 17.59375,
+        "z": 27.15625
+      }
+    },
+    {
+      "name": "Chloe Sedesi",
+      "type": "ship",
+      "system": "Shenve",
+      "base": "Cinder Dock",
+      "body": "Shenve A 6",
+      "invite": "Attain a maximum distance from your career start location of at least 5,000 light years",
+      "unlock": "Provide 25 units of Sensor Fragments",
+      "referral": "Marco Qwent",
+      "specialties": [
+        {
+          "module": "Thrusters",
+          "maxGrade": 5
+        },
+        {
+          "module": "Frame Shift Drive",
+          "maxGrade": 3
+        }
+      ],
+      "notes": "Located in the Witch Head Nebula region. Same specialties as Professor Palin.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 351.96875,
+        "y": -373.46875,
+        "z": -711.09375
+      }
+    },
+    {
+      "name": "Petra Olmanova",
+      "type": "ship",
+      "system": "Asura",
+      "base": "Sanctuary",
+      "body": "Asura 1 A",
+      "invite": "Gain combat rank Expert or higher",
+      "unlock": "Provide 200 units of Progenitor Cells",
+      "referral": "Tod 'The Blaster' McQuinn",
+      "specialties": [
+        {
+          "module": "Armour",
+          "maxGrade": 5
+        },
+        {
+          "module": "Auto Field-Maintenance Unit",
+          "maxGrade": 5
+        },
+        {
+          "module": "Chaff Launcher",
+          "maxGrade": 5
+        },
+        {
+          "module": "Electronic Countermeasure",
+          "maxGrade": 5
+        },
+        {
+          "module": "Heat Sink Launcher",
+          "maxGrade": 5
+        },
+        {
+          "module": "Hull Reinforcement Package",
+          "maxGrade": 5
+        },
+        {
+          "module": "Mine Launcher",
+          "maxGrade": 5
+        },
+        {
+          "module": "Missile Rack",
+          "maxGrade": 5
+        },
+        {
+          "module": "Module Reinforcement Package",
+          "maxGrade": 5
+        },
+        {
+          "module": "Point Defence",
+          "maxGrade": 5
+        },
+        {
+          "module": "Seeker Missile Rack",
+          "maxGrade": 5
+        },
+        {
+          "module": "Torpedo Pylon",
+          "maxGrade": 5
+        }
+      ],
+      "notes": "Colonia region.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": -9550.28125,
+        "y": -916.65625,
+        "z": 19816.1875
+      }
+    },
+    {
+      "name": "Mel Brandon",
+      "type": "ship",
+      "system": "Luchtaine",
+      "base": "The Brig",
+      "body": "Luchtaine A 1 C",
+      "invite": "Gain invitation from Colonia Council",
+      "unlock": "Provide 100,000 credits worth of bounty vouchers",
+      "referral": "Elvira Martuuk",
+      "specialties": [
+        {
+          "module": "Beam Laser",
+          "maxGrade": 5
+        },
+        {
+          "module": "Burst Laser",
+          "maxGrade": 5
+        },
+        {
+          "module": "Frame Shift Drive",
+          "maxGrade": 5
+        },
+        {
+          "module": "Frame Shift Drive Interdictor",
+          "maxGrade": 5
+        },
+        {
+          "module": "Pulse Laser",
+          "maxGrade": 5
+        },
+        {
+          "module": "Shield Booster",
+          "maxGrade": 5
+        },
+        {
+          "module": "Shield Generator",
+          "maxGrade": 5
+        },
+        {
+          "module": "Thrusters",
+          "maxGrade": 5
+        },
+        {
+          "module": "Shield Cell Bank",
+          "maxGrade": 4
+        }
+      ],
+      "notes": "Colonia region. DISCREPANCY: fandom main Engineers table lists older lower grades (e.g. FSD G2, Beam G4); INARA and EDEngineer both give G5 as used here.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": -9523.3125,
+        "y": -914.46875,
+        "z": 19825.90625
+      }
+    },
+    {
+      "name": "Etienne Dorn",
+      "type": "ship",
+      "system": "Los",
+      "base": "Kraken's Retreat",
+      "body": "Los A 2 B",
+      "invite": "Gain trade rank Dealer or higher",
+      "unlock": "Provide 25 units of Occupied Escape Pods",
+      "referral": "Liz Ryder",
+      "specialties": [
+        {
+          "module": "Detailed Surface Scanner",
+          "maxGrade": 5
+        },
+        {
+          "module": "Frame Shift Wake Scanner",
+          "maxGrade": 5
+        },
+        {
+          "module": "Kill Warrant Scanner",
+          "maxGrade": 5
+        },
+        {
+          "module": "Life Support",
+          "maxGrade": 5
+        },
+        {
+          "module": "Manifest Scanner",
+          "maxGrade": 5
+        },
+        {
+          "module": "Plasma Accelerator",
+          "maxGrade": 5
+        },
+        {
+          "module": "Power Distributor",
+          "maxGrade": 5
+        },
+        {
+          "module": "Power Plant",
+          "maxGrade": 5
+        },
+        {
+          "module": "Rail Gun",
+          "maxGrade": 5
+        },
+        {
+          "module": "Sensors",
+          "maxGrade": 5
+        }
+      ],
+      "notes": "Colonia region. DISCREPANCY: fandom main table lists older lower grades; INARA and EDEngineer give all G5.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": -9509.34375,
+        "y": -886.3125,
+        "z": 19820.125
+      }
+    },
+    {
+      "name": "Marsha Hicks",
+      "type": "ship",
+      "system": "Tir",
+      "base": "The Watchtower",
+      "body": "Tir A 2",
+      "invite": "Gain exploration rank Surveyor or higher",
+      "unlock": "Mine 10 units of Osmium (self-mined) and deliver",
+      "referral": "The Dweller",
+      "specialties": [
+        {
+          "module": "Cannon",
+          "maxGrade": 5
+        },
+        {
+          "module": "Collector Limpet Controller",
+          "maxGrade": 5
+        },
+        {
+          "module": "Fragment Cannon",
+          "maxGrade": 5
+        },
+        {
+          "module": "Fuel Scoop",
+          "maxGrade": 5
+        },
+        {
+          "module": "Fuel Transfer Limpet Controller",
+          "maxGrade": 5
+        },
+        {
+          "module": "Hatch Breaker Limpet Controller",
+          "maxGrade": 5
+        },
+        {
+          "module": "Multi-cannon",
+          "maxGrade": 5
+        },
+        {
+          "module": "Prospector Limpet Controller",
+          "maxGrade": 5
+        },
+        {
+          "module": "Refinery",
+          "maxGrade": 5
+        }
+      ],
+      "notes": "Colonia region. DISCREPANCY: fandom main table lists older lower grades; INARA and EDEngineer give all G5.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://elite-dangerous.fandom.com/wiki/Engineers",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": -9532.9375,
+        "y": -923.4375,
+        "z": 19799.125
+      }
+    },
+    {
+      "name": "Domino Green",
+      "type": "onfoot",
+      "system": "Orishis",
+      "base": "The Jackrabbit",
+      "body": "Orishis 4",
+      "invite": "Travel at least 100 light years in Apex Interstellar shuttles",
+      "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "referral": null,
+      "specialties": [
+        "Greater range",
+        "Stability",
+        "Enhanced tracking",
+        "Extra backpack capacity",
+        "Reduced tool battery consumption"
+      ],
+      "notes": "On-foot engineers have no separate item delivery: access is granted once the invitation requirement is met. Discovery: common knowledge. Referral task: provide 5 units of Push to learn about Kit Fowler.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/jixxed/ed-odyssey-materials-helper/blob/master/application/src/main/resources/locale/blueprint/odyssey/description.csv",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html"
+      ],
+      "coords": {
+        "x": -31.0,
+        "y": 93.96875,
+        "z": -3.5625
+      }
+    },
+    {
+      "name": "Hero Ferrari",
+      "type": "onfoot",
+      "system": "Siris",
+      "base": "Nevermore Terrace",
+      "body": "Siris 5 C",
+      "invite": "Complete 10 surface (on-foot) conflict zones (EDOMH: 'low threat Conflict Zones')",
+      "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "referral": null,
+      "specialties": [
+        "Faster handling",
+        "Noise suppressor",
+        "Increased sprint duration",
+        "Improved jump assist",
+        "Increased air reserves"
+      ],
+      "notes": "On-foot engineers have no separate item delivery: access is granted once the invitation requirement is met. Discovery: common knowledge. Referral task: provide Settlement Defence Plans to learn about Wellington Beck. DISCREPANCY on quantity: INARA and EDOMH say 5; Black Box, EDDiscovery and EDEngineer say 15.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/jixxed/ed-odyssey-materials-helper/blob/master/application/src/main/resources/locale/blueprint/odyssey/description.csv",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 131.0625,
+        "y": -73.59375,
+        "z": -11.25
+      }
+    },
+    {
+      "name": "Jude Navarro",
+      "type": "onfoot",
+      "system": "Aurai",
+      "base": "Marshall's Drift",
+      "body": "Aurai 1 A",
+      "invite": "Complete 10 Restore or Reactivation on-foot missions",
+      "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "referral": null,
+      "specialties": [
+        "Reload speed",
+        "Magazine size",
+        "Extra ammo capacity",
+        "Damage resistance",
+        "Added melee damage"
+      ],
+      "notes": "On-foot engineers have no separate item delivery: access is granted once the invitation requirement is met. Discovery: common knowledge. Referral task: provide 5 units of Genetic Repair Meds to learn about Terra Velasquez.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/jixxed/ed-odyssey-materials-helper/blob/master/application/src/main/resources/locale/blueprint/odyssey/description.csv",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html"
+      ],
+      "coords": {
+        "x": 0.9375,
+        "y": -47.8125,
+        "z": 46.28125
+      }
+    },
+    {
+      "name": "Kit Fowler",
+      "type": "onfoot",
+      "system": "Capoya",
+      "base": "The Last Call",
+      "body": "Capoya 2",
+      "invite": "Sell 5 Opinion Polls to bartenders",
+      "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "referral": "Domino Green",
+      "specialties": [
+        "Stowed reloading",
+        "Magazine size",
+        "Added melee damage",
+        "Faster shield regen",
+        "Extra ammo capacity"
+      ],
+      "notes": "On-foot engineers have no separate item delivery: access is granted once the invitation requirement is met. Referral task: provide 5 units of Surveillance Equipment to learn about Yarden Bond. DISCREPANCY: INARA, fandom and EDOMH say 5 Opinion Polls; EDDiscovery says 10.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/jixxed/ed-odyssey-materials-helper/blob/master/application/src/main/resources/locale/blueprint/odyssey/description.csv",
+        "https://elite-dangerous.fandom.com/wiki/Kit_Fowler"
+      ],
+      "coords": {
+        "x": -60.65625,
+        "y": 82.4375,
+        "z": -45.0625
+      }
+    },
+    {
+      "name": "Terra Velasquez",
+      "type": "onfoot",
+      "system": "Shou Xing",
+      "base": "Rascal's Choice",
+      "body": "Shou Xing 1",
+      "invite": "Complete 6 Covert Heist and/or Covert Theft on-foot missions",
+      "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "referral": "Jude Navarro",
+      "specialties": [
+        "Improved hip fire accuracy",
+        "Noise suppressor",
+        "Increased sprint duration",
+        "Combat movement speed",
+        "Increased air reserves"
+      ],
+      "notes": "On-foot engineers have no separate item delivery: access is granted once the invitation requirement is met. Referral task: provide 15 units of Financial Projections to learn about Oden Geiger.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/jixxed/ed-odyssey-materials-helper/blob/master/application/src/main/resources/locale/blueprint/odyssey/description.csv",
+        "https://elite-dangerous.fandom.com/wiki/Terra_Velasquez"
+      ],
+      "coords": {
+        "x": -16.28125,
+        "y": -44.53125,
+        "z": 94.375
+      }
+    },
+    {
+      "name": "Wellington Beck",
+      "type": "onfoot",
+      "system": "Jolapa",
+      "base": "Beck Facility",
+      "body": "Jolapa 6 A",
+      "invite": "Sell a total of 15 Multimedia Entertainment, Classic Entertainment and/or Cat Media to bartenders",
+      "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "referral": "Hero Ferrari",
+      "specialties": [
+        "Greater range",
+        "Scope",
+        "Reduced tool battery consumption",
+        "Improved battery capacity",
+        "Extra backpack capacity"
+      ],
+      "notes": "On-foot engineers have no separate item delivery: access is granted once the invitation requirement is met. Referral task: provide 5 units of InSight Entertainment Suites to learn about Uma Laszlo. DISCREPANCY: INARA and EDOMH say 15 items; EDDiscovery and EDEngineer say 25.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/jixxed/ed-odyssey-materials-helper/blob/master/application/src/main/resources/locale/blueprint/odyssey/description.csv",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": 100.1875,
+        "y": -41.34375,
+        "z": -78.0
+      }
+    },
+    {
+      "name": "Oden Geiger",
+      "type": "onfoot",
+      "system": "Candiaei",
+      "base": "Ankh's Promise",
+      "body": "Candiaei 9 C",
+      "invite": "Sell a total of 20 Biological Sample, Employee Genetic Data and/or Genetic Research to bartenders",
+      "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "referral": "Terra Velasquez",
+      "specialties": [
+        "Stability",
+        "Scope",
+        "Enhanced tracking",
+        "Improved battery capacity",
+        "Night vision"
+      ],
+      "notes": "On-foot engineers have no separate item delivery: access is granted once the invitation requirement is met. Offers no referral (end of chain).",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/jixxed/ed-odyssey-materials-helper/blob/master/application/src/main/resources/locale/blueprint/odyssey/description.csv",
+        "https://elite-dangerous.fandom.com/wiki/Oden_Geiger"
+      ],
+      "coords": {
+        "x": -113.5,
+        "y": -4.9375,
+        "z": 66.84375
+      }
+    },
+    {
+      "name": "Yarden Bond",
+      "type": "onfoot",
+      "system": "Bayan",
+      "base": "Salamander Bank",
+      "body": "Bayan 7 B",
+      "invite": "Sell 5 Smear Campaign Plans to bartenders",
+      "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "referral": "Kit Fowler",
+      "specialties": [
+        "Faster handling",
+        "Improved hip fire accuracy",
+        "Audio masking",
+        "Improved jump assist",
+        "Combat movement speed",
+        "Quieter footsteps"
+      ],
+      "notes": "On-foot engineers have no separate item delivery: access is granted once the invitation requirement is met. Offers no referral (end of chain). DISCREPANCY: INARA and EDOMH say 5 Smear Campaign Plans; EDDiscovery and EDEngineer say 8.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/jixxed/ed-odyssey-materials-helper/blob/master/application/src/main/resources/locale/blueprint/odyssey/description.csv",
+        "https://github.com/msarilar/EDEngineer/blob/master/EDEngineer/Resources/Data/blueprints.json"
+      ],
+      "coords": {
+        "x": -19.96875,
+        "y": 117.625,
+        "z": -90.46875
+      }
+    },
+    {
+      "name": "Uma Laszlo",
+      "type": "onfoot",
+      "system": "Xuane",
+      "base": "Laszlo's Resolve",
+      "body": "Xuane A 3",
+      "invite": "Reach Unfriendly reputation or lower with Sirius Corporation",
+      "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "referral": "Wellington Beck",
+      "specialties": [
+        "Reload speed",
+        "Stowed reloading",
+        "Headshot damage",
+        "Damage resistance",
+        "Faster shield regen"
+      ],
+      "notes": "On-foot engineers have no separate item delivery: access is granted once the invitation requirement is met. Offers no referral (end of chain).",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/jixxed/ed-odyssey-materials-helper/blob/master/application/src/main/resources/locale/blueprint/odyssey/description.csv"
+      ],
+      "coords": {
+        "x": 93.875,
+        "y": -9.25,
+        "z": -32.53125
+      }
+    },
+    {
+      "name": "Baltanos",
+      "type": "onfoot",
+      "system": "Deriso",
+      "base": "The Divine Apparatus",
+      "body": "Deriso 3 A",
+      "invite": "Reach Friendly reputation with the Colonia Council",
+      "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "referral": null,
+      "specialties": [
+        "Noise suppressor",
+        "Improved hip fire accuracy",
+        "Faster handling",
+        "Improved jump assist",
+        "Increased air reserves",
+        "Increased sprint duration",
+        "Combat movement speed"
+      ],
+      "notes": "On-foot engineers have no separate item delivery: access is granted once the invitation requirement is met. Colonia region. Discovery: common knowledge. Referral task (one of three for Yi Shen): provide 10 Faction Associates.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/jixxed/ed-odyssey-materials-helper/blob/master/application/src/main/resources/locale/blueprint/odyssey/description.csv",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html"
+      ],
+      "coords": {
+        "x": -9520.3125,
+        "y": -909.5,
+        "z": 19808.75
+      }
+    },
+    {
+      "name": "Eleanor Bresa",
+      "type": "onfoot",
+      "system": "Desy",
+      "base": "Bresa Modifications",
+      "body": "Desy 7 A",
+      "invite": "Visit (dock and disembark at) 5 settlements in the Colonia system",
+      "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "referral": null,
+      "specialties": [
+        "Magazine size",
+        "Reload speed",
+        "Stowed reloading",
+        "Added melee damage",
+        "Damage resistance",
+        "Extra ammo capacity",
+        "Faster shield regen"
+      ],
+      "notes": "On-foot engineers have no separate item delivery: access is granted once the invitation requirement is met. Colonia region. Discovery: common knowledge. Referral task (one of three for Yi Shen): provide 10 Digital Designs.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/jixxed/ed-odyssey-materials-helper/blob/master/application/src/main/resources/locale/blueprint/odyssey/description.csv",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html"
+      ],
+      "coords": {
+        "x": -9534.21875,
+        "y": -912.21875,
+        "z": 19792.375
+      }
+    },
+    {
+      "name": "Rosa Dayette",
+      "type": "onfoot",
+      "system": "Kojeara",
+      "base": "Rosa's Shop",
+      "body": "Kojeara 4 B",
+      "invite": "Sell a total of 10 Culinary Recipes or Cocktail Recipes to stations in Colonia",
+      "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "referral": null,
+      "specialties": [
+        "Greater range",
+        "Scope",
+        "Stability",
+        "Extra backpack capacity",
+        "Enhanced tracking",
+        "Reduced tool battery consumption",
+        "Improved battery capacity"
+      ],
+      "notes": "On-foot engineers have no separate item delivery: access is granted once the invitation requirement is met. Colonia region. Discovery: public/common knowledge. Referral task (one of three for Yi Shen): provide 10 Manufacturing Instructions. Wording differs: INARA/EDDiscovery/EDOMH say 'to stations in Colonia', fandom says 'to Bartenders in Colonia'.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/jixxed/ed-odyssey-materials-helper/blob/master/application/src/main/resources/locale/blueprint/odyssey/description.csv",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html",
+        "https://elite-dangerous.fandom.com/wiki/Rosa_Dayette"
+      ],
+      "coords": {
+        "x": -9513.09375,
+        "y": -908.84375,
+        "z": 19814.28125
+      }
+    },
+    {
+      "name": "Yi Shen",
+      "type": "onfoot",
+      "system": "Einheriar",
+      "base": "Eidolon Hold",
+      "body": "Einheriar 1 A",
+      "invite": "Complete the referral tasks for Baltanos (10 Faction Associates), Eleanor Bresa (10 Digital Designs) and Rosa Dayette (10 Manufacturing Instructions)",
+      "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "referral": "Baltanos, Eleanor Bresa, Rosa Dayette",
+      "specialties": [
+        "Audio masking",
+        "Headshot damage",
+        "Quieter footsteps",
+        "Night vision"
+      ],
+      "notes": "On-foot engineers have no separate item delivery: access is granted once the invitation requirement is met. Colonia region. EDOMH notes one referral task reveals Yi Shen's location, but all three must be completed to gain access.",
+      "sources": [
+        "https://inara.cz/elite/engineers/",
+        "https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/Items/Engineers.cs",
+        "https://github.com/jixxed/ed-odyssey-materials-helper/blob/master/application/src/main/resources/locale/blueprint/odyssey/description.csv",
+        "https://edblackbox.com/guides/engineering/engineering-manuals/checklist.html"
+      ],
+      "coords": {
+        "x": -9557.8125,
+        "y": -880.1875,
+        "z": 19801.5625
+      }
+    }
+  ]
+}
