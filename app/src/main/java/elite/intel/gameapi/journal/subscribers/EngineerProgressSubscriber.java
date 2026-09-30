@@ -20,7 +20,7 @@ public class EngineerProgressSubscriber {
         EngineerProgressManager manager = EngineerProgressManager.getInstance();
 
         for (EngineerProgressEvent.Engineer eng : event.getEngineers()) {
-            if (eng == null || eng.getName() == null || eng.getProgress() == null) {
+            if (eng == null || eng.getName() == null || eng.getName().isBlank()) {
                 continue;
             }
             manager.recordProgress(

@@ -35,8 +35,11 @@ public final class EngineerProgressManager {
             log.warn("Cannot record engineer progress without display name");
             return;
         }
+        if ((progress == null || progress.isBlank()) && rank != null) {
+            progress = "Unlocked";
+        }
         if (progress == null || progress.isBlank()) {
-            log.warn("Cannot record engineer progress without progress state for {}", displayName);
+            log.warn("Cannot record engineer progress without progress state or rank for {}", displayName);
             return;
         }
         if (eventTimestamp == null || eventTimestamp.isBlank()) {
@@ -47,12 +50,13 @@ public final class EngineerProgressManager {
         String updatedAt = Instant.now().toString();
 
         String finalEventTimestamp = eventTimestamp;
+        String finalProgress = progress.trim();
         Database.withDao(EngineerProgressDao.class, dao -> {
             dao.upsert(
                     nameKey,
                     displayName.trim(),
                     engineerId,
-                    progress.trim(),
+                    finalProgress,
                     rank,
                     rankProgress,
                     finalEventTimestamp,

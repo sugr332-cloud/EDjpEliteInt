@@ -93,4 +93,39 @@ class EngineerProgressManagerTest {
         List<EngineerProgressRecord> unknown = manager.getByProgress("UnknownStatus");
         assertTrue(unknown.isEmpty());
     }
+
+    @Test
+    void recordProgressWithoutProgressButWithRankIsSavedAsUnlocked() {
+        // Single update arrives with null Progress, but rank 3
+        manager.recordProgress("Professor Palin", 300008L, null, 3, 20, "2026-10-01T12:00:00Z");
+
+        EngineerProgressRecord record = manager.findByName("Professor Palin").orElseThrow();
+        assertEquals("Unlocked", record.progress());
+        assertEquals(3, record.rank());
+        assertEquals(20, record.rankProgress());
+    }
+
+    @Test
+    void newerUpdateWithoutRankRetainsExistingRank() {
+        // Initial state: rank 3
+        manager.recordProgress("Professor Palin", 300008L, "Unlocked", 3, 20, "2026-10-01T12:00:00Z");
+
+        // Newer update arrives with Progress only, rank null
+        manager.recordProgress("Professor Palin", 300008L, "Unlocked", null, null, "2026-10-01T13:00:00Z");
+
+        EngineerProgressRecord record = manager.findByName("Professor Palin").orElseThrow();
+        assertEquals("Unlocked", record.progress());
+        assertEquals(3, record.rank(), "Rank must be retained via COALESCE");
+        assertEquals(20, record.rankProgress(), "RankProgress must be retained via COALESCE");
+        assertEquals("2026-10-01T13:00:00Z", record.eventTimestamp());
+    }
+
+    @Test
+    void recordProgressWithoutProgressAndWithoutRankIsIgnored() {
+        manager.recordProgress("Professor Palin", 300008L, null, null, null, "2026-10-01T12:00:00Z");
+        assertTrue(manager.findByName("Professor Palin").isEmpty(), "Update without progress and without rank must be ignored");
+
+        manager.recordProgress("Professor Palin", 300008L, "  ", null, null, "2026-10-01T12:00:00Z");
+        assertTrue(manager.findByName("Professor Palin").isEmpty(), "Update with blank progress and without rank must be ignored");
+    }
 }

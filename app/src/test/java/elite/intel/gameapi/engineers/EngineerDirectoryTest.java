@@ -91,4 +91,41 @@ class EngineerDirectoryTest {
         assertEquals("", EngineerDirectory.normalizeName(null));
         assertEquals("", EngineerDirectory.normalizeName("   "));
     }
+
+    @Test
+    void allEngineersHaveNonEmptySpecialties() {
+        List<EngineerDirectory.EngineerInfo> all = directory.getAllEngineers();
+        assertEquals(38, all.size());
+        for (EngineerDirectory.EngineerInfo eng : all) {
+            assertNotNull(eng.specialties(), "Specialties list must not be null for " + eng.name());
+            assertFalse(eng.specialties().isEmpty(), "Specialties must not be empty for " + eng.name());
+        }
+    }
+
+    @Test
+    void onFootEngineerSpecialtiesParsedWithGradeZero() {
+        Optional<EngineerDirectory.EngineerInfo> dominoOpt = directory.findByName("Domino Green");
+        assertTrue(dominoOpt.isPresent());
+        EngineerDirectory.EngineerInfo domino = dominoOpt.get();
+        assertTrue(domino.isOnFoot());
+        assertFalse(domino.specialties().isEmpty());
+
+        boolean hasGreaterRange = domino.specialties().stream().anyMatch(
+                sp -> "Greater range".equals(sp.module()) && sp.maxGrade() == 0
+        );
+        assertTrue(hasGreaterRange, "Domino Green specialties must contain module 'Greater range' with maxGrade 0");
+    }
+
+    @Test
+    void shipEngineerSpecialtiesParsedWithPositiveGrade() {
+        Optional<EngineerDirectory.EngineerInfo> felicityOpt = directory.findByName("Felicity Farseer");
+        assertTrue(felicityOpt.isPresent());
+        EngineerDirectory.EngineerInfo felicity = felicityOpt.get();
+        assertTrue(felicity.isShip());
+        assertFalse(felicity.specialties().isEmpty());
+
+        for (EngineerDirectory.Specialty sp : felicity.specialties()) {
+            assertTrue(sp.maxGrade() >= 1, "Ship engineer specialty grade must be 1 or higher for " + sp.module());
+        }
+    }
 }

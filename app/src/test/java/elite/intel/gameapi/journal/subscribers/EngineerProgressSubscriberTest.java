@@ -107,4 +107,24 @@ class EngineerProgressSubscriberTest {
         assertEquals(5, felicity.rank());
         assertEquals("2026-10-01T15:00:00Z", felicity.eventTimestamp());
     }
+
+    @Test
+    void receivesSingleUpdateWithOnlyRankAndPersistsAsUnlocked() {
+        JsonObject json = new JsonObject();
+        json.addProperty("timestamp", "2026-10-01T16:00:00Z");
+        json.addProperty("event", "EngineerProgress");
+        json.addProperty("Engineer", "Professor Palin");
+        json.addProperty("EngineerID", 300008L);
+        json.addProperty("Rank", 4);
+        json.addProperty("RankProgress", 50);
+
+        EngineerProgressEvent event = new EngineerProgressEvent(json);
+        subscriber.onEngineerProgressEvent(event);
+
+        EngineerProgressRecord record = manager.findByName("Professor Palin").orElseThrow();
+        assertEquals("Unlocked", record.progress());
+        assertEquals(4, record.rank());
+        assertEquals(50, record.rankProgress());
+        assertEquals("2026-10-01T16:00:00Z", record.eventTimestamp());
+    }
 }

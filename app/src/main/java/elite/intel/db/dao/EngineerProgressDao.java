@@ -32,8 +32,8 @@ public interface EngineerProgressDao {
                 display_name = excluded.display_name,
                 engineer_id = COALESCE(excluded.engineer_id, engineer_progress.engineer_id),
                 progress = excluded.progress,
-                rank = excluded.rank,
-                rank_progress = excluded.rank_progress,
+                rank = COALESCE(excluded.rank, engineer_progress.rank),
+                rank_progress = COALESCE(excluded.rank_progress, engineer_progress.rank_progress),
                 event_timestamp = excluded.event_timestamp,
                 updated_at = excluded.updated_at
             WHERE excluded.event_timestamp >= engineer_progress.event_timestamp

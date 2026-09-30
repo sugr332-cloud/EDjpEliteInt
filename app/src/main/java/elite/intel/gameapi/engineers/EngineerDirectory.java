@@ -113,11 +113,14 @@ public final class EngineerDirectory {
                         List<Specialty> specs = new ArrayList<>();
                         if (obj.has("specialties") && obj.get("specialties").isJsonArray()) {
                             for (JsonElement spEl : obj.getAsJsonArray("specialties")) {
-                                if (!spEl.isJsonObject()) continue;
-                                JsonObject spObj = spEl.getAsJsonObject();
-                                String mod = spObj.has("module") ? spObj.get("module").getAsString() : "";
-                                int grade = spObj.has("maxGrade") ? spObj.get("maxGrade").getAsInt() : 0;
-                                specs.add(new Specialty(mod, grade));
+                                if (spEl.isJsonObject()) {
+                                    JsonObject spObj = spEl.getAsJsonObject();
+                                    String mod = spObj.has("module") ? spObj.get("module").getAsString() : "";
+                                    int grade = spObj.has("maxGrade") ? spObj.get("maxGrade").getAsInt() : 0;
+                                    specs.add(new Specialty(mod, grade));
+                                } else if (spEl.isJsonPrimitive() && spEl.getAsJsonPrimitive().isString()) {
+                                    specs.add(new Specialty(spEl.getAsString(), 0));
+                                }
                             }
                         }
 
