@@ -118,6 +118,44 @@ public final class DockingHistoryManager {
         }
     }
 
+    /**
+     * Resolves the "previous station" from docking history based on docking status.
+     * - When docked: targets back-th entry if currently docked station matches history 0,
+     *   or (back - 1)-th entry if unrecorded (history 0 does not match). If currentDockedMarketId is 0, targets back-th.
+     * - When undocked: targets (back - 1)-th entry (back=1 is 0th entry, the last docked station).
+     *
+     * @param back number of stations back (1 for previous, 2 for two stations ago)
+     * @param isDocked whether player is currently docked
+     * @param currentDockedMarketId marketId of currently docked station, or 0
+     * @return the resolved DockingHistoryEntry, or empty
+     */
+    public Optional<DockingHistoryEntry> getPreviousStation(int back, boolean isDocked, long currentDockedMarketId) {
+        if (back < 1) {
+            return Optional.empty();
+        }
+        int targetIndex;
+        if (isDocked) {
+            if (currentDockedMarketId > 0) {
+                Optional<DockingHistoryEntry> latestEntryOpt = getNthPreviousStation(0);
+                if (latestEntryOpt.isPresent() && latestEntryOpt.get().marketId() != currentDockedMarketId) {
+                    targetIndex = back - 1;
+                } else {
+                    targetIndex = back;
+                }
+            } else {
+                targetIndex = back;
+            }
+        } else {
+            targetIndex = back - 1;
+        }
+
+        if (targetIndex < 0) {
+            return Optional.empty();
+        }
+        return getNthPreviousStation(targetIndex);
+    }
+
+
     public Optional<DistinctStations> getRecentDistinctStations() {
         try {
             return Database.withDao(DockingHistoryDao.class, dao -> {

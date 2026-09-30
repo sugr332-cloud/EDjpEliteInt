@@ -35,6 +35,11 @@ public final class NavigateToPreviousStationCommand implements IntelCommand {
     public static final String ID = "navigate_to_previous_station";
 
     @FunctionalInterface
+    public interface PreviousStationResolver {
+        Optional<DockingHistoryEntry> resolve(int back, boolean isDocked, long currentDockedMarketId);
+    }
+
+    @FunctionalInterface
     public interface ReminderSetter {
         void setReminder(String text, String starSystem, String stationName, ReminderContact contact);
     }
@@ -49,7 +54,7 @@ public final class NavigateToPreviousStationCommand implements IntelCommand {
         void publish(Object event);
     }
 
-    private final Function<Integer, Optional<DockingHistoryEntry>> nthStationLookup;
+    private final PreviousStationResolver previousStationResolver;
     private final BooleanSupplier inMainShipChecker;
     private final BooleanSupplier isDockedChecker;
     private final LongSupplier dockedMarketIdSupplier;
@@ -63,7 +68,7 @@ public final class NavigateToPreviousStationCommand implements IntelCommand {
 
     public NavigateToPreviousStationCommand() {
         this(
-                back -> DockingHistoryManager.getInstance().getNthPreviousStation(back),
+                (back, isDocked, marketId) -> DockingHistoryManager.getInstance().getPreviousStation(back, isDocked, marketId),
                 () -> Status.getInstance().isInMainShip(),
                 () -> Status.getInstance().isDocked(),
                 () -> DockedMarket.getInstance().marketId(),
@@ -84,7 +89,7 @@ public final class NavigateToPreviousStationCommand implements IntelCommand {
     }
 
     NavigateToPreviousStationCommand(
-            Function<Integer, Optional<DockingHistoryEntry>> nthStationLookup,
+            PreviousStationResolver previousStationResolver,
             BooleanSupplier inMainShipChecker,
             BooleanSupplier isDockedChecker,
             LongSupplier dockedMarketIdSupplier,
@@ -95,7 +100,7 @@ public final class NavigateToPreviousStationCommand implements IntelCommand {
             ReminderSetter reminderSetter,
             RoutePlotterFunction routePlotterFunction,
             VoicePublisher voicePublisher) {
-        this.nthStationLookup = Objects.requireNonNull(nthStationLookup, "nthStationLookup");
+        this.previousStationResolver = Objects.requireNonNull(previousStationResolver, "previousStationResolver");
         this.inMainShipChecker = Objects.requireNonNull(inMainShipChecker, "inMainShipChecker");
         this.isDockedChecker = Objects.requireNonNull(isDockedChecker, "isDockedChecker");
         this.dockedMarketIdSupplier = Objects.requireNonNull(dockedMarketIdSupplier, "dockedMarketIdSupplier");
@@ -107,6 +112,7 @@ public final class NavigateToPreviousStationCommand implements IntelCommand {
         this.routePlotterFunction = Objects.requireNonNull(routePlotterFunction, "routePlotterFunction");
         this.voicePublisher = Objects.requireNonNull(voicePublisher, "voicePublisher");
     }
+
 
     @Override
     public String id() {
@@ -170,30 +176,15 @@ public final class NavigateToPreviousStationCommand implements IntelCommand {
             }
         }
 
-        // 3. Exception rule for counting:
-        // If docked and the latest history entry does not match the currently docked station marketId,
-        // treat the currently docked station as unrecorded, so target back - 1.
-        int targetIndex = back;
-        if (isDockedChecker.getAsBoolean()) {
-            long currentDockedMarketId = dockedMarketIdSupplier.getAsLong();
-            if (currentDockedMarketId > 0) {
-                Optional<DockingHistoryEntry> latestEntryOpt = nthStationLookup.apply(0);
-                if (latestEntryOpt.isPresent() && latestEntryOpt.get().marketId() != currentDockedMarketId) {
-                    targetIndex = back - 1;
-                }
-            }
-        }
-
-        if (targetIndex < 0) {
-            String answer = StringUtls.localizedResponse("handler.navigateToPreviousStation.insufficientHistory");
-            return returnOrVoice(answer, isGui);
-        }
-
-        Optional<DockingHistoryEntry> targetOpt = nthStationLookup.apply(targetIndex);
+        // 3. Resolve target station
+        boolean isDocked = isDockedChecker.getAsBoolean();
+        long dockedMarketId = isDocked ? dockedMarketIdSupplier.getAsLong() : 0L;
+        Optional<DockingHistoryEntry> targetOpt = previousStationResolver.resolve(back, isDocked, dockedMarketId);
         if (targetOpt.isEmpty()) {
             String answer = StringUtls.localizedResponse("handler.navigateToPreviousStation.insufficientHistory");
             return returnOrVoice(answer, isGui);
         }
+
 
         DockingHistoryEntry target = targetOpt.get();
         String stationName = target.stationName();

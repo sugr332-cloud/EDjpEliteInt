@@ -928,3 +928,22 @@ responses|pt|MISSING|handler.pistonMode.reminder
 responses|ptbz|MISSING|handler.pistonMode.reminder
 responses|ru|MISSING|handler.pistonMode.reminder
 responses|uk|MISSING|handler.pistonMode.reminder
+
+# --- LF-1: Station queries ---
+ai_action_aliases|de|MISSING|query_previous_station
+ai_action_aliases|es|MISSING|query_previous_station
+ai_action_aliases|fr|MISSING|query_previous_station
+ai_action_aliases|it|MISSING|query_previous_station
+ai_action_aliases|pt|MISSING|query_previous_station
+ai_action_aliases|ptbz|MISSING|query_previous_station
+ai_action_aliases|ru|MISSING|query_previous_station
+ai_action_aliases|uk|MISSING|query_previous_station
+
+ai_action_aliases|de|MISSING|query_current_station
+ai_action_aliases|es|MISSING|query_current_station
+ai_action_aliases|fr|MISSING|query_current_station
+ai_action_aliases|it|MISSING|query_current_station
+ai_action_aliases|pt|MISSING|query_current_station
+ai_action_aliases|ptbz|MISSING|query_current_station
+ai_action_aliases|ru|MISSING|query_current_station
+ai_action_aliases|uk|MISSING|query_current_station

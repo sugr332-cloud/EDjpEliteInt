@@ -365,4 +365,75 @@ class DockingHistoryManagerTest {
         DockingHistoryEntry emptyType = new DockingHistoryEntry(7, "Station 4", "Sol", 1L, 1L, "", 0.0, "ts");
         assertFalse(emptyType.isFleetCarrier(), "Empty stationType should return false");
     }
+
+    /**
+     * TEST GATE LF-1: getPreviousStation(back, isDocked, currentDockedMarketId)
+     * - ドッキング中・一致 → back 件目
+     * - ドッキング中・不一致 → back - 1 件目
+     * - ドッキング中・MarketID 0 → back 件目
+     * - 未ドッキング → back - 1 件目
+     * - 範囲外 → 空
+     */
+    @Test
+    void test12_getPreviousStation() {
+        // History: 0=Station C (marketId=30), 1=Station B (marketId=20), 2=Station A (marketId=10)
+        DockedEvent evA = dockedEvent("Station A", "System A", 100L, 10L, "Coriolis", 1.0, "2026-09-28T01:00:00Z");
+        DockedEvent evB = dockedEvent("Station B", "System B", 200L, 20L, "Orbis", 2.0, "2026-09-28T02:00:00Z");
+        DockedEvent evC = dockedEvent("Station C", "System C", 300L, 30L, "Ocellus", 3.0, "2026-09-28T03:00:00Z");
+
+        manager.recordDocked(evA);
+        manager.recordDocked(evB);
+        manager.recordDocked(evC);
+
+        // 1. ドッキング中・一致 (currentDockedMarketId = 30L matches 0th entry Station C)
+        // back=1 -> index 1 (Station B)
+        Optional<DockingHistoryEntry> dockedMatchBack1 = manager.getPreviousStation(1, true, 30L);
+        assertTrue(dockedMatchBack1.isPresent());
+        assertEquals("Station B", dockedMatchBack1.get().stationName());
+
+        // back=2 -> index 2 (Station A)
+        Optional<DockingHistoryEntry> dockedMatchBack2 = manager.getPreviousStation(2, true, 30L);
+        assertTrue(dockedMatchBack2.isPresent());
+        assertEquals("Station A", dockedMatchBack2.get().stationName());
+
+        // 2. ドッキング中・不一致 (currentDockedMarketId = 99L != 30L, unrecorded docked station)
+        // back=1 -> index 0 (Station C, the previous station before current unrecorded one)
+        Optional<DockingHistoryEntry> dockedMismatchBack1 = manager.getPreviousStation(1, true, 99L);
+        assertTrue(dockedMismatchBack1.isPresent());
+        assertEquals("Station C", dockedMismatchBack1.get().stationName());
+
+        // back=2 -> index 1 (Station B)
+        Optional<DockingHistoryEntry> dockedMismatchBack2 = manager.getPreviousStation(2, true, 99L);
+        assertTrue(dockedMismatchBack2.isPresent());
+        assertEquals("Station B", dockedMismatchBack2.get().stationName());
+
+        // 3. ドッキング中・MarketID 0 (currentDockedMarketId = 0L)
+        // back=1 -> index 1 (Station B)
+        Optional<DockingHistoryEntry> dockedZeroBack1 = manager.getPreviousStation(1, true, 0L);
+        assertTrue(dockedZeroBack1.isPresent());
+        assertEquals("Station B", dockedZeroBack1.get().stationName());
+
+        // 4. 未ドッキング (isDocked = false)
+        // back=1 -> index 0 (Station C, last docked station)
+        Optional<DockingHistoryEntry> undockedBack1 = manager.getPreviousStation(1, false, 0L);
+        assertTrue(undockedBack1.isPresent());
+        assertEquals("Station C", undockedBack1.get().stationName());
+
+        // back=2 -> index 1 (Station B, station before last docked station)
+        Optional<DockingHistoryEntry> undockedBack2 = manager.getPreviousStation(2, false, 0L);
+        assertTrue(undockedBack2.isPresent());
+        assertEquals("Station B", undockedBack2.get().stationName());
+
+        // 5. 範囲外 -> 空
+        // back=0 -> empty (< 1)
+        assertTrue(manager.getPreviousStation(0, false, 0L).isEmpty());
+        assertTrue(manager.getPreviousStation(-1, true, 30L).isEmpty());
+
+        // back=3 on docked match -> index 3 (out of range, only 3 entries)
+        assertTrue(manager.getPreviousStation(3, true, 30L).isEmpty());
+
+        // back=4 on undocked -> index 3 (out of range)
+        assertTrue(manager.getPreviousStation(4, false, 0L).isEmpty());
+    }
 }
+
