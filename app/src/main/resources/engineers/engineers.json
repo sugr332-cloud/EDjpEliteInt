@@ -11,11 +11,16 @@
       "ED Odyssey Materials Helper locale CSV (on-foot requirement text cross-check): https://github.com/jixxed/ed-odyssey-materials-helper"
     ],
     "matching": "Match journal EngineerProgress entries by engineer name (case-insensitive). EngineerID is not stored here.",
-    "notes": "Where sources disagreed, the value used and the alternative are written in each entry's notes. Regenerate after game updates that move or add engineers."
+    "notes": "Where sources disagreed, the value used and the alternative are written in each entry's notes. Regenerate after game updates that move or add engineers. namesJa: Japanese katakana spellings for voice matching (no official Japanese client; Claude-written, several variants per name; not from the sources above)."
   },
   "engineers": [
     {
       "name": "Felicity Farseer",
+      "namesJa": [
+        "フェリシティ・ファーシーア",
+        "フェリシティ・ファーシア",
+        "ファーシーア"
+      ],
       "type": "ship",
       "system": "Deciat",
       "base": "Farseer Inc",
@@ -70,6 +75,12 @@
     },
     {
       "name": "Elvira Martuuk",
+      "namesJa": [
+        "エルビラ・マルトゥーク",
+        "エルヴィラ・マートゥーク",
+        "エルビラ・マートゥーク",
+        "マルトゥーク"
+      ],
       "type": "ship",
       "system": "Khun",
       "base": "Long Sight Base",
@@ -112,6 +123,11 @@
     },
     {
       "name": "The Dweller",
+      "namesJa": [
+        "ザ・ドゥエラー",
+        "ドゥエラー",
+        "ドウェラー"
+      ],
       "type": "ship",
       "system": "Wyrd",
       "base": "Black Hide",
@@ -154,6 +170,12 @@
     },
     {
       "name": "Tod 'The Blaster' McQuinn",
+      "namesJa": [
+        "トッド・マックイン",
+        "トッド・マクイン",
+        "ブラスター",
+        "マックイン"
+      ],
       "type": "ship",
       "system": "Wolf 397",
       "base": "Trophy Camp",
@@ -196,6 +218,9 @@
     },
     {
       "name": "Liz Ryder",
+      "namesJa": [
+        "リズ・ライダー"
+      ],
       "type": "ship",
       "system": "Eurybia",
       "base": "Demolition Unlimited",
@@ -258,6 +283,11 @@
     },
     {
       "name": "Juri Ishmaak",
+      "namesJa": [
+        "ジュリ・イシュマーク",
+        "ユーリ・イシュマーク",
+        "イシュマーク"
+      ],
       "type": "ship",
       "system": "Giryak",
       "base": "Pater's Memorial",
@@ -332,6 +362,11 @@
     },
     {
       "name": "Selene Jean",
+      "namesJa": [
+        "セレーネ・ジーン",
+        "セリーン・ジーン",
+        "セレーン・ジーン"
+      ],
       "type": "ship",
       "system": "Kuk",
       "base": "Prospector's Rest",
@@ -370,6 +405,9 @@
     },
     {
       "name": "Hera Tani",
+      "namesJa": [
+        "ヘラ・タニ"
+      ],
       "type": "ship",
       "system": "Kuwemaki",
       "base": "The Jet's Hole",
@@ -412,6 +450,11 @@
     },
     {
       "name": "Lei Cheung",
+      "namesJa": [
+        "レイ・チュン",
+        "レイ・チャン",
+        "レイ・チェン"
+      ],
       "type": "ship",
       "system": "Laksak",
       "base": "Trader's Rest",
@@ -454,6 +497,11 @@
     },
     {
       "name": "Marco Qwent",
+      "namesJa": [
+        "マルコ・クウェント",
+        "マルコ・クエント",
+        "クウェント"
+      ],
       "type": "ship",
       "system": "Sirius",
       "base": "Qwent Research Base",
@@ -488,6 +536,11 @@
     },
     {
       "name": "Zacariah Nemo",
+      "namesJa": [
+        "ザカライア・ネモ",
+        "ザカリア・ネモ",
+        "ネモ"
+      ],
       "type": "ship",
       "system": "Yoru",
       "base": "Nemo Cyber Party Base",
@@ -526,6 +579,10 @@
     },
     {
       "name": "The Sarge",
+      "namesJa": [
+        "ザ・サージ",
+        "サージ"
+      ],
       "type": "ship",
       "system": "Beta-3 Tucani",
       "base": "The Beach",
@@ -576,6 +633,11 @@
     },
     {
       "name": "Colonel Bris Dekker",
+      "namesJa": [
+        "ブリス・デッカー",
+        "デッカー大佐",
+        "デッカー"
+      ],
       "type": "ship",
       "system": "Sol",
       "base": "Dekker's Yard",
@@ -610,6 +672,12 @@
     },
     {
       "name": "Didi Vatermann",
+      "namesJa": [
+        "ディディ・ヴァターマン",
+        "ディディ・バターマン",
+        "ヴァターマン",
+        "バターマン"
+      ],
       "type": "ship",
       "system": "Leesti",
       "base": "Vatermann LLC",
@@ -644,6 +712,9 @@
     },
     {
       "name": "Bill Turner",
+      "namesJa": [
+        "ビル・ターナー"
+      ],
       "type": "ship",
       "system": "Alioth",
       "base": "Turner Metallics Inc",
@@ -714,6 +785,11 @@
     },
     {
       "name": "Broo Tarquin",
+      "namesJa": [
+        "ブルー・ターキン",
+        "ブロー・ターキン",
+        "ターキン"
+      ],
       "type": "ship",
       "system": "Muang",
       "base": "Broo's Legacy",
@@ -752,6 +828,9 @@
     },
     {
       "name": "Tiana Fortune",
+      "namesJa": [
+        "ティアナ・フォーチュン"
+      ],
       "type": "ship",
       "system": "Achenar",
       "base": "Fortune's Loss",
@@ -822,6 +901,9 @@
     },
     {
       "name": "Ram Tah",
+      "namesJa": [
+        "ラム・ター"
+      ],
       "type": "ship",
       "system": "Meene",
       "base": "Phoenix Base",
@@ -896,6 +978,11 @@
     },
     {
       "name": "Professor Palin",
+      "namesJa": [
+        "パリン教授",
+        "プロフェッサー・パリン",
+        "パリン"
+      ],
       "type": "ship",
       "system": "Arque",
       "base": "Abel Laboratory",
@@ -930,6 +1017,12 @@
     },
     {
       "name": "Lori Jameson",
+      "namesJa": [
+        "ロリ・ジェイムソン",
+        "ローリー・ジェイムソン",
+        "ロリ・ジェームソン",
+        "ローリー・ジェームソン"
+      ],
       "type": "ship",
       "system": "Shinrarta Dezhra",
       "base": "Jameson Base",
@@ -996,6 +1089,9 @@
     },
     {
       "name": "Chloe Sedesi",
+      "namesJa": [
+        "クロエ・セデシ"
+      ],
       "type": "ship",
       "system": "Shenve",
       "base": "Cinder Dock",
@@ -1030,6 +1126,11 @@
     },
     {
       "name": "Petra Olmanova",
+      "namesJa": [
+        "ペトラ・オルマノヴァ",
+        "ペトラ・オルマノバ",
+        "オルマノバ"
+      ],
       "type": "ship",
       "system": "Asura",
       "base": "Sanctuary",
@@ -1104,6 +1205,9 @@
     },
     {
       "name": "Mel Brandon",
+      "namesJa": [
+        "メル・ブランドン"
+      ],
       "type": "ship",
       "system": "Luchtaine",
       "base": "The Brig",
@@ -1166,6 +1270,11 @@
     },
     {
       "name": "Etienne Dorn",
+      "namesJa": [
+        "エティエンヌ・ドーン",
+        "エティエン・ドーン",
+        "エチエンヌ・ドーン"
+      ],
       "type": "ship",
       "system": "Los",
       "base": "Kraken's Retreat",
@@ -1232,6 +1341,9 @@
     },
     {
       "name": "Marsha Hicks",
+      "namesJa": [
+        "マーシャ・ヒックス"
+      ],
       "type": "ship",
       "system": "Tir",
       "base": "The Watchtower",
@@ -1294,6 +1406,9 @@
     },
     {
       "name": "Domino Green",
+      "namesJa": [
+        "ドミノ・グリーン"
+      ],
       "type": "onfoot",
       "system": "Orishis",
       "base": "The Jackrabbit",
@@ -1324,6 +1439,10 @@
     },
     {
       "name": "Hero Ferrari",
+      "namesJa": [
+        "ヒーロー・フェラーリ",
+        "ヘロ・フェラーリ"
+      ],
       "type": "onfoot",
       "system": "Siris",
       "base": "Nevermore Terrace",
@@ -1355,6 +1474,10 @@
     },
     {
       "name": "Jude Navarro",
+      "namesJa": [
+        "ジュード・ナバロ",
+        "ジュード・ナヴァロ"
+      ],
       "type": "onfoot",
       "system": "Aurai",
       "base": "Marshall's Drift",
@@ -1385,6 +1508,9 @@
     },
     {
       "name": "Kit Fowler",
+      "namesJa": [
+        "キット・ファウラー"
+      ],
       "type": "onfoot",
       "system": "Capoya",
       "base": "The Last Call",
@@ -1415,6 +1541,10 @@
     },
     {
       "name": "Terra Velasquez",
+      "namesJa": [
+        "テラ・ベラスケス",
+        "テラ・ヴェラスケス"
+      ],
       "type": "onfoot",
       "system": "Shou Xing",
       "base": "Rascal's Choice",
@@ -1445,6 +1575,9 @@
     },
     {
       "name": "Wellington Beck",
+      "namesJa": [
+        "ウェリントン・ベック"
+      ],
       "type": "onfoot",
       "system": "Jolapa",
       "base": "Beck Facility",
@@ -1475,6 +1608,10 @@
     },
     {
       "name": "Oden Geiger",
+      "namesJa": [
+        "オーデン・ガイガー",
+        "オデン・ガイガー"
+      ],
       "type": "onfoot",
       "system": "Candiaei",
       "base": "Ankh's Promise",
@@ -1505,6 +1642,10 @@
     },
     {
       "name": "Yarden Bond",
+      "namesJa": [
+        "ヤーデン・ボンド",
+        "ヤルデン・ボンド"
+      ],
       "type": "onfoot",
       "system": "Bayan",
       "base": "Salamander Bank",
@@ -1536,6 +1677,10 @@
     },
     {
       "name": "Uma Laszlo",
+      "namesJa": [
+        "ウマ・ラズロ",
+        "ユマ・ラズロ"
+      ],
       "type": "onfoot",
       "system": "Xuane",
       "base": "Laszlo's Resolve",
@@ -1565,6 +1710,9 @@
     },
     {
       "name": "Baltanos",
+      "namesJa": [
+        "バルタノス"
+      ],
       "type": "onfoot",
       "system": "Deriso",
       "base": "The Divine Apparatus",
@@ -1597,6 +1745,10 @@
     },
     {
       "name": "Eleanor Bresa",
+      "namesJa": [
+        "エレノア・ブレサ",
+        "エレノア・ブレッサ"
+      ],
       "type": "onfoot",
       "system": "Desy",
       "base": "Bresa Modifications",
@@ -1629,6 +1781,11 @@
     },
     {
       "name": "Rosa Dayette",
+      "namesJa": [
+        "ローザ・デイエット",
+        "ロサ・デイエット",
+        "ローザ・ダイエット"
+      ],
       "type": "onfoot",
       "system": "Kojeara",
       "base": "Rosa's Shop",
@@ -1662,6 +1819,10 @@
     },
     {
       "name": "Yi Shen",
+      "namesJa": [
+        "イー・シェン",
+        "イ・シェン"
+      ],
       "type": "onfoot",
       "system": "Einheriar",
       "base": "Eidolon Hold",
