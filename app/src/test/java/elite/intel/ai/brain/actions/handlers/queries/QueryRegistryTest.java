@@ -20,7 +20,7 @@ class QueryRegistryTest {
     /**
      * Number of @RegisterQuery built-in query handlers. Update deliberately when adding/removing one.
      */
-    private static final int EXPECTED_QUERY_COUNT = 42;
+    private static final int EXPECTED_QUERY_COUNT = 44;
 
     @BeforeAll
     static void loadRegistry() {

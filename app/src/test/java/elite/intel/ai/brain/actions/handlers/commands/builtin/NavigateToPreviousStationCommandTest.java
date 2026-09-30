@@ -63,7 +63,27 @@ class NavigateToPreviousStationCommandTest {
         currentFleetCarrierSystem.set(null);
 
         command = new NavigateToPreviousStationCommand(
-                back -> (back >= 0 && back < historyEntries.size()) ? Optional.of(historyEntries.get(back)) : Optional.empty(),
+                (back, docked, marketId) -> {
+                    if (back < 1) return Optional.empty();
+                    int targetIndex;
+                    if (docked) {
+                        if (marketId > 0) {
+                            if (!historyEntries.isEmpty() && historyEntries.get(0).marketId() != marketId) {
+                                targetIndex = back - 1;
+                            } else {
+                                targetIndex = back;
+                            }
+                        } else {
+                            targetIndex = back;
+                        }
+                    } else {
+                        targetIndex = back - 1;
+                    }
+                    if (targetIndex < 0 || targetIndex >= historyEntries.size()) {
+                        return Optional.empty();
+                    }
+                    return Optional.of(historyEntries.get(targetIndex));
+                },
                 inMainShip::get,
                 isDocked::get,
                 dockedMarketId::get,
@@ -96,6 +116,8 @@ class NavigateToPreviousStationCommandTest {
         historyEntries.add(createEntry(2, "StationB", "SysB", 2000L, 20L, "Coriolis"));
         historyEntries.add(createEntry(1, "StationA", "SysA", 1000L, 10L, "Coriolis"));
 
+        isDocked.set(true);
+        dockedMarketId.set(20L);
         currentSystemAddress.set(2000L);
         currentStarSystem.set("SysB");
 
@@ -120,6 +142,8 @@ class NavigateToPreviousStationCommandTest {
         historyEntries.add(createEntry(2, "StationB", "SysA", 1000L, 20L, "Coriolis"));
         historyEntries.add(createEntry(1, "StationA", "SysA", 1000L, 10L, "Coriolis"));
 
+        isDocked.set(true);
+        dockedMarketId.set(20L);
         currentSystemAddress.set(1000L);
         currentStarSystem.set("SysA");
 
@@ -142,6 +166,8 @@ class NavigateToPreviousStationCommandTest {
         historyEntries.add(createEntry(2, "StationB", "SysA", 0L, 20L, "Coriolis"));
         historyEntries.add(createEntry(1, "StationA", "SysA", 0L, 10L, "Coriolis"));
 
+        isDocked.set(true);
+        dockedMarketId.set(20L);
         currentSystemAddress.set(null);
         currentStarSystem.set("sysa");
 
@@ -166,6 +192,8 @@ class NavigateToPreviousStationCommandTest {
 
         // History with 1 entry, but back=2 requested
         historyEntries.add(createEntry(1, "StationA", "SysA", 1000L, 10L, "Coriolis"));
+        isDocked.set(true);
+        dockedMarketId.set(10L);
         params.addProperty("back", 2);
         result = command.execute(params, "");
 
@@ -173,6 +201,7 @@ class NavigateToPreviousStationCommandTest {
         assertTrue(reminders.isEmpty());
         assertEquals(StringUtls.localizedResponse("handler.navigateToPreviousStation.insufficientHistory"), result);
     }
+
 
     @Test
     void testGate4_notInMainShip() {
@@ -191,11 +220,13 @@ class NavigateToPreviousStationCommandTest {
 
     @Test
     void testGate5_backEqualsTwo_targetsSecondPreviousStation() {
-        // 0: StationC, 1: StationB, 2: StationA
+        // 0: StationC (marketId=30), 1: StationB (marketId=20), 2: StationA (marketId=10)
         historyEntries.add(createEntry(3, "StationC", "SysC", 3000L, 30L, "Coriolis"));
         historyEntries.add(createEntry(2, "StationB", "SysB", 2000L, 20L, "Coriolis"));
         historyEntries.add(createEntry(1, "StationA", "SysA", 1000L, 10L, "Coriolis"));
 
+        isDocked.set(true);
+        dockedMarketId.set(30L);
         currentSystemAddress.set(3000L);
         currentStarSystem.set("SysC");
 
@@ -290,22 +321,34 @@ class NavigateToPreviousStationCommandTest {
     }
 
     @Test
-    void testGate9_undocked_backOneTargetsOne() {
+    void testGate9_undocked_backOneTargetsZero_backTwoTargetsOne() {
         // Undocked (isDocked = false)
         // History has 0: StationB (marketId=20L), 1: StationA (marketId=10L)
         historyEntries.add(createEntry(2, "StationB", "SysB", 2000L, 20L, "Coriolis"));
         historyEntries.add(createEntry(1, "StationA", "SysA", 1000L, 10L, "Coriolis"));
 
         isDocked.set(false);
-        dockedMarketId.set(20L); // dockedMarketId might still hold old pad, but isDocked is false
-        currentSystemAddress.set(2000L);
-        currentStarSystem.set("SysB");
+        dockedMarketId.set(0L);
+        currentSystemAddress.set(3000L);
+        currentStarSystem.set("SysC");
 
-        JsonObject params = new JsonObject();
-        params.addProperty("back", 1);
-        String result = command.execute(params, "");
+        // back = 1 -> targets 0th entry (StationB, last visited station)
+        JsonObject params1 = new JsonObject();
+        params1.addProperty("back", 1);
+        String result1 = command.execute(params1, "");
 
-        // Standard: targetIndex = back = 1 (StationA)
+        assertEquals(1, plottedRoutes.size());
+        assertEquals("SysB", plottedRoutes.get(0).destination());
+        assertEquals("StationB", reminders.get(0).stationName());
+
+        plottedRoutes.clear();
+        reminders.clear();
+
+        // back = 2 -> targets 1st entry (StationA, station before last visited station)
+        JsonObject params2 = new JsonObject();
+        params2.addProperty("back", 2);
+        String result2 = command.execute(params2, "");
+
         assertEquals(1, plottedRoutes.size());
         assertEquals("SysA", plottedRoutes.get(0).destination());
         assertEquals("StationA", reminders.get(0).stationName());
@@ -316,6 +359,8 @@ class NavigateToPreviousStationCommandTest {
         historyEntries.add(createEntry(2, "StationB", "SysB", 2000L, 20L, "Coriolis"));
         historyEntries.add(createEntry(1, "Carrier-XYZ", "SysA", 1000L, 10L, "FleetCarrier"));
 
+        isDocked.set(true);
+        dockedMarketId.set(20L);
         ownCarrierCallSign.set("MY-CARRIER");
         currentSystemAddress.set(2000L);
         currentStarSystem.set("SysB");
@@ -336,6 +381,8 @@ class NavigateToPreviousStationCommandTest {
         // Carrier recorded at SysA
         historyEntries.add(createEntry(1, "Q7B-89X", "SysA", 1000L, 10L, "FleetCarrier"));
 
+        isDocked.set(true);
+        dockedMarketId.set(20L);
         ownCarrierCallSign.set("Q7B-89X");
         // But carrier has moved to SysNew!
         currentFleetCarrierSystem.set("SysNew");
@@ -361,6 +408,8 @@ class NavigateToPreviousStationCommandTest {
         historyEntries.add(createEntry(2, "StationB", "SysB", 2000L, 20L, "Coriolis"));
         historyEntries.add(createEntry(1, "Q7B-89X", "SysA", 1000L, 10L, "FleetCarrier"));
 
+        isDocked.set(true);
+        dockedMarketId.set(20L);
         ownCarrierCallSign.set("Q7B-89X");
         currentFleetCarrierSystem.set(null); // Unknown
         currentSystemAddress.set(2000L);
@@ -381,6 +430,8 @@ class NavigateToPreviousStationCommandTest {
         historyEntries.add(createEntry(2, "StationB", "SysB", 2000L, 20L, "Coriolis"));
         historyEntries.add(createEntry(1, "StationA", "SysA", 1000L, 10L, "Coriolis"));
 
+        isDocked.set(true);
+        dockedMarketId.set(20L);
         currentSystemAddress.set(2000L);
         currentStarSystem.set("SysB");
 
@@ -396,6 +447,7 @@ class NavigateToPreviousStationCommandTest {
         String expectedMessage = StringUtls.localizedResponse("handler.navigateToPreviousStation.success", "StationA", "SysA");
         assertEquals(expectedMessage + " [PLOTTED]", vox.getText());
     }
+
 
     @Test
     void testCommandMetadata() {
