@@ -1,0 +1,72 @@
+<Root PresetName="LF2Sample" MajorVersion="4" MinorVersion="2">
+	<HyperSuperCombination>
+		<Primary Device="Keyboard" Key="Key_J" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</HyperSuperCombination>
+	<Hyperspace>
+		<Primary Device="Keyboard" Key="Key_F4">
+			<Modifier Device="Keyboard" Key="Key_LeftShift" />
+		</Primary>
+		<Secondary Device="{NoDevice}" Key="" />
+	</Hyperspace>
+	<ToggleSilentRunning>
+		<Primary Device="Keyboard" Key="Key_RightShift" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</ToggleSilentRunning>
+	<SetSpeedZero>
+		<Primary Device="Keyboard" Key="Key_X" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</SetSpeedZero>
+	<SelectTargetsTarget>
+		<Primary Device="Keyboard" Key="Key_T" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</SelectTargetsTarget>
+	<OrderDefensiveBehaviour>
+		<Primary Device="Keyboard" Key="Key_LeftControl" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</OrderDefensiveBehaviour>
+	<OrderAggressiveBehaviour>
+		<Primary Device="Keyboard" Key="Key_LeftControl" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</OrderAggressiveBehaviour>
+	<AutoBreakBuggyButton>
+		<Primary Device="044F0422" Key="Joy_1" />
+		<Secondary Device="Mouse" Key="Mouse_3" />
+	</AutoBreakBuggyButton>
+	<LandingGearToggle>
+		<Primary Device="Keyboard" Key="Key_L" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</LandingGearToggle>
+	<ToggleCargoScoop>
+		<Primary Device="Keyboard" Key="Key_Home" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</ToggleCargoScoop>
+	<HeadlightsToggle>
+		<Primary Device="Keyboard" Key="Key_Insert" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</HeadlightsToggle>
+	<UI_Up>
+		<Primary Device="Keyboard" Key="Key_UpArrow" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</UI_Up>
+	<UI_Down>
+		<Primary Device="Keyboard" Key="Key_DownArrow" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</UI_Down>
+	<UI_Left>
+		<Primary Device="Keyboard" Key="Key_LeftArrow" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</UI_Left>
+	<UI_Right>
+		<Primary Device="Keyboard" Key="Key_RightArrow" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</UI_Right>
+	<UI_Select>
+		<Primary Device="Keyboard" Key="Key_Space" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</UI_Select>
+	<UI_Back>
+		<Primary Device="Keyboard" Key="Key_Backspace" />
+		<Secondary Device="{NoDevice}" Key="" />
+	</UI_Back>
+</Root>
