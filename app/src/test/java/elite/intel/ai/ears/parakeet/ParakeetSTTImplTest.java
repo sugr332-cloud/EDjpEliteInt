@@ -384,6 +384,51 @@ class ParakeetSTTImplTest {
     }
 
     @Test
+    void testGate1_japaneseFillerDropsLaughterAndExclamations() {
+        List<String> toDrop = List.of(
+                "ああ", "あー", "ああー",
+                "ハハハ", "ははは",
+                "ふふ", "ふふふ",
+                "へえ", "ほう", "おお", "おおお",
+                "わはは"
+        );
+        for (String phrase : toDrop) {
+            assertTrue(ParakeetSTTImpl.isJapaneseFiller(phrase),
+                    "「" + phrase + "」 must be dropped as Japanese filler/laughter");
+            assertTrue(ParakeetSTTImpl.isFillerToDrop(phrase, Language.JA),
+                    "「" + phrase + "」 must be dropped by isFillerToDrop in Japanese");
+        }
+    }
+
+    @Test
+    void testGate2_japaneseFillerPreservesDecisionsAndCommands() {
+        List<String> toPreserve = List.of(
+                "はい", "いいえ", "いい", "了解", "発進",
+                "脚を下ろして", "前のステーションへ", "ジャンプして"
+        );
+        for (String phrase : toPreserve) {
+            assertFalse(ParakeetSTTImpl.isJapaneseFiller(phrase),
+                    "「" + phrase + "」 must NOT be dropped");
+            assertFalse(ParakeetSTTImpl.isFillerToDrop(phrase, Language.JA),
+                    "「" + phrase + "」 must NOT be dropped by isFillerToDrop in Japanese");
+        }
+    }
+
+    @Test
+    void testGate4_englishIgnoresJapaneseFillerRules() {
+        List<String> phrases = List.of(
+                "ああ", "あー", "ああー", "ハハハ", "ははは", "ふふ", "ふふふ",
+                "へえ", "ほう", "おお", "おおお", "わはは",
+                "はい", "いいえ", "いい", "了解", "発進",
+                "脚を下ろして", "前のステーションへ", "ジャンプして"
+        );
+        for (String phrase : phrases) {
+            assertFalse(ParakeetSTTImpl.isFillerToDrop(phrase, Language.EN),
+                    "Language.EN must not drop phrase via isFillerToDrop: " + phrase);
+        }
+    }
+
+    @Test
     void hotwordsJaResourceContainsNoAsciiLetters() throws Exception {
         // Must be readable directly from classpath via getResourceAsStream
         try (InputStream is = ParakeetSTTImpl.class.getResourceAsStream("/stt/hotwords_ja.txt")) {
