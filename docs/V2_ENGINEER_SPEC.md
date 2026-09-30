@@ -1,6 +1,6 @@
 # エンジニア（開放条件・場所・進み具合・案内）EG-0〜EG-4
 
-**Status:** EG-0 DONE（2026-10-01）。EG-1〜EG-4 は PLAN CHECK 待ち
+**Status:** EG-0 DONE、EG-1〜EG-4 PLAN CHECK 承認（2026-10-01）。EG-1 から順に実装
 **正本との関係:** `docs/ELITEINTEL_INTEGRATION_PLAN.md` §R.13 の統制手順に従う。全体テストの判定は「失敗 0 件」。
 
 ## 0. 目的（2026-09-30 TP 要望）
@@ -69,6 +69,30 @@
 - カードのボタンからも同じコマンドを呼ぶ（GUI から呼んだときの読み上げも P8-3 と同じ）。
 - エンジニアの基地は多くが惑星の地上にあるため、到着後の案内（惑星への降下など）は今回は行わない。
 
+## 6.5 PLAN CHECK で確定（2026-10-01）
+
+- 共通: EG-1 → EG-2 → EG-3 → EG-4 の順に 1 つずつ、それぞれ MERGE GATE の後に次へ進む。engineers.json は Claude が管理し、agy は書き換えない。engineers.json に `permitRequired`（許可証が要る星系: Sirius／Sol／Alioth／Achenar／Shinrarta Dezhra）を追加済み。
+- EG-1:
+  - `EngineerProgressEvent` は一覧の形と 1 人分の形の両方を読む。
+  - 保存は新規テーブル `engineer_progress`（マイグレーション 01053）。キーは正規化した名前（小文字・前後の空白を除く・引用符 ' ’ " ” を除く）。表示用の名前、`EngineerID`（分かれば）、進み具合、ランク、ランクの進み、**Journal の timestamp** を持つ。
+  - **古いイベントで新しい記録を上書きしない**（保存済みの timestamp より古いイベントは無視する）。起動時の読み込み（`JournalPreScanner`）と通常の読み込みの順番が前後しても正しくなるように。
+  - 起動前の分は `JournalPreScanner` の専用のバスに購読を足して取り込む。
+  - engineers.json の読み込みと名前の照合は新規 `EngineerDirectory`。
+- EG-2:
+  - 新規クエリ `query_engineer`。**EG-2 では声で答えるだけ**にし、カードの表示は EG-3 で足す（EG-3 より先に EG-3 の仕組みを呼ばない）。
+  - モジュール名は既存 `module_aliases_ja.properties` で英語名にそろえて engineers.json の `specialties.module` と照合する。**engineers.json に出てくる全モジュール名が照合できることをテストで確かめる**（名前の書き方の違い、例: Multi-cannon／Multicannon、を吸収する）。
+  - 現在地の座標は既存の `LocationManager.getGalacticCoordinates()` を使う。
+  - エイリアス（EN/JA）と埋め込みルーティングテストを含める。
+- EG-3:
+  - `query_result_display` の種類の制約に `engineers` を足すマイグレーション（01054）。SQLite は制約を直接変えられないため、表を作り直してデータを移す。既存のデータが残ることをテストで確かめる。
+  - 手動チェックは新規テーブル `engineer_checklist`。項目は `invite`（招待の条件）、`unlock`（開放の条件）、徒歩のエンジニアで紹介の作業がある場合は `referral_task`。
+  - チェックは AI タブのカードでのみ付け外しする。HUD は要約のみでクリックしない。
+  - 「ステーションへ発進」ボタンは EG-4 で足す（EG-3 のカードにはまだ置かない）。
+- EG-4:
+  - 新規コマンド `navigate_to_engineer`。文言は `responses*.properties` に置く（`commands*.properties` ではない）。エイリアス、`AiActionMapGeneratorTest`、埋め込みルーティングテストを含める。
+  - `permitRequired` が true のエンジニアへは、航路を設定したうえで「許可証が必要な星系です」と添える。
+  - EG-3 のカードに「ステーションへ発進」ボタンを足し、GUI から呼んだときの読み上げは P8-3 と同じ。
+
 ## 7. 非目標
 
 - 素材の所持数から開放条件の達成を自動判定すること（将来の候補）
@@ -79,7 +103,7 @@
 | ID | 内容 | 変更許可ファイル | TEST GATE | 状態 |
 |---|---|---|---|---|
 | EG-0 | 固定データの JSON（Claude 作成） | `app/src/main/resources/engineers/engineers.json`（Claude が作成） | JSON の形式チェック（EG-1 のテストで読み込めること） | DONE（2026-10-01。38 人: 宇宙船 25・徒歩 13。出どころ・食い違いは JSON の `meta` と各項目の `notes`） |
-| EG-1 | 進み具合の保存 | PLAN CHECK で確定 | 新規テスト（一覧の形・1 人分の形・更新・起動前の取り込み・固定データとの対応）、全体テスト（失敗 0 件） | 未着手 |
+| EG-1 | 進み具合の保存 | PLAN CHECK で確定 | 新規テスト（一覧の形・1 人分の形・更新・古いイベントで上書きしない・起動前の取り込み・固定データとの対応）、全体テスト（失敗 0 件） | PLAN CHECK 承認済み（`v2/eg-1`） |
 | EG-2 | 声で聞く | PLAN CHECK で確定 | 新規テスト（得意分野から・名前から・一覧）、エイリアス関連テスト、埋め込みルーティングテスト、全体テスト（失敗 0 件） | 未着手 |
 | EG-3 | カードとチェックリスト | PLAN CHECK で確定 | 新規テスト（表示内容・自動チェック・手動チェックの保存）、全体テスト（失敗 0 件）。実機: AI タブに枠とチェックリストが出ること | 未着手 |
 | EG-4 | エンジニアへの案内 | PLAN CHECK で確定 | 新規テスト（別の星系→航路・同じ星系→航路なし・本船外→断る・ボタンから）、全体テスト（失敗 0 件）。実機: ボタンと声で航路が設定されること | 未着手 |
