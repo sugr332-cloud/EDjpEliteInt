@@ -41,6 +41,9 @@ class BindingsDrivenCommandsTest {
                 unflagged.add(name);
             }
         }
+        // LF-5: HyperSuperCombination is a fallback for Hyperspace; deliberately not marked DRIVEN
+        // to avoid false-positive startup missing-binding warnings for commanders using Hyperspace.
+        unflagged.remove("BINDING_HYPER_SUPER_COMBINATION");
 
         assertTrue(unflagged.isEmpty(),
                 "these game commands are pressed by the app but not marked DRIVEN in Bindings.java, so the "

@@ -83,6 +83,7 @@ public class Bindings {
         BINDING_EXIT_SUPERCRUISE("Supercruise", DRIVEN),
         BINDING_JUMP_TO_HYPERSPACE("Hyperspace", DRIVEN),
         BINDING_ENTER_SUPERCRUISE("Supercruise", DRIVEN),
+        BINDING_HYPER_SUPER_COMBINATION("HyperSuperCombination"),
 
 
         //TODO: convert to custom
