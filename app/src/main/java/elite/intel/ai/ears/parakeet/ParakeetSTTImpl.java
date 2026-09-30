@@ -185,6 +185,18 @@ public class ParakeetSTTImpl implements EarsInterface {
     }
 
     /**
+     * Words that must NEVER be dropped as fillers (decisions, affirmative/negative responses, critical orders).
+     * Checked before length, filler list, and repeated-kana patterns.
+     */
+    private static final Set<String> JA_PRESERVED_WORDS = Set.of(
+            "はい", "ハイ",
+            "いいえ", "イイエ",
+            "いい", "イイ",
+            "了解", "リョウカイ",
+            "発進", "ハッシン"
+    );
+
+    /**
      * Pattern matching characters to strip before testing for Japanese fillers:
      * punctuation, whitespace, prolonged sound marks (ー/―/−), sokuon (っ/ッ), and wave marks (~/〜/～).
      */
@@ -198,9 +210,22 @@ public class ParakeetSTTImpl implements EarsInterface {
     private static final Set<String> JA_FILLER_WORDS = Set.of(
             "あれ", "うん", "えと", "あの", "ほう", "へえ", "はあ", "おお",
             "ふむ", "ふん", "うむ", "おい", "まあ", "ええ", "おや", "ほほう",
+            "ああ", "あああ", "うう", "おおお",
+            "はは", "ははは", "ふふ", "ふふふ", "へへ", "へへへ", "ひひ", "ひひひ", "ほほ", "ほほほ",
+            "わはは", "くすくす",
             "アレ", "ウン", "エト", "アノ", "ホウ", "ヘエ", "ハア", "オオ",
-            "フム", "フン", "ウム", "オイ", "マア", "エエ", "オヤ", "ホホウ"
+            "フム", "フン", "ウム", "オイ", "マア", "エエ", "オヤ", "ホホウ",
+            "アア", "アアア", "ウウ", "オオオ",
+            "ハハ", "ハハハ", "フフ", "フフフ", "ヘヘ", "ヘヘヘ", "ヒヒ", "ヒヒヒ", "ホホ", "ホホホ",
+            "ワハハ", "クスクス"
     );
+
+    /**
+     * Pattern matching repeated single-kana fillers/laughter (e.g. ああああ, はははは, ふふふふ).
+     * Note: "い/イ" is intentionally excluded to preserve positive responses like "いい".
+     */
+    private static final Pattern JA_REPEATED_KANA_PATTERN =
+            Pattern.compile("^[あア]{2,}$|^[うウ]{2,}$|^[おオ]{2,}$|^[はハ]{2,}$|^[ふフ]{2,}$|^[へヘ]{2,}$|^[ひヒ]{2,}$|^[ほホ]{2,}$");
 
     /**
      * Checks if a Japanese transcript consists solely of fillers, interjections, or a single character
@@ -211,10 +236,16 @@ public class ParakeetSTTImpl implements EarsInterface {
             return false;
         }
         String stripped = JA_FILLER_STRIP_PATTERN.matcher(transcript).replaceAll("");
+        if (JA_PRESERVED_WORDS.contains(stripped)) {
+            return false;
+        }
         if (stripped.length() <= 1) {
             return true;
         }
-        return JA_FILLER_WORDS.contains(stripped);
+        if (JA_FILLER_WORDS.contains(stripped)) {
+            return true;
+        }
+        return JA_REPEATED_KANA_PATTERN.matcher(stripped).matches();
     }
 
     /**
@@ -827,7 +858,8 @@ public class ParakeetSTTImpl implements EarsInterface {
                 }
 
                 if (isFillerToDrop(finalTranscript, systemSession.getLanguage())) {
-                    log.info("STT dropped (JA filler): [{}] - {}", finalTranscript, capture);
+                    log.info("STT: dropped [{}] - {}", finalTranscript, capture);
+                    UiBus.publish(new AppLogEvent("STT: dropped [" + finalTranscript + "]"));
                     return;
                 }
 
