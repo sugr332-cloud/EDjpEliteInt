@@ -325,4 +325,57 @@ public class KeyBindingsParser {
                 .map(BindingModifier::key)
                 .toArray(String[]::new);
     }
+
+    /**
+     * Checks if a physical hardware throttle axis is bound in the bindings file.
+     * Returns true if {@code <ThrottleAxis>} contains a {@code <Binding>} whose Device
+     * is neither blank nor "{NoDevice}" and whose Key is not blank.
+     */
+    public boolean hasThrottleAxis(File file) {
+        if (file == null || !file.exists()) {
+            return false;
+        }
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(file);
+            return hasThrottleAxis(doc);
+        } catch (Exception e) {
+            log.warn("Failed to check throttle axis from {}: {}", file.getName(), e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Checks if a physical hardware throttle axis is bound in the XML document.
+     */
+    public boolean hasThrottleAxis(Document doc) {
+        if (doc == null || doc.getDocumentElement() == null) {
+            return false;
+        }
+        NodeList throttleAxisList = doc.getDocumentElement().getElementsByTagName("ThrottleAxis");
+        if (throttleAxisList.getLength() == 0) {
+            return false;
+        }
+        Element throttleAxisElement = (Element) throttleAxisList.item(0);
+        NodeList bindingList = throttleAxisElement.getElementsByTagName("Binding");
+        if (bindingList.getLength() == 0) {
+            return false;
+        }
+        Element bindingElement = (Element) bindingList.item(0);
+        String device = bindingElement.getAttribute("Device");
+        String key = bindingElement.getAttribute("Key");
+        if (device == null || key == null) {
+            return false;
+        }
+        device = device.trim();
+        key = key.trim();
+        if (device.isEmpty() || key.isEmpty()) {
+            return false;
+        }
+        if ("{NoDevice}".equalsIgnoreCase(device)) {
+            return false;
+        }
+        return true;
+    }
 }

@@ -165,4 +165,71 @@ class KeyBindingsParserTest {
         assertFalse(KeyBindingsParser.isBoundToNonKeyboardDeviceOnly(slots.primary(), slots.secondary()),
                 "an unassigned action is the missing-binding check's business, not this warning's");
     }
+
+    @Test
+    void throttleAxisWithPhysicalDeviceReturnsTrue() throws Exception {
+        File file = bindsFile("""
+                	<ThrottleAxis>
+                		<Binding Device="06A3075C" Key="Joy_UAxis" />
+                		<Inverted Value="1" />
+                		<Deadzone Value="0.00000000" />
+                	</ThrottleAxis>
+                """);
+
+        assertTrue(KeyBindingsParser.getInstance().hasThrottleAxis(file),
+                "hardware device bound to ThrottleAxis must return true");
+    }
+
+    @Test
+    void throttleAxisWithNoDeviceReturnsFalse() throws Exception {
+        File file = bindsFile("""
+                	<ThrottleAxis>
+                		<Binding Device="{NoDevice}" Key="" />
+                		<Inverted Value="0" />
+                		<Deadzone Value="0.00000000" />
+                	</ThrottleAxis>
+                """);
+
+        assertFalse(KeyBindingsParser.getInstance().hasThrottleAxis(file),
+                "{NoDevice} must return false");
+    }
+
+    @Test
+    void throttleAxisWithBlankDeviceOrKeyReturnsFalse() throws Exception {
+        File file1 = bindsFile("""
+                	<ThrottleAxis>
+                		<Binding Device="" Key="" />
+                	</ThrottleAxis>
+                """);
+        assertFalse(KeyBindingsParser.getInstance().hasThrottleAxis(file1),
+                "blank device and key must return false");
+
+        File file2 = bindsFile("""
+                	<ThrottleAxis>
+                		<Binding Device="Keyboard" Key="" />
+                	</ThrottleAxis>
+                """);
+        assertFalse(KeyBindingsParser.getInstance().hasThrottleAxis(file2),
+                "blank key must return false");
+    }
+
+    @Test
+    void throttleAxisMissingReturnsFalse() throws Exception {
+        File file = bindsFile("""
+                	<ShipSpotLightToggle>
+                		<Primary Device="{NoDevice}" Key="" />
+                	</ShipSpotLightToggle>
+                """);
+
+        assertFalse(KeyBindingsParser.getInstance().hasThrottleAxis(file),
+                "missing ThrottleAxis must return false");
+    }
+
+    @Test
+    void throttleAxisNullOrNonExistentFileReturnsFalse() {
+        assertFalse(KeyBindingsParser.getInstance().hasThrottleAxis((File) null),
+                "null file must return false");
+        assertFalse(KeyBindingsParser.getInstance().hasThrottleAxis(new File("nonexistent_test_binds.binds")),
+                "nonexistent file must return false");
+    }
 }

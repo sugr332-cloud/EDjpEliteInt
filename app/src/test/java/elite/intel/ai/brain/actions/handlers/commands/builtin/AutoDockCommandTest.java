@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -69,6 +70,15 @@ class AutoDockCommandTest {
             UINavigator navigator,
             ShipLoadOutDto loadout,
             int timeoutSeconds) {
+        return createCommand(status, navigator, loadout, timeoutSeconds, () -> false);
+    }
+
+    private AutoDockCommand createCommand(
+            Status status,
+            UINavigator navigator,
+            ShipLoadOutDto loadout,
+            int timeoutSeconds,
+            BooleanSupplier throttleAxisSupplier) {
         return new AutoDockCommand(
                 status,
                 navigator != null ? navigator : new UINavigator(),
@@ -77,7 +87,8 @@ class AutoDockCommandTest {
                 gameInputs::add,
                 event -> voxResponses.add((AiVoxResponseEvent) event),
                 task -> backgroundTask.set(task),
-                timeoutSeconds
+                timeoutSeconds,
+                throttleAxisSupplier
         );
     }
 
@@ -452,6 +463,81 @@ class AutoDockCommandTest {
         assertEquals(1, gameInputs.size());
         assertEquals(1, voxResponses.size());
         assertEquals(StringUtls.localizedResponse("handler.autoDock.throttleZero"), voxResponses.get(0).getText());
+    }
+
+    @Test
+    void executeRequestsDockingAndSpeaksThrottleAxisWhenGrantedWithThrottleAxis() {
+        Status status = Status.detached(PlayerSituation.IN_SHIP_DEEP_SPACE);
+        AutoDockCommand command = createCommand(status, null, withDockingComputer(true), 20, () -> true);
+
+        String result = command.execute(new JsonObject(), null);
+        assertEquals(StringUtls.localizedResponse("handler.autoDock.requested"), result);
+        assertNotNull(backgroundTask.get(), "Background task must be submitted");
+
+        // Fire DockingGrantedEvent
+        JsonObject json = createEventJson("DockingGranted");
+        json.addProperty("StationName", "Jameson Memorial");
+        GameEventBus.publish(new DockingGrantedEvent(json));
+
+        // Run background task
+        backgroundTask.get().run();
+
+        // Throttle zero sent
+        assertEquals(1, gameInputs.size());
+        assertTrue(gameInputs.get(0) instanceof GameInputSequenceEvent);
+        GameInputSequenceEvent seq = (GameInputSequenceEvent) gameInputs.get(0);
+        assertEquals(Bindings.GameCommand.BINDING_SET_SPEED_ZERO.getGameBinding(), seq.getSteps().get(0).getBindingId());
+
+        // Vox notification sent with throttleAxis message (NOT throttleZero)
+        assertEquals(1, voxResponses.size());
+        assertEquals(StringUtls.localizedResponse("handler.autoDock.throttleAxis"), voxResponses.get(0).getText());
+    }
+
+    @Test
+    void executeWhenAlreadyGrantedWithThrottleAxisReturnsThrottleAxisAndSendsThrottleZero() {
+        // Pre-grant docking
+        JsonObject json = createEventJson("DockingGranted");
+        json.addProperty("StationName", "Jameson Memorial");
+        dockingStateTracker.onDockingGranted(new DockingGrantedEvent(json));
+
+        Status status = Status.detached(PlayerSituation.IN_SHIP_DEEP_SPACE);
+        AutoDockCommand command = createCommand(status, null, withDockingComputer(true), 20, () -> true);
+
+        String result = command.execute(new JsonObject(), null);
+        assertEquals(StringUtls.localizedResponse("handler.autoDock.throttleAxis"), result);
+
+        // Immediate throttle zero
+        assertEquals(1, gameInputs.size());
+        GameInputSequenceEvent seq = (GameInputSequenceEvent) gameInputs.get(0);
+        assertEquals(Bindings.GameCommand.BINDING_SET_SPEED_ZERO.getGameBinding(), seq.getSteps().get(0).getBindingId());
+
+        // No background task or voice response (result string returned to caller)
+        assertNull(backgroundTask.get());
+        assertTrue(voxResponses.isEmpty());
+        assertTrue(statusCapture.events.isEmpty());
+    }
+
+    @Test
+    void executeWhenAlreadyGrantedWithoutThrottleAxisReturnsAlreadyGrantedAndSendsThrottleZero() {
+        // Pre-grant docking
+        JsonObject json = createEventJson("DockingGranted");
+        json.addProperty("StationName", "Jameson Memorial");
+        dockingStateTracker.onDockingGranted(new DockingGrantedEvent(json));
+
+        Status status = Status.detached(PlayerSituation.IN_SHIP_DEEP_SPACE);
+        AutoDockCommand command = createCommand(status, null, withDockingComputer(true), 20, () -> false);
+
+        String result = command.execute(new JsonObject(), null);
+        assertEquals(StringUtls.localizedResponse("handler.autoDock.alreadyGranted"), result);
+
+        // Immediate throttle zero
+        assertEquals(1, gameInputs.size());
+        GameInputSequenceEvent seq = (GameInputSequenceEvent) gameInputs.get(0);
+        assertEquals(Bindings.GameCommand.BINDING_SET_SPEED_ZERO.getGameBinding(), seq.getSteps().get(0).getBindingId());
+
+        assertNull(backgroundTask.get());
+        assertTrue(voxResponses.isEmpty());
+        assertTrue(statusCapture.events.isEmpty());
     }
 
     private static void setLiveStatus(long flags, long flags2) {
