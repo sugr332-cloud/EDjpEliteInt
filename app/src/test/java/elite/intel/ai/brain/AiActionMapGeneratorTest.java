@@ -167,6 +167,7 @@ class AiActionMapGeneratorTest {
             "query_exploration_profits",
             "query_fsd_target",
             "query_geo_signals",
+            "query_key_binding",
             "query_last_scan",
             "query_local_outfitting",
             "query_local_shipyard",
