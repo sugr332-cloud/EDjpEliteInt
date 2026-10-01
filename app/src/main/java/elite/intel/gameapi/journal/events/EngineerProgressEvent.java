@@ -6,6 +6,7 @@ import elite.intel.util.TimestampFormatter;
 import elite.intel.util.json.GsonFactory;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
 
 public class EngineerProgressEvent extends BaseEvent {
@@ -14,8 +15,15 @@ public class EngineerProgressEvent extends BaseEvent {
 
     public EngineerProgressEvent(JsonObject json) {
         super(json.get("timestamp").getAsString(), Duration.ofDays(30), "EngineerProgress");
-        EngineerProgressEvent event = GsonFactory.getGson().fromJson(json, EngineerProgressEvent.class);
-        this.engineers = event.engineers;
+        if (json.has("Engineers") && json.get("Engineers").isJsonArray()) {
+            EngineerProgressEvent event = GsonFactory.getGson().fromJson(json, EngineerProgressEvent.class);
+            this.engineers = event.engineers != null ? event.engineers : Collections.emptyList();
+        } else if (json.has("Engineer")) {
+            Engineer single = GsonFactory.getGson().fromJson(json, Engineer.class);
+            this.engineers = single != null ? List.of(single) : Collections.emptyList();
+        } else {
+            this.engineers = Collections.emptyList();
+        }
     }
 
     @Override
@@ -62,22 +70,26 @@ public class EngineerProgressEvent extends BaseEvent {
         private String name;
 
         @SerializedName("EngineerID")
-        private long engineerID;
+        private Long engineerID;
 
         @SerializedName("Progress")
         private String progress;
 
         @SerializedName("RankProgress")
-        private int rankProgress;
+        private Integer rankProgress;
 
         @SerializedName("Rank")
-        private int rank;
+        private Integer rank;
 
         public String getName() {
             return name;
         }
 
         public long getEngineerID() {
+            return engineerID != null ? engineerID : 0L;
+        }
+
+        public Long getEngineerIdNullable() {
             return engineerID;
         }
 
@@ -86,15 +98,23 @@ public class EngineerProgressEvent extends BaseEvent {
         }
 
         public int getRankProgress() {
+            return rankProgress != null ? rankProgress : 0;
+        }
+
+        public Integer getRankProgressNullable() {
             return rankProgress;
         }
 
         public int getRank() {
+            return rank != null ? rank : 0;
+        }
+
+        public Integer getRankNullable() {
             return rank;
         }
 
         public boolean isFullyUnlocked() {
-            return "Unlocked".equals(progress) && rank == 5 && rankProgress == 0;
+            return "Unlocked".equals(progress) && rank != null && rank == 5 && (rankProgress == null || rankProgress == 0);
         }
     }
 }

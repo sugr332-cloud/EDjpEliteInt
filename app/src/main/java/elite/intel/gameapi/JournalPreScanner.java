@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import elite.intel.gameapi.journal.EventRegistry;
 import elite.intel.gameapi.journal.events.BaseEvent;
 import elite.intel.gameapi.journal.subscribers.DockedMarketSubscriber;
+import elite.intel.gameapi.journal.subscribers.EngineerProgressSubscriber;
 import elite.intel.gameapi.journal.subscribers.ResourceSiteSubscriber;
 import elite.intel.gameapi.journal.subscribers.SilentPersistenceSubscriber;
 import elite.intel.util.json.GsonFactory;
@@ -73,6 +74,7 @@ public class JournalPreScanner {
         // in, it lives in memory, and a restart taken between kills would otherwise lose the card
         // along with the tally the commander is halfway through building.
         privateBus.register(new ResourceSiteSubscriber());
+        privateBus.register(new EngineerProgressSubscriber());
 
         for (Path file : toScan) {
             processFile(file, privateBus);
