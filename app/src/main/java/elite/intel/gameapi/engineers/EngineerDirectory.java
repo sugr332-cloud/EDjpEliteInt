@@ -93,6 +93,8 @@ public final class EngineerDirectory {
     private final List<EngineerInfo> engineers;
     private final Map<String, EngineerInfo> byNormalizedName;
     private final Map<String, String> specialtyNamesJa;
+    private final Map<String, String> aliasToDisplayName;
+    private final Pattern nameDecorationPattern;
 
     public static EngineerDirectory getInstance() {
         return INSTANCE;
@@ -218,6 +220,33 @@ public final class EngineerDirectory {
         this.engineers = Collections.unmodifiableList(loadedEngineers);
         this.byNormalizedName = Collections.unmodifiableMap(nameMap);
         this.specialtyNamesJa = Collections.unmodifiableMap(loadedSpecialtiesJa);
+
+        Map<String, String> aliasMap = new HashMap<>();
+        List<String> allAliases = new ArrayList<>();
+        for (EngineerInfo eng : loadedEngineers) {
+            if (eng.namesJa() != null && !eng.namesJa().isEmpty()) {
+                String dispName = eng.namesJa().get(0) + "（" + eng.name() + "）";
+                for (String alias : eng.namesJa()) {
+                    if (alias != null && !alias.isBlank()) {
+                        aliasMap.putIfAbsent(alias, dispName);
+                        allAliases.add(alias);
+                    }
+                }
+            }
+        }
+        allAliases.sort(Comparator.comparingInt(String::length).reversed().thenComparing(Comparator.naturalOrder()));
+        if (!allAliases.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < allAliases.size(); i++) {
+                if (i > 0) sb.append("|");
+                sb.append(Pattern.quote(allAliases.get(i)));
+            }
+            this.nameDecorationPattern = Pattern.compile("(?:" + sb + ")(?![（(])");
+        } else {
+            this.nameDecorationPattern = null;
+        }
+        this.aliasToDisplayName = Collections.unmodifiableMap(aliasMap);
+
         log.info("EngineerDirectory initialized with {} engineers from {}", this.engineers.size(), RESOURCE_PATH);
     }
 
@@ -409,5 +438,26 @@ public final class EngineerDirectory {
             return eng.unlockJa();
         }
         return eng.unlock() != null ? eng.unlock() : "";
+    }
+
+    /**
+     * Decorates engineer Japanese names (Katakana aliases from namesJa) in the given text with their
+     * display names ("カタカナ（英字）"), using the longest match first.
+     * If the matched name is immediately followed by '（' or '(', it is not decorated (prevents double decoration).
+     * Only applies when lang == Language.JA. Returns text unchanged for other languages or null/blank.
+     */
+    public String decorateNamesForDisplay(String text, Language lang) {
+        if (text == null || text.isBlank() || lang != Language.JA || nameDecorationPattern == null) {
+            return text;
+        }
+        Matcher matcher = nameDecorationPattern.matcher(text);
+        StringBuilder sb = new StringBuilder();
+        while (matcher.find()) {
+            String matched = matcher.group();
+            String replacement = aliasToDisplayName.getOrDefault(matched, matched);
+            matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
     }
 }

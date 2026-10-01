@@ -222,6 +222,100 @@ class EngineerCardTest {
         }
     }
 
+    @Test
+    void cardActionButtonsPanelHasLeftFlowLayout() {
+        QueryResultCard card = QueryResultCard.forEngineer("Felicity Farseer", null, null);
+        BorderLayout borderLayout = (BorderLayout) card.getLayout();
+        Component southComp = borderLayout.getLayoutComponent(BorderLayout.SOUTH);
+        assertNotNull(southComp, "Card must have action buttons in SOUTH");
+        assertTrue(southComp instanceof JPanel);
+        JPanel btnPanel = (JPanel) southComp;
+        assertTrue(btnPanel.getLayout() instanceof FlowLayout);
+        FlowLayout flow = (FlowLayout) btnPanel.getLayout();
+        assertEquals(FlowLayout.LEFT, flow.getAlignment(), "Button panel must be FlowLayout.LEFT");
+    }
+
+    @Test
+    void checklistComponentsHaveLeftAlignment() {
+        QueryResultCard card = QueryResultCard.forEngineer("Felicity Farseer", null, null);
+        List<JCheckBox> checkBoxes = findComponentsOfType(card, JCheckBox.class);
+        assertFalse(checkBoxes.isEmpty());
+        for (JCheckBox cb : checkBoxes) {
+            assertEquals(Component.LEFT_ALIGNMENT, cb.getAlignmentX(), 0.001f, "CheckBox must be LEFT_ALIGNMENT");
+        }
+    }
+
+    @Test
+    void autoCheckOrderingFourCases() {
+        SystemSession session = SystemSession.getInstance();
+        Language orig = session.getLanguage();
+        try {
+            session.setLanguage(Language.JA);
+            String eng = "Elvira Martuuk";
+
+            // ケース 1: 面識あり・ランクなし
+            EngineerProgressManager.getInstance().clear();
+            EngineerProgressManager.getInstance().recordProgress(eng, null, "Acquainted", null, null, "2026-10-01T10:00:00Z");
+            QueryResultCard cardAcq = QueryResultCard.forEngineer(eng, null, null);
+            List<String> labelsAcq = extractAutoCheckLabels(cardAcq);
+            List<String> expectedAcq = List.of(
+                    "☑ 面識あり", "☑ 招待済み", "☑ 知っている",
+                    "☐ 開放済み", "☐ ランク 1", "☐ ランク 2", "☐ ランク 3", "☐ ランク 4", "☐ ランク 5"
+            );
+            assertEquals(expectedAcq, labelsAcq, "Acquainted case ordering mismatch");
+
+            // ケース 2: 開放済み・ランク 3 (40%)
+            EngineerProgressManager.getInstance().clear();
+            EngineerProgressManager.getInstance().recordProgress(eng, null, "Unlocked", 3, 40, "2026-10-01T10:00:00Z");
+            QueryResultCard cardUnlocked = QueryResultCard.forEngineer(eng, null, null);
+            List<String> labelsUnlocked = extractAutoCheckLabels(cardUnlocked);
+            List<String> expectedUnlocked = List.of(
+                    "☑ 開放済み", "☑ 面識あり", "☑ 招待済み", "☑ 知っている",
+                    "☑ ランク 1", "☑ ランク 2", "☑ ランク 3（40%）",
+                    "☐ ランク 4", "☐ ランク 5"
+            );
+            assertEquals(expectedUnlocked, labelsUnlocked, "Unlocked rank 3 (40%) case ordering mismatch");
+
+            // ケース 3: 記録なし
+            EngineerProgressManager.getInstance().clear();
+            QueryResultCard cardNoRec = QueryResultCard.forEngineer(eng, null, null);
+            List<JLabel> allLabelsNoRec = findComponentsOfType(cardNoRec, JLabel.class);
+            assertTrue(allLabelsNoRec.stream().anyMatch(l -> "記録なし".equals(l.getText())), "Should contain 記録なし label");
+            List<String> labelsNoRec = extractAutoCheckLabels(cardNoRec);
+            List<String> expectedNoRec = List.of(
+                    "☐ 開放済み", "☐ 面識あり", "☐ 招待済み", "☐ 知っている",
+                    "☐ ランク 1", "☐ ランク 2", "☐ ランク 3", "☐ ランク 4", "☐ ランク 5"
+            );
+            assertEquals(expectedNoRec, labelsNoRec, "No record case ordering mismatch");
+
+            // ケース 4: 知っているだけ
+            EngineerProgressManager.getInstance().clear();
+            EngineerProgressManager.getInstance().recordProgress(eng, null, "Known", null, null, "2026-10-01T10:00:00Z");
+            QueryResultCard cardKnown = QueryResultCard.forEngineer(eng, null, null);
+            List<String> labelsKnown = extractAutoCheckLabels(cardKnown);
+            List<String> expectedKnown = List.of(
+                    "☑ 知っている",
+                    "☐ 開放済み", "☐ 面識あり", "☐ 招待済み",
+                    "☐ ランク 1", "☐ ランク 2", "☐ ランク 3", "☐ ランク 4", "☐ ランク 5"
+            );
+            assertEquals(expectedKnown, labelsKnown, "Known-only case ordering mismatch");
+        } finally {
+            session.setLanguage(orig);
+        }
+    }
+
+    private static List<String> extractAutoCheckLabels(QueryResultCard card) {
+        List<JLabel> labels = findComponentsOfType(card, JLabel.class);
+        List<String> autoChecks = new ArrayList<>();
+        for (JLabel l : labels) {
+            String text = l.getText();
+            if (text != null && (text.startsWith("☑ ") || text.startsWith("☐ "))) {
+                autoChecks.add(text);
+            }
+        }
+        return autoChecks;
+    }
+
     @SuppressWarnings("unchecked")
     private static <T extends Component> List<T> findComponentsOfType(Container container, Class<T> type) {
         List<T> list = new ArrayList<>();
