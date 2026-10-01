@@ -240,7 +240,7 @@ public class QueryResultObjectiveSource implements HudObjectiveSource {
         Language lang = SystemSession.getInstance().getLanguage();
         if ("module".equalsIgnoreCase(queryKind)) {
             String rawMod = dto.moduleName() != null ? dto.moduleName() : "-";
-            String mod = EngineerDirectory.getInstance().localizedSpecialtyName(rawMod, lang);
+            String mod = EngineerDirectory.getInstance().displaySpecialtyName(rawMod, lang);
             rows.add(HudRow.of(HudText.get("overlay.card.row.module"), mod));
 
             String firstEngName = dto.engineerNames().get(0);

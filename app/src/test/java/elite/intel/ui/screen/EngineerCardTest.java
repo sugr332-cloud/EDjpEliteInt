@@ -164,9 +164,12 @@ class EngineerCardTest {
             List<JLabel> labels = findComponentsOfType(cardFelicity, JLabel.class);
             List<JCheckBox> checkBoxes = findComponentsOfType(cardFelicity, JCheckBox.class);
 
-            // Specialties: フレームシフトドライブ（FSD）
-            boolean hasFsdJa = labels.stream().anyMatch(l -> l.getText().contains("フレームシフトドライブ（FSD）"));
-            assertTrue(hasFsdJa, "Specialties must display Japanese name: フレームシフトドライブ（FSD）");
+            // Specialties: フレームシフトドライブ（Frame Shift Drive）
+            boolean hasFsdJa = labels.stream().anyMatch(l -> l.getText().contains("フレームシフトドライブ（Frame Shift Drive）"));
+            assertTrue(hasFsdJa, "Specialties must display Japanese name with English: フレームシフトドライブ（Frame Shift Drive）");
+
+            assertTrue(labels.stream().anyMatch(l -> "フレームシフトドライブ（Frame Shift Drive） G5".equals(l.getText())),
+                    "Specialty must be 日本語（英字） followed by grade");
 
             // Invite condition
             boolean hasInviteJa = checkBoxes.stream().anyMatch(cb -> cb.getText().contains("スカウト（Scout）"));
@@ -246,7 +249,7 @@ class EngineerCardTest {
     }
 
     @Test
-    void autoCheckOrderingFourCases() {
+    void autoCheckOrderRestoredToEg6FourCases() {
         SystemSession session = SystemSession.getInstance();
         Language orig = session.getLanguage();
         try {
@@ -259,8 +262,7 @@ class EngineerCardTest {
             QueryResultCard cardAcq = QueryResultCard.forEngineer(eng, null, null);
             List<String> labelsAcq = extractAutoCheckLabels(cardAcq);
             List<String> expectedAcq = List.of(
-                    "☑ 面識あり", "☑ 招待済み", "☑ 知っている",
-                    "☐ 開放済み", "☐ ランク 1", "☐ ランク 2", "☐ ランク 3", "☐ ランク 4", "☐ ランク 5"
+                    "☑ 知っている", "☑ 招待済み", "☑ 面識あり", "☐ 開放済み"
             );
             assertEquals(expectedAcq, labelsAcq, "Acquainted case ordering mismatch");
 
@@ -270,9 +272,8 @@ class EngineerCardTest {
             QueryResultCard cardUnlocked = QueryResultCard.forEngineer(eng, null, null);
             List<String> labelsUnlocked = extractAutoCheckLabels(cardUnlocked);
             List<String> expectedUnlocked = List.of(
-                    "☑ 開放済み", "☑ 面識あり", "☑ 招待済み", "☑ 知っている",
-                    "☑ ランク 1", "☑ ランク 2", "☑ ランク 3（40%）",
-                    "☐ ランク 4", "☐ ランク 5"
+                    "☑ 知っている", "☑ 招待済み", "☑ 面識あり", "☑ 開放済み",
+                    "☑ ランク 3 (40%)"
             );
             assertEquals(expectedUnlocked, labelsUnlocked, "Unlocked rank 3 (40%) case ordering mismatch");
 
@@ -283,8 +284,7 @@ class EngineerCardTest {
             assertTrue(allLabelsNoRec.stream().anyMatch(l -> "記録なし".equals(l.getText())), "Should contain 記録なし label");
             List<String> labelsNoRec = extractAutoCheckLabels(cardNoRec);
             List<String> expectedNoRec = List.of(
-                    "☐ 開放済み", "☐ 面識あり", "☐ 招待済み", "☐ 知っている",
-                    "☐ ランク 1", "☐ ランク 2", "☐ ランク 3", "☐ ランク 4", "☐ ランク 5"
+                    "☐ 知っている", "☐ 招待済み", "☐ 面識あり", "☐ 開放済み"
             );
             assertEquals(expectedNoRec, labelsNoRec, "No record case ordering mismatch");
 
@@ -294,9 +294,7 @@ class EngineerCardTest {
             QueryResultCard cardKnown = QueryResultCard.forEngineer(eng, null, null);
             List<String> labelsKnown = extractAutoCheckLabels(cardKnown);
             List<String> expectedKnown = List.of(
-                    "☑ 知っている",
-                    "☐ 開放済み", "☐ 面識あり", "☐ 招待済み",
-                    "☐ ランク 1", "☐ ランク 2", "☐ ランク 3", "☐ ランク 4", "☐ ランク 5"
+                    "☑ 知っている", "☐ 招待済み", "☐ 面識あり", "☐ 開放済み"
             );
             assertEquals(expectedKnown, labelsKnown, "Known-only case ordering mismatch");
         } finally {

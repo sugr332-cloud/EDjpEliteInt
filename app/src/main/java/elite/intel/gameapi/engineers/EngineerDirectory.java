@@ -389,6 +389,18 @@ public final class EngineerDirectory {
     }
 
     /**
+     * Returns the specialty / module name for screen display.
+     * JA with a translation: "日本語（英字）"; otherwise the English name as-is.
+     */
+    public String displaySpecialtyName(String moduleOrSpecialty, Language lang) {
+        if (moduleOrSpecialty == null) return "";
+        if (lang == Language.JA && specialtyNamesJa.containsKey(moduleOrSpecialty)) {
+            return specialtyNamesJa.get(moduleOrSpecialty) + "（" + moduleOrSpecialty + "）";
+        }
+        return moduleOrSpecialty;
+    }
+
+    /**
      * Formats comma-separated English referral names into display names (カタカナ（英字） in JA).
      */
     public String formatReferral(String referral, Language lang) {

@@ -257,7 +257,7 @@ public class QueryResultCard extends JPanel {
             specList.setOpaque(false);
 
             for (Specialty sp : info.specialties()) {
-                String modDisp = dir.localizedSpecialtyName(sp.module(), lang);
+                String modDisp = dir.displaySpecialtyName(sp.module(), lang);
                 String spText = modDisp + (sp.maxGrade() > 0 ? " G" + sp.maxGrade() : "");
                 boolean isMatch = highlightModule != null && sp.module().equalsIgnoreCase(highlightModule);
 
@@ -315,32 +315,18 @@ public class QueryResultCard extends JPanel {
             autoProgPanel.add(noRecLbl);
         }
 
-        record StageItem(boolean checked, String text) {}
-        List<StageItem> allStageItems = new ArrayList<>();
-        allStageItems.add(new StageItem(stage >= 4, getText("ai.queryResult.engineer.unlocked")));
-        allStageItems.add(new StageItem(stage >= 3, getText("ai.queryResult.engineer.acquainted")));
-        allStageItems.add(new StageItem(stage >= 2, getText("ai.queryResult.engineer.invited")));
-        allStageItems.add(new StageItem(stage >= 1, getText("ai.queryResult.engineer.known")));
+        // 知っている → 招待済み → 面識あり → 開放済み
+        addAutoStageLabel(autoProgPanel, getText("ai.queryResult.engineer.known"), stage >= 1);
+        addAutoStageLabel(autoProgPanel, getText("ai.queryResult.engineer.invited"), stage >= 2);
+        addAutoStageLabel(autoProgPanel, getText("ai.queryResult.engineer.acquainted"), stage >= 3);
+        addAutoStageLabel(autoProgPanel, getText("ai.queryResult.engineer.unlocked"), stage >= 4);
 
-        for (int r = 1; r <= 5; r++) {
-            boolean rChecked = (rank != null && rank >= r);
-            String rText = getText("ai.queryResult.engineer.rank", r);
-            if (rank != null && rank == r && rankProg != null && rankProg > 0) {
-                rText += (lang == Language.JA) ? "（" + rankProg + "%）" : " (" + rankProg + "%)";
-            }
-            allStageItems.add(new StageItem(rChecked, rText));
-        }
-
-        // チェック済みが上（先頭）、未チェックが下（後続）
-        for (StageItem it : allStageItems) {
-            if (it.checked()) {
-                addAutoStageLabel(autoProgPanel, it.text(), true);
-            }
-        }
-        for (StageItem it : allStageItems) {
-            if (!it.checked()) {
-                addAutoStageLabel(autoProgPanel, it.text(), false);
-            }
+        if (rank != null && rank >= 1) {
+            String rankText = getText("ai.queryResult.engineer.rank", rank) + (rankProg != null ? " (" + rankProg + "%)" : "");
+            JLabel rankLbl = new JLabel("☑ " + rankText);
+            rankLbl.setFont(rankLbl.getFont().deriveFont(Font.BOLD, 11.0f));
+            rankLbl.setForeground(HUD_COLOR_4FC56B);
+            autoProgPanel.add(rankLbl);
         }
 
         body.add(autoProgPanel);

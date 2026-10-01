@@ -120,7 +120,7 @@ class EngineerQueryTest {
             assertTrue(dataJa.unlock().contains("メタアロイ"));
             assertNotNull(dataJa.specialties());
             assertFalse(dataJa.specialties().isEmpty());
-            assertTrue(dataJa.specialties().stream().anyMatch(sp -> "フレームシフトドライブ（FSD）".equals(sp.moduleOrDescription())),
+            assertTrue(dataJa.specialties().stream().anyMatch(sp -> "フレームシフトドライブ".equals(sp.moduleOrDescription())),
                     "Specialties must use Japanese localized name");
         } finally {
             session.setLanguage(orig);
@@ -400,9 +400,9 @@ class EngineerQueryTest {
         assertEquals("progress", dto.queryKind());
 
         List<String> names = dto.engineerNames();
-        // Ordering: Unlocked (Elvira, Felicity) -> Acquainted (Didi) -> Invited (Chloe) -> Known (Bill) -> Barred (Zacariah)
-        assertEquals("Elvira Martuuk", names.get(0));
-        assertEquals("Felicity Farseer", names.get(1));
+        // Ordering: Unlocked by rank desc (Felicity r5, Elvira r3) -> Acquainted (Didi) -> Invited (Chloe) -> Known (Bill) -> Barred (Zacariah)
+        assertEquals("Felicity Farseer", names.get(0));
+        assertEquals("Elvira Martuuk", names.get(1));
         assertEquals("Didi Vatermann", names.get(2));
         assertEquals("Chloe Sedesi", names.get(3));
         assertEquals("Bill Turner", names.get(4));
@@ -483,5 +483,54 @@ class EngineerQueryTest {
         assertEquals("module", data.type());
         assertEquals("Abrasion Blaster", data.moduleName());
     }
-}
 
+    @Test
+    void progressUnlockedSortedByRankDescThenName() throws Exception {
+        progressManager.recordProgress("Elvira Martuuk", null, "Unlocked", 3, 0, "2026-10-01T10:00:00Z");
+        progressManager.recordProgress("Felicity Farseer", null, "Unlocked", 3, 0, "2026-10-01T10:00:00Z");
+        progressManager.recordProgress("Lei Cheung", null, "Unlocked", 5, 0, "2026-10-01T10:00:00Z");
+        progressManager.recordProgress("Didi Vatermann", null, "Acquainted", null, null, "2026-10-01T10:00:00Z");
+
+        createTestQuery().handle("query_engineer", new JsonObject(), "エンジニアの進捗は？");
+
+        List<String> names = displayManager.getLatest().orElseThrow().engineers().engineerNames();
+        assertEquals(List.of("Lei Cheung", "Elvira Martuuk", "Felicity Farseer", "Didi Vatermann"), names);
+    }
+
+    @Test
+    void directoryPutsEngineersWithProgressFirstThenUnrecordedShipThenOnFoot() throws Exception {
+        progressManager.recordProgress("Zacariah Nemo", null, "Barred", null, null, "2026-10-01T10:00:00Z");
+        progressManager.recordProgress("Bill Turner", null, "Known", null, null, "2026-10-01T10:00:00Z");
+        progressManager.recordProgress("Didi Vatermann", null, "Acquainted", null, null, "2026-10-01T10:00:00Z");
+        progressManager.recordProgress("Chloe Sedesi", null, "Invited", null, null, "2026-10-01T10:00:00Z");
+        progressManager.recordProgress("Elvira Martuuk", null, "Unlocked", 2, 0, "2026-10-01T10:00:00Z");
+        progressManager.recordProgress("Felicity Farseer", null, "Unlocked", 5, 0, "2026-10-01T10:00:00Z");
+
+        EngineerQuery query = createTestQuery();
+        query.handle("query_engineer", new JsonObject(), "エンジニアの一覧と効能を教えて");
+
+        EngineersDisplayDto dto = displayManager.getLatest().orElseThrow().engineers();
+        assertEquals("directory", dto.queryKind());
+        List<String> names = dto.engineerNames();
+        assertEquals(38, names.size());
+        assertEquals(List.of("Felicity Farseer", "Elvira Martuuk", "Didi Vatermann",
+                "Chloe Sedesi", "Bill Turner", "Zacariah Nemo"), names.subList(0, 6));
+
+        // Remaining 32 have no record: ship (alphabetical) -> on-foot (alphabetical)
+        List<String> rest = names.subList(6, 38);
+        var dir = elite.intel.gameapi.engineers.EngineerDirectory.getInstance();
+        boolean seenOnFoot = false;
+        String prev = null;
+        boolean prevIsShip = true;
+        for (String n : rest) {
+            boolean ship = dir.findByName(n).orElseThrow().isShip();
+            if (!ship) seenOnFoot = true;
+            assertFalse(ship && seenOnFoot, "Ship engineers must come before on-foot: " + n);
+            if (prev != null && ship == prevIsShip) {
+                assertTrue(prev.compareToIgnoreCase(n) <= 0, "Alphabetical within group: " + prev + " vs " + n);
+            }
+            prev = n;
+            prevIsShip = ship;
+        }
+    }
+}

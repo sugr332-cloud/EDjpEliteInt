@@ -154,7 +154,7 @@ public class QueryResultDisplayPanel extends JPanel {
 
         Language lang = SystemSession.getInstance().getLanguage();
         if ("module".equalsIgnoreCase(dto.queryKind())) {
-            String mod = dto.moduleName() != null ? EngineerDirectory.getInstance().localizedSpecialtyName(dto.moduleName(), lang) : "-";
+            String mod = dto.moduleName() != null ? EngineerDirectory.getInstance().displaySpecialtyName(dto.moduleName(), lang) : "-";
             headerLabel.setText(getText("ai.queryResult.header.engineers.module", mod, timeStr));
         } else if ("engineer".equalsIgnoreCase(dto.queryKind())) {
             String rawEngName = !dto.engineerNames().isEmpty() ? dto.engineerNames().get(0) : "-";

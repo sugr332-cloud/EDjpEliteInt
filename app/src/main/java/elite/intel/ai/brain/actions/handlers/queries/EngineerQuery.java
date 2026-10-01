@@ -288,9 +288,7 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
             onFootCount = allOnFoot.size();
         }
 
-        List<String> cardNames = targetEngineers.stream()
-                .map(EngineerInfo::name)
-                .toList();
+        List<String> cardNames = sortDirectoryByProgress(targetEngineers);
 
         return new DataDto(
                 "directory", originalUserInput,
@@ -514,12 +512,13 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
         return allRecords.stream()
                 .filter(rec -> !onlyUnlocked || "Unlocked".equalsIgnoreCase(rec.progress()))
                 .sorted(Comparator.comparingInt((EngineerProgressRecord r) -> progressPriority(r.progress()))
+                        .thenComparing(EngineerQuery::unlockedRankDesc)
                         .thenComparing(EngineerProgressRecord::displayName, String.CASE_INSENSITIVE_ORDER))
                 .map(EngineerProgressRecord::displayName)
                 .toList();
     }
 
-    private int progressPriority(String progress) {
+    private static int progressPriority(String progress) {
         if (progress == null) return 6;
         return switch (progress.toLowerCase(Locale.ROOT)) {
             case "unlocked" -> 1;
@@ -529,5 +528,31 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
             case "barred" -> 5;
             default -> 6;
         };
+    }
+
+    /** Unlocked engineers: higher rank first. Others compare equal (0). */
+    private static int unlockedRankDesc(EngineerProgressRecord r) {
+        if (!"unlocked".equalsIgnoreCase(r.progress())) return 0;
+        return -(r.rank() != null ? r.rank() : 0);
+    }
+
+    /**
+     * Directory card order: Unlocked (rank desc) -> Acquainted -> Invited -> Known -> Barred -> no record.
+     * Stable: within the same stage the incoming order (ship -> on-foot, by name) is kept.
+     */
+    static List<String> sortDirectoryByProgress(List<EngineerInfo> engineers) {
+        EngineerProgressManager pm = EngineerProgressManager.getInstance();
+        record Keyed(String name, int priority, int rankDesc) {}
+        List<Keyed> keyed = new ArrayList<>();
+        for (EngineerInfo eng : engineers) {
+            Optional<EngineerProgressRecord> rec = pm.findByName(eng.name());
+            int priority = rec.map(r -> progressPriority(r.progress())).orElse(6);
+            int rankDesc = rec.map(EngineerQuery::unlockedRankDesc).orElse(0);
+            keyed.add(new Keyed(eng.name(), priority, rankDesc));
+        }
+        return keyed.stream()
+                .sorted(Comparator.comparingInt(Keyed::priority).thenComparingInt(Keyed::rankDesc))
+                .map(Keyed::name)
+                .toList();
     }
 }
