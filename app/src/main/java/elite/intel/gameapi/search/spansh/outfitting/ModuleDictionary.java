@@ -200,4 +200,12 @@ public final class ModuleDictionary {
             return -1;
         }
     }
+
+    public Set<String> getAliasKeys() {
+        return Collections.unmodifiableSet(aliasToCanonical.keySet());
+    }
+
+    public Collection<String> getCanonicalNames() {
+        return Collections.unmodifiableCollection(canonicalByLower.values());
+    }
 }

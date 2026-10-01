@@ -163,6 +163,7 @@ class AiActionMapGeneratorTest {
             "query_distance_to_body",
             "query_distance_to_bubble_earth_sol_civilization",
             "query_distance_to_carrier",
+            "query_engineer",
             "query_exobiology_samples",
             "query_exploration_profits",
             "query_fsd_target",

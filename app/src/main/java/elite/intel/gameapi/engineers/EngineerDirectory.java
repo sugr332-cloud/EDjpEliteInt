@@ -12,7 +12,10 @@ import org.apache.logging.log4j.Logger;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Loads and provides access to static reference data for Elite Dangerous engineers from engineers.json.
@@ -23,6 +26,7 @@ public final class EngineerDirectory {
     private static final Logger log = LogManager.getLogger(EngineerDirectory.class);
     private static final String RESOURCE_PATH = "/engineers/engineers.json";
     private static final EngineerDirectory INSTANCE = new EngineerDirectory();
+    private static final Pattern QUOTED_SECTION_PATTERN = Pattern.compile("['’‘\"”“`]([^'’‘\"”“`]+)['’‘\"”“`]");
 
     public record Specialty(String module, int maxGrade) {}
     public record Coords(double x, double y, double z) {}
@@ -40,7 +44,8 @@ public final class EngineerDirectory {
             String notes,
             List<String> sources,
             Coords coords,
-            boolean permitRequired
+            boolean permitRequired,
+            List<String> namesJa
     ) {
         public boolean isShip() {
             return "ship".equalsIgnoreCase(type);
@@ -48,6 +53,28 @@ public final class EngineerDirectory {
 
         public boolean isOnFoot() {
             return "onfoot".equalsIgnoreCase(type);
+        }
+
+        public List<String> getSpeechCandidates() {
+            Set<String> candidates = new LinkedHashSet<>();
+            candidates.add(name);
+
+            Matcher m = QUOTED_SECTION_PATTERN.matcher(name);
+            if (m.find()) {
+                String quoted = m.group(1).trim();
+                if (!quoted.isEmpty()) {
+                    candidates.add(quoted);
+                }
+                String unquoted = QUOTED_SECTION_PATTERN.matcher(name).replaceAll(" ").replaceAll("\\s+", " ").trim();
+                if (!unquoted.isEmpty()) {
+                    candidates.add(unquoted);
+                }
+            }
+
+            if (namesJa != null) {
+                candidates.addAll(namesJa);
+            }
+            return new ArrayList<>(candidates);
         }
     }
 
@@ -145,11 +172,21 @@ public final class EngineerDirectory {
 
                         boolean permitRequired = obj.has("permitRequired") && obj.get("permitRequired").getAsBoolean();
 
+                        List<String> namesJaList = new ArrayList<>();
+                        if (obj.has("namesJa") && obj.get("namesJa").isJsonArray()) {
+                            for (JsonElement jEl : obj.getAsJsonArray("namesJa")) {
+                                if (jEl.isJsonPrimitive() && jEl.getAsJsonPrimitive().isString()) {
+                                    namesJaList.add(jEl.getAsString());
+                                }
+                            }
+                        }
+
                         EngineerInfo info = new EngineerInfo(
                                 name, type, system, base, body, invite, unlock, referral,
                                 Collections.unmodifiableList(specs),
                                 notes, Collections.unmodifiableList(srcList),
-                                coords, permitRequired
+                                coords, permitRequired,
+                                Collections.unmodifiableList(namesJaList)
                         );
 
                         loadedEngineers.add(info);
@@ -205,5 +242,53 @@ public final class EngineerDirectory {
             return Optional.empty();
         }
         return Optional.ofNullable(byNormalizedName.get(normalizeName(name)));
+    }
+
+    /**
+     * Normalizes text for speech matching:
+     * - NFKC normalization
+     * - strips quotation marks (' ’ ‘ " ” “ `), middle dots (・ ･), and all whitespace
+     * - converts to lower case using Locale.ROOT
+     */
+    public static String normalizeForSpeech(String text) {
+        if (text == null) {
+            return "";
+        }
+        String nfkc = Normalizer.normalize(text, Normalizer.Form.NFKC);
+        return nfkc.replaceAll("['’‘\"”“`・･\\s]", "")
+                .toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Finds an engineer mentioned in the user's spoken utterance.
+     * Compares candidates (full name, quoted part removed, quoted part alone, and all namesJa)
+     * using normalizeForSpeech. Picks the candidate with the longest normalized match.
+     */
+    public Optional<EngineerInfo> findMentionedIn(String utterance) {
+        if (utterance == null || utterance.isBlank()) {
+            return Optional.empty();
+        }
+
+        String normUtterance = normalizeForSpeech(utterance);
+        if (normUtterance.isEmpty()) {
+            return Optional.empty();
+        }
+
+        EngineerInfo bestMatch = null;
+        int bestLength = 0;
+
+        for (EngineerInfo eng : engineers) {
+            for (String candidate : eng.getSpeechCandidates()) {
+                String normCandidate = normalizeForSpeech(candidate);
+                if (!normCandidate.isEmpty() && normUtterance.contains(normCandidate)) {
+                    if (normCandidate.length() > bestLength) {
+                        bestLength = normCandidate.length();
+                        bestMatch = eng;
+                    }
+                }
+            }
+        }
+
+        return Optional.ofNullable(bestMatch);
     }
 }
