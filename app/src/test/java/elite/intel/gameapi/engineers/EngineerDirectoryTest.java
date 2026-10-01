@@ -157,7 +157,7 @@ class EngineerDirectoryTest {
         assertTrue(palin.isPresent());
         assertEquals("Professor Palin", palin.get().name());
 
-        // "Tod McQuinn", "The Blaster", "ブラスター" -> Tod 'The Blaster' McQuinn
+        // "Tod McQuinn", "The Blaster", "マックイン" -> Tod 'The Blaster' McQuinn
         Optional<EngineerDirectory.EngineerInfo> tod1 = directory.findMentionedIn("where is Tod McQuinn");
         assertTrue(tod1.isPresent());
         assertEquals("Tod 'The Blaster' McQuinn", tod1.get().name());
@@ -166,9 +166,12 @@ class EngineerDirectoryTest {
         assertTrue(tod2.isPresent());
         assertEquals("Tod 'The Blaster' McQuinn", tod2.get().name());
 
-        Optional<EngineerDirectory.EngineerInfo> tod3 = directory.findMentionedIn("ブラスターの開放条件");
+        Optional<EngineerDirectory.EngineerInfo> tod3 = directory.findMentionedIn("マックインの開放条件");
         assertTrue(tod3.isPresent());
         assertEquals("Tod 'The Blaster' McQuinn", tod3.get().name());
+
+        Optional<EngineerDirectory.EngineerInfo> tod4 = directory.findMentionedIn("研磨ブラスターのエンジニアは");
+        assertTrue(tod4.isEmpty(), "研磨ブラスター must not match any engineer");
     }
 
     @Test
@@ -265,5 +268,9 @@ class EngineerDirectoryTest {
         EngineerDirectory.EngineerInfo felicity = directory.findByName("Felicity Farseer").orElseThrow();
         assertEquals("フェリシティ・ファーシーア", directory.spokenName(felicity, Language.JA),
                 "Spoken name for TTS must remain Katakana only without English name");
+
+        // 7. 研磨ブラスターを改造できます → 変わらないこと
+        String input7 = "研磨ブラスターを改造できます";
+        assertEquals(input7, directory.decorateNamesForDisplay(input7, Language.JA));
     }
 }
