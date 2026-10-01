@@ -128,4 +128,55 @@ class EngineerDirectoryTest {
             assertTrue(sp.maxGrade() >= 1, "Ship engineer specialty grade must be 1 or higher for " + sp.module());
         }
     }
+
+    @Test
+    void allEngineersHaveNonEmptyNamesJa() {
+        List<EngineerDirectory.EngineerInfo> all = directory.getAllEngineers();
+        assertEquals(38, all.size());
+        for (EngineerDirectory.EngineerInfo eng : all) {
+            assertNotNull(eng.namesJa(), "namesJa must not be null for " + eng.name());
+            assertFalse(eng.namesJa().isEmpty(), "namesJa must not be empty for " + eng.name());
+        }
+    }
+
+    @Test
+    void findMentionedInMatchesVariousJapaneseAndEnglishUtterances() {
+        // "フェリシティ・ファーシーアの開放条件は", "フェリシティファーシーアはどこ" -> Felicity Farseer
+        Optional<EngineerDirectory.EngineerInfo> felicity1 = directory.findMentionedIn("フェリシティ・ファーシーアの開放条件は");
+        assertTrue(felicity1.isPresent());
+        assertEquals("Felicity Farseer", felicity1.get().name());
+
+        Optional<EngineerDirectory.EngineerInfo> felicity2 = directory.findMentionedIn("フェリシティファーシーアはどこ");
+        assertTrue(felicity2.isPresent());
+        assertEquals("Felicity Farseer", felicity2.get().name());
+
+        // "パリン教授" -> Professor Palin
+        Optional<EngineerDirectory.EngineerInfo> palin = directory.findMentionedIn("パリン教授に会いたい");
+        assertTrue(palin.isPresent());
+        assertEquals("Professor Palin", palin.get().name());
+
+        // "Tod McQuinn", "The Blaster", "ブラスター" -> Tod 'The Blaster' McQuinn
+        Optional<EngineerDirectory.EngineerInfo> tod1 = directory.findMentionedIn("where is Tod McQuinn");
+        assertTrue(tod1.isPresent());
+        assertEquals("Tod 'The Blaster' McQuinn", tod1.get().name());
+
+        Optional<EngineerDirectory.EngineerInfo> tod2 = directory.findMentionedIn("tell me about The Blaster");
+        assertTrue(tod2.isPresent());
+        assertEquals("Tod 'The Blaster' McQuinn", tod2.get().name());
+
+        Optional<EngineerDirectory.EngineerInfo> tod3 = directory.findMentionedIn("ブラスターの開放条件");
+        assertTrue(tod3.isPresent());
+        assertEquals("Tod 'The Blaster' McQuinn", tod3.get().name());
+    }
+
+    @Test
+    void normalizeForSpeechStripsQuotesMiddleDotsAndWhitespace() {
+        assertEquals("felicityfarseer", EngineerDirectory.normalizeForSpeech("Felicity Farseer"));
+        assertEquals("フェリシティファーシーア", EngineerDirectory.normalizeForSpeech("フェリシティ・ファーシーア"));
+        assertEquals("フェリシティファーシーア", EngineerDirectory.normalizeForSpeech("フェリシティ･ファーシーア"));
+        assertEquals("todtheblastermcquinn", EngineerDirectory.normalizeForSpeech("Tod 'The Blaster' McQuinn"));
+        assertEquals("todtheblastermcquinn", EngineerDirectory.normalizeForSpeech("Tod “The Blaster” McQuinn"));
+        assertEquals("", EngineerDirectory.normalizeForSpeech(null));
+        assertEquals("", EngineerDirectory.normalizeForSpeech("   "));
+    }
 }
