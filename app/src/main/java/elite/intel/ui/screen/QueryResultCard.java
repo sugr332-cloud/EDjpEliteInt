@@ -10,9 +10,13 @@ import elite.intel.db.dao.EngineerProgressDao.EngineerProgressRecord;
 import elite.intel.db.dao.LocationDao;
 import elite.intel.db.managers.EngineerChecklistManager;
 import elite.intel.db.managers.EngineerProgressManager;
+import elite.intel.db.managers.QueryResultDisplayManager;
+import elite.intel.db.managers.QueryResultDisplayManager.EngineersDisplayDto;
 import elite.intel.gameapi.engineers.EngineerDirectory;
 import elite.intel.gameapi.engineers.EngineerDirectory.EngineerInfo;
 import elite.intel.gameapi.engineers.EngineerDirectory.Specialty;
+import elite.intel.i18n.Language;
+import elite.intel.session.SystemSession;
 import elite.intel.ui.overlay.QueryResultObjectiveSource;
 import elite.intel.ui.support.GuiCommandRunner;
 import elite.intel.ui.widget.HudButton;
@@ -159,6 +163,10 @@ public class QueryResultCard extends JPanel {
     }
 
     public static QueryResultCard forEngineer(String engineerName, String highlightModule, LocationDao.Coordinates here) {
+        return forEngineer(engineerName, highlightModule, here, false);
+    }
+
+    public static QueryResultCard forEngineer(String engineerName, String highlightModule, LocationDao.Coordinates here, boolean showFilterButton) {
         Optional<EngineerInfo> opt = EngineerDirectory.getInstance().findByName(engineerName);
         if (opt.isEmpty()) {
             JPanel emptyBody = new JPanel();
@@ -170,10 +178,15 @@ public class QueryResultCard extends JPanel {
         }
 
         EngineerInfo info = opt.get();
+        Language lang = SystemSession.getInstance().getLanguage();
+        EngineerDirectory dir = EngineerDirectory.getInstance();
+        String dispName = dir.displayName(info, lang);
         String typeStr = "onfoot".equalsIgnoreCase(info.type())
                 ? getText("ai.queryResult.engineer.onfoot")
                 : getText("ai.queryResult.engineer.ship");
-        String title = info.name() + " (" + typeStr + ")";
+        String title = (lang == Language.JA)
+                ? dispName + "（" + typeStr + "）"
+                : dispName + " (" + typeStr + ")";
 
         JPanel body = new JPanel();
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
@@ -241,7 +254,8 @@ public class QueryResultCard extends JPanel {
             specList.setOpaque(false);
 
             for (Specialty sp : info.specialties()) {
-                String spText = sp.module() + (sp.maxGrade() > 0 ? " G" + sp.maxGrade() : "");
+                String modDisp = dir.localizedSpecialtyName(sp.module(), lang);
+                String spText = modDisp + (sp.maxGrade() > 0 ? " G" + sp.maxGrade() : "");
                 boolean isMatch = highlightModule != null && sp.module().equalsIgnoreCase(highlightModule);
 
                 JLabel spComp = new JLabel(spText);
@@ -330,27 +344,39 @@ public class QueryResultCard extends JPanel {
 
             if (hasInvite) {
                 boolean initChecked = chkMgr.isChecked(info.name(), EngineerChecklistManager.ITEM_INVITE);
-                String baseText = getText("ai.queryResult.checklist.invite") + ": " + info.invite();
+                String inviteText = dir.localizedInvite(info, lang);
+                String baseText = getText("ai.queryResult.checklist.invite") + ": " + inviteText;
                 JCheckBox cb = createChecklistCheckBox(info.name(), EngineerChecklistManager.ITEM_INVITE, baseText, initChecked);
                 body.add(cb);
             }
 
             if (hasUnlock) {
                 boolean initChecked = chkMgr.isChecked(info.name(), EngineerChecklistManager.ITEM_UNLOCK);
-                String baseText = getText("ai.queryResult.checklist.unlock") + ": " + info.unlock();
+                String unlockText = dir.localizedUnlock(info, lang);
+                String baseText = getText("ai.queryResult.checklist.unlock") + ": " + unlockText;
                 JCheckBox cb = createChecklistCheckBox(info.name(), EngineerChecklistManager.ITEM_UNLOCK, baseText, initChecked);
                 body.add(cb);
             }
 
             if (hasReferral) {
                 boolean initChecked = chkMgr.isChecked(info.name(), EngineerChecklistManager.ITEM_REFERRAL_TASK);
-                String baseText = getText("ai.queryResult.checklist.referral") + ": " + info.referral();
+                String refText = dir.formatReferral(info.referral(), lang);
+                String baseText = getText("ai.queryResult.checklist.referral") + ": " + refText;
                 JCheckBox cb = createChecklistCheckBox(info.name(), EngineerChecklistManager.ITEM_REFERRAL_TASK, baseText, initChecked);
                 body.add(cb);
             }
         }
 
         List<JButton> buttons = new ArrayList<>();
+        if (showFilterButton) {
+            JButton isolateBtn = new HudButton(getText("ai.queryResult.btn.isolateEngineer"), false);
+            buttons.add(isolateBtn);
+            isolateBtn.addActionListener(e -> {
+                QueryResultDisplayManager.getInstance().saveEngineers(
+                        new EngineersDisplayDto("engineer", null, List.of(info.name()))
+                );
+            });
+        }
         JButton goBtn = new HudButton(getText("ai.queryResult.btn.engineerStation"), false);
         buttons.add(goBtn);
         setupEngineerButtonAction(goBtn, buttons, info.name());
@@ -494,7 +520,7 @@ public class QueryResultCard extends JPanel {
         setBorder(hudMajorPanelBorder());
 
         JLabel titleLabel = new JLabel(title);
-        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 12.0f));
+        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 13.0f));
         titleLabel.setForeground(HUD_COLOR_FF822E);
         titleLabel.setBorder(new EmptyBorder(2, 4, 4, 4));
         add(titleLabel, BorderLayout.NORTH);

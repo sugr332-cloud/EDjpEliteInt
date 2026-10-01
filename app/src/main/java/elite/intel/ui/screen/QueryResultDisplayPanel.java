@@ -10,6 +10,9 @@ import elite.intel.db.managers.QueryResultDisplayManager;
 import elite.intel.db.managers.QueryResultDisplayManager.EngineersDisplayDto;
 import elite.intel.db.managers.QueryResultDisplayManager.LatestDisplay;
 import elite.intel.eventbus.UiBus;
+import elite.intel.gameapi.engineers.EngineerDirectory;
+import elite.intel.i18n.Language;
+import elite.intel.session.SystemSession;
 import elite.intel.ui.event.QueryResultDisplayUpdatedEvent;
 import elite.intel.ui.theme.HudPalette;
 
@@ -149,12 +152,14 @@ public class QueryResultDisplayPanel extends JPanel {
             return;
         }
 
+        Language lang = SystemSession.getInstance().getLanguage();
         if ("module".equalsIgnoreCase(dto.queryKind())) {
-            String mod = dto.moduleName() != null ? dto.moduleName() : "-";
+            String mod = dto.moduleName() != null ? EngineerDirectory.getInstance().localizedSpecialtyName(dto.moduleName(), lang) : "-";
             headerLabel.setText(getText("ai.queryResult.header.engineers.module", mod, timeStr));
         } else if ("engineer".equalsIgnoreCase(dto.queryKind())) {
-            String engName = !dto.engineerNames().isEmpty() ? dto.engineerNames().get(0) : "-";
-            headerLabel.setText(getText("ai.queryResult.header.engineers.engineer", engName, timeStr));
+            String rawEngName = !dto.engineerNames().isEmpty() ? dto.engineerNames().get(0) : "-";
+            String dispEngName = EngineerDirectory.getInstance().displayName(rawEngName, lang);
+            headerLabel.setText(getText("ai.queryResult.header.engineers.engineer", dispEngName, timeStr));
         } else {
             headerLabel.setText(getText("ai.queryResult.header.engineers.progress", timeStr));
         }
@@ -165,9 +170,10 @@ public class QueryResultDisplayPanel extends JPanel {
         } catch (Exception ignored) {
         }
 
+        boolean canIsolate = dto.engineerNames().size() > 1;
         cardsContainer.removeAll();
         for (String name : dto.engineerNames()) {
-            QueryResultCard card = QueryResultCard.forEngineer(name, dto.moduleName(), here);
+            QueryResultCard card = QueryResultCard.forEngineer(name, dto.moduleName(), here, canIsolate);
             cardsContainer.add(card);
             cardsContainer.add(Box.createVerticalStrut(6));
         }

@@ -12,6 +12,8 @@ import elite.intel.gameapi.engineers.EngineerDirectory.Specialty;
 import elite.intel.gameapi.engineers.EngineerModuleMatcher;
 import elite.intel.db.managers.QueryResultDisplayManager;
 import elite.intel.db.managers.QueryResultDisplayManager.EngineersDisplayDto;
+import elite.intel.i18n.Language;
+import elite.intel.session.SystemSession;
 import elite.intel.util.NavigationUtils;
 import elite.intel.util.yaml.ToYamlConvertable;
 import elite.intel.util.yaml.YamlFactory;
@@ -166,6 +168,7 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
                 
                 Rules:
                 - Answer in the user's language concisely.
+                - When answering in Japanese, strictly use the provided Japanese conditions, specialties, and Katakana engineer names as given in the data without re-translating them. Do not read or output Latin alphabet names.
                 - For type 'module': mention up to the top 3 engineers, including their maximum grade and progress status. For any engineer with permitRequired=true, explicitly mention that a system permit is required.
                 - For type 'engineer': summarize the engineer's details (system, base, requirements, specialties, progress status).
                 - For type 'progress': summarize the player's engineering progress by status group.
@@ -301,28 +304,38 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
     }
 
     private DataDto buildEngineerDetailData(EngineerInfo eng, LocationDao.Coordinates here, String query) {
+        Language lang = SystemSession.getInstance().getLanguage();
+        EngineerDirectory dir = EngineerDirectory.getInstance();
+        String spokenName = dir.spokenName(eng, lang);
         Double distance = calculateDistanceLy(here, eng.coords());
 
         Optional<EngineerProgressRecord> progOpt = EngineerProgressManager.getInstance().findByName(eng.name());
-        String progress = progOpt.map(EngineerProgressRecord::progress).orElse("記録なし");
+        String progress = progOpt.map(EngineerProgressRecord::progress).orElse(lang == Language.JA ? "記録なし" : "No Record");
         Integer rank = progOpt.map(EngineerProgressRecord::rank).orElse(null);
         Integer rankProgress = progOpt.map(EngineerProgressRecord::rankProgress).orElse(null);
+
+        String invite = dir.localizedInvite(eng, lang);
+        String unlock = dir.localizedUnlock(eng, lang);
+        String referral = dir.formatReferralSpoken(eng.referral(), lang);
 
         List<SpecialtyDto> specs = new ArrayList<>();
         if (eng.specialties() != null) {
             for (Specialty sp : eng.specialties()) {
-                specs.add(new SpecialtyDto(sp.module(), sp.maxGrade()));
+                String modName = dir.localizedSpecialtyName(sp.module(), lang);
+                specs.add(new SpecialtyDto(modName, sp.maxGrade()));
             }
         }
 
         return new DataDto(
                 "engineer", query,
                 null, null,
-                eng.name(), eng.type(), eng.system(), eng.base(), eng.body(),
-                distance, eng.invite(), eng.unlock(), eng.referral(),
+                spokenName, eng.type(), eng.system(), eng.base(), eng.body(),
+                distance, invite, unlock, referral,
                 specs, progress, rank, rankProgress, eng.permitRequired(), eng.notes(),
                 false, null,
-                null, null
+                null, null,
+                null, null, null, null,
+                List.of(eng.name())
         );
     }
 
@@ -368,6 +381,7 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
     private DataDto buildModuleEngineersData(String moduleName, LocationDao.Coordinates here, String query) {
         EngineerDirectory dir = EngineerDirectory.getInstance();
         EngineerProgressManager pm = EngineerProgressManager.getInstance();
+        Language lang = SystemSession.getInstance().getLanguage();
 
         List<RankedModuleEngineer> ranked = findEngineersForModule(moduleName, here, dir);
 
@@ -375,11 +389,11 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
         for (RankedModuleEngineer item : ranked) {
             EngineerInfo eng = item.engineer();
             Optional<EngineerProgressRecord> prog = pm.findByName(eng.name());
-            String progressStr = prog.map(EngineerProgressRecord::progress).orElse("記録なし");
+            String progressStr = prog.map(EngineerProgressRecord::progress).orElse(lang == Language.JA ? "記録なし" : "No Record");
             Integer rank = prog.map(EngineerProgressRecord::rank).orElse(null);
 
             candidates.add(new ModuleEngineerDto(
-                    eng.name(),
+                    dir.spokenName(eng, lang),
                     eng.system(),
                     eng.base(),
                     item.distanceLy(),
@@ -398,12 +412,14 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
                 .map(r -> r.engineer().name())
                 .toList();
 
+        String spokenModuleName = dir.localizedSpecialtyName(moduleName, lang);
+
         return new DataDto(
                 "module", query,
-                moduleName, limited,
+                spokenModuleName, limited,
                 null, null, null, null, null, null, null, null, null, null, null, null, null, false, null,
                 false, null,
-                null, null,
+                moduleName, null,
                 null, null, null, null,
                 allCardNames
         );
@@ -415,14 +431,17 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
 
         List<EngineerProgressRecord> allRecords = EngineerProgressManager.getInstance().getAll();
         Map<String, List<ProgressEngineerDto>> groups = new LinkedHashMap<>();
+        Language lang = SystemSession.getInstance().getLanguage();
+        EngineerDirectory dir = EngineerDirectory.getInstance();
 
         for (EngineerProgressRecord rec : allRecords) {
             if (onlyUnlocked && !"Unlocked".equalsIgnoreCase(rec.progress())) {
                 continue;
             }
             String groupKey = rec.progress() != null ? rec.progress() : "Unknown";
+            String engSpokenName = dir.spokenName(rec.displayName(), lang);
             groups.computeIfAbsent(groupKey, k -> new ArrayList<>()).add(
-                    new ProgressEngineerDto(rec.displayName(), rec.progress(), rec.rank(), rec.rankProgress())
+                    new ProgressEngineerDto(engSpokenName, rec.progress(), rec.rank(), rec.rankProgress())
             );
         }
 
@@ -455,11 +474,20 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
             List<String> names = data.cardEngineerNames() != null ? data.cardEngineerNames() :
                     (data.moduleEngineers() != null ? data.moduleEngineers().stream().map(ModuleEngineerDto::name).toList() : Collections.emptyList());
             if (!names.isEmpty()) {
-                displayMgr.saveEngineers(new EngineersDisplayDto("module", data.moduleName(), names));
+                String cardMod = data.rawModule() != null ? data.rawModule() : data.moduleName();
+                displayMgr.saveEngineers(new EngineersDisplayDto("module", cardMod, names));
             }
         } else if ("engineer".equals(data.type())) {
-            if (data.name() != null && !data.name().isBlank()) {
-                displayMgr.saveEngineers(new EngineersDisplayDto("engineer", null, List.of(data.name())));
+            String engName = (data.cardEngineerNames() != null && !data.cardEngineerNames().isEmpty())
+                    ? data.cardEngineerNames().get(0)
+                    : data.name();
+            if (engName != null && !engName.isBlank()) {
+                Optional<EngineerInfo> infoOpt = EngineerDirectory.getInstance().findByName(engName);
+                if (infoOpt.isEmpty()) {
+                    infoOpt = EngineerDirectory.getInstance().findMentionedIn(engName);
+                }
+                String canonicalName = infoOpt.map(EngineerInfo::name).orElse(engName);
+                displayMgr.saveEngineers(new EngineersDisplayDto("engineer", null, List.of(canonicalName)));
             }
         } else if ("directory".equals(data.type())) {
             List<String> names = data.cardEngineerNames();

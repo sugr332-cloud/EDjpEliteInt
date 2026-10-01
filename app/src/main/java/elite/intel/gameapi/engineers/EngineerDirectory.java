@@ -5,6 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import elite.intel.i18n.Language;
 import elite.intel.util.json.GsonFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -38,7 +39,9 @@ public final class EngineerDirectory {
             String base,
             String body,
             String invite,
+            String inviteJa,
             String unlock,
+            String unlockJa,
             String referral,
             List<Specialty> specialties,
             String notes,
@@ -89,6 +92,7 @@ public final class EngineerDirectory {
     private final MetaInfo meta;
     private final List<EngineerInfo> engineers;
     private final Map<String, EngineerInfo> byNormalizedName;
+    private final Map<String, String> specialtyNamesJa;
 
     public static EngineerDirectory getInstance() {
         return INSTANCE;
@@ -98,6 +102,7 @@ public final class EngineerDirectory {
         MetaInfo loadedMeta = null;
         List<EngineerInfo> loadedEngineers = new ArrayList<>();
         Map<String, EngineerInfo> nameMap = new HashMap<>();
+        Map<String, String> loadedSpecialtiesJa = new LinkedHashMap<>();
 
         try (InputStream is = getClass().getResourceAsStream(RESOURCE_PATH)) {
             if (is == null) {
@@ -122,6 +127,15 @@ public final class EngineerDirectory {
                     );
                 }
 
+                if (root.has("specialtyNamesJa") && root.get("specialtyNamesJa").isJsonObject()) {
+                    JsonObject sObj = root.getAsJsonObject("specialtyNamesJa");
+                    for (Map.Entry<String, JsonElement> entry : sObj.entrySet()) {
+                        if (entry.getValue().isJsonPrimitive() && entry.getValue().getAsJsonPrimitive().isString()) {
+                            loadedSpecialtiesJa.put(entry.getKey(), entry.getValue().getAsString());
+                        }
+                    }
+                }
+
                 if (root.has("engineers") && root.get("engineers").isJsonArray()) {
                     JsonArray arr = root.getAsJsonArray("engineers");
                     for (JsonElement el : arr) {
@@ -134,7 +148,9 @@ public final class EngineerDirectory {
                         String base = obj.has("base") ? obj.get("base").getAsString() : "";
                         String body = obj.has("body") ? obj.get("body").getAsString() : "";
                         String invite = obj.has("invite") && !obj.get("invite").isJsonNull() ? obj.get("invite").getAsString() : "";
+                        String inviteJa = obj.has("inviteJa") && !obj.get("inviteJa").isJsonNull() ? obj.get("inviteJa").getAsString() : null;
                         String unlock = obj.has("unlock") && !obj.get("unlock").isJsonNull() ? obj.get("unlock").getAsString() : "";
+                        String unlockJa = obj.has("unlockJa") && !obj.get("unlockJa").isJsonNull() ? obj.get("unlockJa").getAsString() : null;
                         String referral = obj.has("referral") && !obj.get("referral").isJsonNull() ? obj.get("referral").getAsString() : null;
 
                         List<Specialty> specs = new ArrayList<>();
@@ -182,7 +198,7 @@ public final class EngineerDirectory {
                         }
 
                         EngineerInfo info = new EngineerInfo(
-                                name, type, system, base, body, invite, unlock, referral,
+                                name, type, system, base, body, invite, inviteJa, unlock, unlockJa, referral,
                                 Collections.unmodifiableList(specs),
                                 notes, Collections.unmodifiableList(srcList),
                                 coords, permitRequired,
@@ -201,6 +217,7 @@ public final class EngineerDirectory {
         this.meta = loadedMeta;
         this.engineers = Collections.unmodifiableList(loadedEngineers);
         this.byNormalizedName = Collections.unmodifiableMap(nameMap);
+        this.specialtyNamesJa = Collections.unmodifiableMap(loadedSpecialtiesJa);
         log.info("EngineerDirectory initialized with {} engineers from {}", this.engineers.size(), RESOURCE_PATH);
     }
 
@@ -290,5 +307,107 @@ public final class EngineerDirectory {
         }
 
         return Optional.ofNullable(bestMatch);
+    }
+
+    public Map<String, String> getSpecialtyNamesJa() {
+        return specialtyNamesJa;
+    }
+
+    /**
+     * Display name for GUI / HUD / cards / reminder text.
+     * When lang == JA, formats as "カタカナ（English Name）" if namesJa exists, else "English Name".
+     * For other languages, returns "English Name".
+     */
+    public String displayName(EngineerInfo eng, Language lang) {
+        if (eng == null) return "";
+        if (lang == Language.JA && eng.namesJa() != null && !eng.namesJa().isEmpty()) {
+            return eng.namesJa().get(0) + "（" + eng.name() + "）";
+        }
+        return eng.name();
+    }
+
+    public String displayName(String name, Language lang) {
+        return findByName(name).map(eng -> displayName(eng, lang)).orElse(name != null ? name : "");
+    }
+
+    /**
+     * Spoken name for TTS / LLM voice response.
+     * When lang == JA, returns Katakana name ("カタカナ") if namesJa exists, else "English Name".
+     * For other languages, returns "English Name".
+     */
+    public String spokenName(EngineerInfo eng, Language lang) {
+        if (eng == null) return "";
+        if (lang == Language.JA && eng.namesJa() != null && !eng.namesJa().isEmpty()) {
+            return eng.namesJa().get(0);
+        }
+        return eng.name();
+    }
+
+    public String spokenName(String name, Language lang) {
+        return findByName(name).map(eng -> spokenName(eng, lang)).orElse(name != null ? name : "");
+    }
+
+    /**
+     * Returns the localized specialty / module name.
+     * When lang == JA, returns the translation from specialtyNamesJa if present, else original name.
+     */
+    public String localizedSpecialtyName(String moduleOrSpecialty, Language lang) {
+        if (moduleOrSpecialty == null) return "";
+        if (lang == Language.JA && specialtyNamesJa.containsKey(moduleOrSpecialty)) {
+            return specialtyNamesJa.get(moduleOrSpecialty);
+        }
+        return moduleOrSpecialty;
+    }
+
+    /**
+     * Formats comma-separated English referral names into display names (カタカナ（英字） in JA).
+     */
+    public String formatReferral(String referral, Language lang) {
+        if (referral == null || referral.isBlank()) return "";
+        String[] parts = referral.split(",");
+        List<String> formatted = new ArrayList<>();
+        for (String part : parts) {
+            String trimmed = part.trim();
+            if (trimmed.isEmpty()) continue;
+            formatted.add(displayName(trimmed, lang));
+        }
+        return String.join(", ", formatted);
+    }
+
+    /**
+     * Formats comma-separated English referral names into spoken names (カタカナ in JA).
+     */
+    public String formatReferralSpoken(String referral, Language lang) {
+        if (referral == null || referral.isBlank()) return "";
+        String[] parts = referral.split(",");
+        List<String> formatted = new ArrayList<>();
+        for (String part : parts) {
+            String trimmed = part.trim();
+            if (trimmed.isEmpty()) continue;
+            formatted.add(spokenName(trimmed, lang));
+        }
+        return String.join(", ", formatted);
+    }
+
+    /**
+     * Localized invitation requirement string.
+     */
+    public String localizedInvite(EngineerInfo eng, Language lang) {
+        if (eng == null) return "";
+        if (lang == Language.JA && eng.inviteJa() != null && !eng.inviteJa().isBlank()) {
+            return eng.inviteJa();
+        }
+        return eng.invite() != null ? eng.invite() : "";
+    }
+
+    /**
+     * Localized unlock requirement string.
+     */
+    public String localizedUnlock(EngineerInfo eng, Language lang) {
+        if (eng == null) return "";
+        if (lang == Language.JA && eng.unlockJa() != null && !eng.unlockJa().isBlank()) {
+            return eng.unlockJa();
+        }
+        return eng.unlock() != null ? eng.unlock() : "";
     }
 }

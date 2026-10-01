@@ -143,9 +143,9 @@ public class HudLogArea extends JPanel implements Scrollable {
         }
     }
 
-    private record TextPosition(int messageIndex, int lineIndex, int charIndex) {}
+    record TextPosition(int messageIndex, int lineIndex, int charIndex) {}
 
-    private record RenderedLine(int messageIndex, int lineIndex, String text, int x, int topY) {}
+    record RenderedLine(int messageIndex, int lineIndex, String text, int x, int topY) {}
 
     private record SelectionRange(int start, int end) {}
 
@@ -173,7 +173,7 @@ public class HudLogArea extends JPanel implements Scrollable {
     private HudLogArea(int typewriterDelayMs, Style style, boolean chat) {
         this.style = style;
         this.chat = chat;
-        this.selectable = !chat && style == Style.SYSTEM_LOG;
+        this.selectable = (!chat && style == Style.SYSTEM_LOG) || chat;
         setOpaque(true);
         setBackground(HudPalette.HUD_COLOR_ROLE_APPLICATION_BACKGROUND);
         typewriterTimer = new Timer(typewriterDelayMs, null);
@@ -250,11 +250,20 @@ public class HudLogArea extends JPanel implements Scrollable {
         addMouseMotionListener(selectionMouse);
     }
 
-    /** Copies the current system-log selection to the system clipboard, if a non-empty range is selected. */
+    /** Copies the current log selection to the system clipboard, if a non-empty range is selected. */
     public void copySelectedText() {
-        String text = selectedText(refreshSystemLines());
+        String text = getSelectedText();
         if (text.isEmpty()) return;
-        Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
+        try {
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
+        } catch (Exception ignored) {
+            // Headless or clipboard access failure fallback
+        }
+    }
+
+    /** Returns the currently selected text, or empty string if no selection. */
+    public String getSelectedText() {
+        return selectedText(refreshLines());
     }
 
     /** Returns whether this log currently contains a non-empty text selection. */
@@ -263,7 +272,7 @@ public class HudLogArea extends JPanel implements Scrollable {
     }
 
     private void selectAllText() {
-        List<RenderedLine> lines = refreshSystemLines();
+        List<RenderedLine> lines = refreshLines();
         if (lines.isEmpty()) {
             clearSelection();
             return;
@@ -314,14 +323,72 @@ public class HudLogArea extends JPanel implements Scrollable {
         return Integer.compare(left.charIndex(), right.charIndex());
     }
 
-    private List<RenderedLine> refreshSystemLines() {
+    List<RenderedLine> refreshLines() {
         if (!selectable) return List.of();
         Font font = hudFont();
-        FontMetrics fm = getFontMetrics(font);
-        int textX = PAD_X + fm.stringWidth(style.marker) + MARKER_GAP;
-        int maxW = Math.max(1, layoutWidth() - textX - PAD_X);
-        int height = Math.max(getHeight(), calculateContentHeight(layoutWidth()));
-        return buildSystemLines(fm, textX, maxW, height);
+        int width = layoutWidth();
+        int height = Math.max(getHeight(), calculateContentHeight(width));
+        if (chat) {
+            ChatMetrics m = chatMetrics(font, width);
+            return buildChatLines(m, width, height);
+        } else {
+            FontMetrics fm = getFontMetrics(font);
+            int textX = PAD_X + fm.stringWidth(style.marker) + MARKER_GAP;
+            int maxW = Math.max(1, width - textX - PAD_X);
+            return buildSystemLines(fm, textX, maxW, height);
+        }
+    }
+
+    private List<RenderedLine> buildChatLines(ChatMetrics m, int w, int h) {
+        Message newest = messages.isEmpty() ? null : messages.get(messages.size() - 1);
+        boolean cmdrAnimating = newest != null && !newest.complete && newest.align == Align.LEFT;
+        List<String> activeLines = cmdrAnimating ? wrapText(newest.visibleText, m.fm(), m.wrapW()) : null;
+        int nInputRows = cmdrAnimating ? activeLines.size() : 1;
+        int cursorZoneH = nInputRows * m.lineH() + LINE_GAP;
+
+        int historyCount = cmdrAnimating ? messages.size() - 1 : messages.size();
+
+        List<List<String>> wrapped = new ArrayList<>();
+        for (int i = 0; i < historyCount; i++) {
+            Message msg = messages.get(i);
+            wrapped.add(wrapText(msg.complete ? msg.fullText : msg.visibleText, m.fm(), m.wrapW()));
+        }
+
+        List<RenderedLine> result = new ArrayList<>();
+        int y = h - PAD_Y - cursorZoneH;
+        for (int i = historyCount - 1; i >= 0; i--) {
+            Message msg = messages.get(i);
+            List<String> lines = wrapped.get(i);
+            int cardH = cardHeight(lines, m);
+            y -= cardH;
+
+            int lineIdx = 0;
+            if (msg.timestamp != null) {
+                String ts = LogTimestampFormat.screen(msg.timestamp);
+                int tsX = (msg.align == Align.RIGHT) ? m.rightTextEnd() - m.tsFm().stringWidth(ts) : m.leftTextX();
+                result.add(new RenderedLine(i, lineIdx++, ts, tsX, y));
+            }
+
+            int textTop = y + m.tsH() + CHAT_TS_GAP;
+            boolean multiLine = lines.size() > 1;
+            int blockW = multiLine ? m.wrapW() : m.fm().stringWidth(lines.get(0));
+            int colLeft = m.rightTextEnd() - blockW;
+
+            for (int li = 0; li < lines.size(); li++) {
+                String line = lines.get(li);
+                int lx = (msg.align == Align.RIGHT)
+                        ? (multiLine ? colLeft : m.rightTextEnd() - m.fm().stringWidth(line))
+                        : m.leftTextX();
+                int lineY = textTop + li * m.lineH();
+                result.add(new RenderedLine(i, lineIdx++, line, lx, lineY));
+            }
+
+            y -= CHAT_CARD_GAP;
+        }
+
+        result.sort(Comparator.comparingInt(RenderedLine::messageIndex)
+                .thenComparingInt(RenderedLine::lineIndex));
+        return result;
     }
 
     private String selectedText(List<RenderedLine> lines) {
@@ -344,19 +411,25 @@ public class HudLogArea extends JPanel implements Scrollable {
         TextPosition lineEnd = new TextPosition(line.messageIndex(), line.lineIndex(), line.text().length());
         if (comparePositions(end, lineStart) <= 0 || comparePositions(start, lineEnd) >= 0) return null;
 
-        int from = comparePositions(start, lineStart) <= 0 ? 0 : start.charIndex();
-        int to = comparePositions(end, lineEnd) >= 0 ? line.text().length() : end.charIndex();
+        int from = comparePositions(start, lineStart) <= 0 ? 0 : Math.min(start.charIndex(), line.text().length());
+        int to = comparePositions(end, lineEnd) >= 0 ? line.text().length() : Math.min(end.charIndex(), line.text().length());
         return from < to ? new SelectionRange(from, to) : null;
     }
 
     private TextPosition hitTest(Point point) {
-        List<RenderedLine> lines = refreshSystemLines();
+        List<RenderedLine> lines = refreshLines();
         if (lines.isEmpty()) return null;
 
-        FontMetrics fm = getFontMetrics(hudFont());
+        Font font = hudFont();
+        Font tsFont = chat ? font.deriveFont(font.getSize2D() * 0.82f) : font;
+        FontMetrics normalFm = getFontMetrics(font);
+        FontMetrics tsFm = getFontMetrics(tsFont);
+
         RenderedLine closest = null;
         int closestDistance = Integer.MAX_VALUE;
         for (RenderedLine line : lines) {
+            boolean isTs = chat && line.lineIndex() == 0 && messages.get(line.messageIndex()).timestamp != null;
+            FontMetrics fm = isTs ? tsFm : normalFm;
             int lineBottom = line.topY() + fm.getHeight();
             if (point.y >= line.topY() && point.y < lineBottom) {
                 closest = line;
@@ -370,6 +443,8 @@ public class HudLogArea extends JPanel implements Scrollable {
         }
         if (closest == null) return null;
 
+        boolean isTs = chat && closest.lineIndex() == 0 && messages.get(closest.messageIndex()).timestamp != null;
+        FontMetrics fm = isTs ? tsFm : normalFm;
         int relativeX = point.x - closest.x();
         int charIndex = characterIndex(closest.text(), relativeX, fm);
         return new TextPosition(closest.messageIndex(), closest.lineIndex(), charIndex);
@@ -435,7 +510,6 @@ public class HudLogArea extends JPanel implements Scrollable {
     private void addMessageInternal(String text, int prefixLen, String transcriptText, Style msgStyle, Align align,
                                     Instant timestamp) {
         if (text == null || text.isBlank()) return;
-        if (selectable) clearSelection();
         transcript.addLast(transcriptText);
         while (transcript.size() > MAX_TRANSCRIPT) transcript.removeFirst();
         if (activeCardTimer != null) activeCardTimer.stop();
@@ -448,7 +522,14 @@ public class HudLogArea extends JPanel implements Scrollable {
         removeAllTimerListeners();
         Message msg = new Message(text, prefixLen, msgStyle, align, timestamp);
         messages.add(msg);
-        while (messages.size() > MAX_MESSAGES) messages.remove(0);
+        boolean trimmed = false;
+        while (messages.size() > MAX_MESSAGES) {
+            messages.remove(0);
+            trimmed = true;
+        }
+        if (selectable && trimmed) {
+            clearSelection();
+        }
         startTypewriter(msg);
         revalidate();
         repaint();
@@ -592,6 +673,12 @@ public class HudLogArea extends JPanel implements Scrollable {
     }
 
     private void startTypewriter(Message target) {
+        if (typewriterTimer.getDelay() <= 0) {
+            target.complete = true;
+            target.visibleText = target.fullText;
+            retainVegaCardActivity(target);
+            return;
+        }
         typewriterTimer.addActionListener(e -> {
             boolean wasAtBottom = isScrolledToBottom();
             if (target.complete) {
@@ -791,9 +878,9 @@ public class HudLogArea extends JPanel implements Scrollable {
 
             if (msg.align == Align.RIGHT) {
                 float activityStrength = vegaActivityStrength(msg, i);
-                paintVegaCard(g2, msg, lines, activityStrength, y, cardH, m);
+                paintVegaCard(g2, msg, i, lines, activityStrength, y, cardH, m);
             } else {
-                paintCommanderCard(g2, msg, lines, y, cardH, m);
+                paintCommanderCard(g2, msg, i, lines, y, cardH, m);
             }
             y -= CHAT_CARD_GAP;
         }
@@ -842,9 +929,42 @@ public class HudLogArea extends JPanel implements Scrollable {
         return m.tsH() + CHAT_TS_GAP + lines.size() * m.lineH();
     }
 
+    private void paintChatLine(Graphics2D g2, RenderedLine line, Font font, FontMetrics fm, Color defaultTextColor) {
+        SelectionRange selection = selectionRange(line);
+        String text = line.text();
+        if (text.isEmpty()) return;
+
+        if (selection == null) {
+            g2.setFont(font);
+            g2.setColor(defaultTextColor);
+            g2.drawString(text, line.x(), line.topY() + fm.getAscent());
+            return;
+        }
+
+        AttributedString attributed = new AttributedString(text);
+        attributed.addAttribute(TextAttribute.FONT, font);
+        attributed.addAttribute(TextAttribute.FOREGROUND, defaultTextColor);
+        attributed.addAttribute(TextAttribute.FOREGROUND,
+                HudPalette.HUD_COLOR_ROLE_PRIMARY_TEXT, selection.start(), selection.end());
+
+        TextLayout layout = new TextLayout(attributed.getIterator(), g2.getFontRenderContext());
+        float baseline = line.topY() + fm.getAscent();
+
+        Graphics2D selectionGraphics = (Graphics2D) g2.create();
+        try {
+            selectionGraphics.translate(line.x(), baseline);
+            selectionGraphics.setColor(HudPalette.HUD_COLOR_ROLE_SELECTION_BACKGROUND);
+            selectionGraphics.fill(layout.getLogicalHighlightShape(selection.start(), selection.end()));
+        } finally {
+            selectionGraphics.dispose();
+        }
+
+        layout.draw(g2, line.x(), baseline);
+    }
+
     /** Right (Vega) card: cyan rail, timestamp, text right-anchored (single line) or column-aligned (wrapped);
      *  the active card adds a left-fading highlight in place of a caret. */
-    private void paintVegaCard(Graphics2D g2, Message msg, List<String> lines, float activityStrength,
+    private void paintVegaCard(Graphics2D g2, Message msg, int messageIndex, List<String> lines, float activityStrength,
                                int y, int cardH, ChatMetrics m) {
         boolean multiLine = lines.size() > 1;
         int blockW = multiLine ? m.wrapW() : m.fm().stringWidth(lines.get(0));
@@ -855,27 +975,40 @@ public class HudLogArea extends JPanel implements Scrollable {
         int railAlpha = CHAT_RAIL_ALPHA + Math.round((FULL_ALPHA - CHAT_RAIL_ALPHA) * activityStrength);
         g2.setColor(withAlpha(HudPalette.HUD_COLOR_ROLE_INFORMATION_MARK, railAlpha));
         g2.fillRect(m.rightRailX(), y, CHAT_RAIL_W, cardH);
-        drawTimestamp(g2, msg, m.tsFont(), m.tsFm(), m.rightTextEnd(), y + m.tsFm().getAscent(), true);
-        g2.setFont(m.font());
-        g2.setColor(msg.style.textColor);
+
+        int lineIdx = 0;
+        if (msg.timestamp != null) {
+            String ts = LogTimestampFormat.screen(msg.timestamp);
+            int tsX = m.rightTextEnd() - m.tsFm().stringWidth(ts);
+            RenderedLine tsLine = new RenderedLine(messageIndex, lineIdx++, ts, tsX, y);
+            paintChatLine(g2, tsLine, m.tsFont(), m.tsFm(), HudPalette.HUD_COLOR_ROLE_SYSTEM_LOG_TIMESTAMP_TEXT);
+        }
+
         int textTop = y + m.tsH() + CHAT_TS_GAP;
         for (int li = 0; li < lines.size(); li++) {
             String line = lines.get(li);
             int lx = multiLine ? colLeft : m.rightTextEnd() - m.fm().stringWidth(line);
-            g2.drawString(line, lx, textTop + li * m.lineH() + m.fm().getAscent());
+            RenderedLine bodyLine = new RenderedLine(messageIndex, lineIdx++, line, lx, textTop + li * m.lineH());
+            paintChatLine(g2, bodyLine, m.font(), m.fm(), msg.style.textColor);
         }
     }
 
     /** Left (commander) card: green rail, timestamp, left-aligned text. */
-    private void paintCommanderCard(Graphics2D g2, Message msg, List<String> lines, int y, int cardH, ChatMetrics m) {
+    private void paintCommanderCard(Graphics2D g2, Message msg, int messageIndex, List<String> lines, int y, int cardH, ChatMetrics m) {
         g2.setColor(withAlpha(HudPalette.HUD_COLOR_ROLE_COMMANDER_MARKER, CHAT_RAIL_ALPHA));
         g2.fillRect(PAD_X, y, CHAT_RAIL_W, cardH);
-        drawTimestamp(g2, msg, m.tsFont(), m.tsFm(), m.leftTextX(), y + m.tsFm().getAscent(), false);
-        g2.setFont(m.font());
-        g2.setColor(msg.style.textColor);
+
+        int lineIdx = 0;
+        if (msg.timestamp != null) {
+            String ts = LogTimestampFormat.screen(msg.timestamp);
+            RenderedLine tsLine = new RenderedLine(messageIndex, lineIdx++, ts, m.leftTextX(), y);
+            paintChatLine(g2, tsLine, m.tsFont(), m.tsFm(), HudPalette.HUD_COLOR_ROLE_SYSTEM_LOG_TIMESTAMP_TEXT);
+        }
+
         int textTop = y + m.tsH() + CHAT_TS_GAP;
         for (int li = 0; li < lines.size(); li++) {
-            g2.drawString(lines.get(li), m.leftTextX(), textTop + li * m.lineH() + m.fm().getAscent());
+            RenderedLine bodyLine = new RenderedLine(messageIndex, lineIdx++, lines.get(li), m.leftTextX(), textTop + li * m.lineH());
+            paintChatLine(g2, bodyLine, m.font(), m.fm(), msg.style.textColor);
         }
     }
 
