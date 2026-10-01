@@ -1267,6 +1267,14 @@ gui|pt|MISSING|ai.queryResult.btn.engineerStation
 gui|ptbz|MISSING|ai.queryResult.btn.engineerStation
 gui|ru|MISSING|ai.queryResult.btn.engineerStation
 gui|uk|MISSING|ai.queryResult.btn.engineerStation
+gui|de|MISSING|ai.queryResult.btn.isolateEngineer
+gui|es|MISSING|ai.queryResult.btn.isolateEngineer
+gui|fr|MISSING|ai.queryResult.btn.isolateEngineer
+gui|it|MISSING|ai.queryResult.btn.isolateEngineer
+gui|pt|MISSING|ai.queryResult.btn.isolateEngineer
+gui|ptbz|MISSING|ai.queryResult.btn.isolateEngineer
+gui|ru|MISSING|ai.queryResult.btn.isolateEngineer
+gui|uk|MISSING|ai.queryResult.btn.isolateEngineer
 
 responses|de|MISSING|handler.navigateToEngineer.invalidRank
 responses|de|MISSING|handler.navigateToEngineer.noDisplayedEngineers

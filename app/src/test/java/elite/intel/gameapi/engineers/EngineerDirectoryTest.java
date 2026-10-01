@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Optional;
 
+import elite.intel.i18n.Language;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class EngineerDirectoryTest {
@@ -178,5 +180,57 @@ class EngineerDirectoryTest {
         assertEquals("todtheblastermcquinn", EngineerDirectory.normalizeForSpeech("Tod “The Blaster” McQuinn"));
         assertEquals("", EngineerDirectory.normalizeForSpeech(null));
         assertEquals("", EngineerDirectory.normalizeForSpeech("   "));
+    }
+
+    @Test
+    void specialtyNamesJaLoadedCorrectly() {
+        assertEquals(72, directory.getSpecialtyNamesJa().size(), "specialtyNamesJa must contain exactly 72 mappings");
+        assertEquals("フレームシフトドライブ（FSD）", directory.localizedSpecialtyName("Frame Shift Drive", Language.JA));
+        assertEquals("Frame Shift Drive", directory.localizedSpecialtyName("Frame Shift Drive", Language.EN));
+        assertEquals("射程の延長", directory.localizedSpecialtyName("Greater range", Language.JA));
+        assertEquals("Greater range", directory.localizedSpecialtyName("Greater range", Language.EN));
+        // Fallback for unknown
+        assertEquals("Unknown Specialty", directory.localizedSpecialtyName("Unknown Specialty", Language.JA));
+    }
+
+    @Test
+    void engineerLocalizedNamesAndConditions() {
+        EngineerDirectory.EngineerInfo felicity = directory.findByName("Felicity Farseer").orElseThrow();
+        assertEquals("フェリシティ・ファーシーア（Felicity Farseer）", directory.displayName(felicity, Language.JA));
+        assertEquals("Felicity Farseer", directory.displayName(felicity, Language.EN));
+        assertEquals("フェリシティ・ファーシーア", directory.spokenName(felicity, Language.JA));
+        assertEquals("Felicity Farseer", directory.spokenName(felicity, Language.EN));
+
+        // Conditions
+        assertNotNull(felicity.inviteJa());
+        assertFalse(felicity.inviteJa().isBlank());
+        assertNotNull(felicity.unlockJa());
+        assertFalse(felicity.unlockJa().isBlank());
+
+        assertEquals(felicity.inviteJa(), directory.localizedInvite(felicity, Language.JA));
+        assertEquals(felicity.invite(), directory.localizedInvite(felicity, Language.EN));
+        assertEquals(felicity.unlockJa(), directory.localizedUnlock(felicity, Language.JA));
+        assertEquals(felicity.unlock(), directory.localizedUnlock(felicity, Language.EN));
+    }
+
+    @Test
+    void engineerReferralFormatting() {
+        // Terra Velasquez referral is Jude Navarro
+        EngineerDirectory.EngineerInfo terra = directory.findByName("Terra Velasquez").orElseThrow();
+        assertEquals("Jude Navarro", terra.referral());
+
+        // Display format: ジュード・ナバロ（Jude Navarro）
+        assertEquals("ジュード・ナバロ（Jude Navarro）", directory.formatReferral(terra.referral(), Language.JA));
+        assertEquals("Jude Navarro", directory.formatReferral(terra.referral(), Language.EN));
+
+        // Spoken format: ジュード・ナバロ
+        assertEquals("ジュード・ナバロ", directory.formatReferralSpoken(terra.referral(), Language.JA));
+        assertEquals("Jude Navarro", directory.formatReferralSpoken(terra.referral(), Language.EN));
+
+        // Null / blank referral
+        assertEquals("", directory.formatReferral(null, Language.JA));
+        assertEquals("", directory.formatReferral("", Language.JA));
+        assertEquals("", directory.formatReferralSpoken(null, Language.JA));
+        assertEquals("", directory.formatReferralSpoken("", Language.JA));
     }
 }

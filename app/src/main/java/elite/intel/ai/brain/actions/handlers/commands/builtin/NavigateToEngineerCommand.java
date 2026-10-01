@@ -21,8 +21,10 @@ import elite.intel.gameapi.engineers.EngineerDirectory;
 import elite.intel.gameapi.engineers.EngineerDirectory.EngineerInfo;
 import elite.intel.gameapi.engineers.EngineerModuleMatcher;
 import elite.intel.gameapi.inputs.RoutePlotter;
+import elite.intel.i18n.Language;
 import elite.intel.session.PlayerSession;
 import elite.intel.session.Status;
+import elite.intel.session.SystemSession;
 import elite.intel.util.StringUtls;
 
 import java.time.Duration;
@@ -182,16 +184,20 @@ public final class NavigateToEngineerCommand implements IntelCommand {
         boolean sameSystem = currentSystem != null && targetSystem != null
                 && currentSystem.trim().equalsIgnoreCase(targetSystem.trim());
 
+        Language lang = SystemSession.getInstance().getLanguage();
+        String spokenTargetName = engineerDirectory.spokenName(target, lang);
+        String displayTargetName = engineerDirectory.displayName(target, lang);
+
         // 4. Set reminder (always set, even if in the same system)
-        String reminderMessage = StringUtls.localizedResponse("handler.navigateToEngineer.reminder", target.name(), stationName, targetSystem);
+        String reminderMessage = StringUtls.localizedResponse("handler.navigateToEngineer.reminder", displayTargetName, stationName, targetSystem);
         reminderSetter.setReminder(reminderMessage, targetSystem, stationName, null);
 
         if (sameSystem) {
             String answer;
             if (bodyName != null && !bodyName.isBlank()) {
-                answer = StringUtls.localizedResponse("handler.navigateToEngineer.sameSystem", target.name(), stationName, bodyName);
+                answer = StringUtls.localizedResponse("handler.navigateToEngineer.sameSystem", spokenTargetName, stationName, bodyName);
             } else {
-                answer = StringUtls.localizedResponse("handler.navigateToEngineer.sameSystemNoBody", target.name(), stationName);
+                answer = StringUtls.localizedResponse("handler.navigateToEngineer.sameSystemNoBody", spokenTargetName, stationName);
             }
             return returnOrVoice(answer, isGui);
         }
@@ -199,9 +205,9 @@ public final class NavigateToEngineerCommand implements IntelCommand {
         // 5. Different system -> route plotting
         String message;
         if (target.permitRequired()) {
-            message = StringUtls.localizedResponse("handler.navigateToEngineer.successPermitRequired", target.name(), targetSystem, stationName);
+            message = StringUtls.localizedResponse("handler.navigateToEngineer.successPermitRequired", spokenTargetName, targetSystem, stationName);
         } else {
-            message = StringUtls.localizedResponse("handler.navigateToEngineer.success", target.name(), targetSystem, stationName);
+            message = StringUtls.localizedResponse("handler.navigateToEngineer.success", spokenTargetName, targetSystem, stationName);
         }
 
         String plottedAnswer = routePlotterFunction.plotRouteAnd(message, targetSystem);

@@ -3,6 +3,10 @@ package elite.intel.ui.screen;
 import elite.intel.db.dao.LocationDao;
 import elite.intel.db.managers.EngineerChecklistManager;
 import elite.intel.db.managers.EngineerProgressManager;
+import elite.intel.db.managers.QueryResultDisplayManager;
+import elite.intel.db.managers.QueryResultDisplayManager.EngineersDisplayDto;
+import elite.intel.i18n.Language;
+import elite.intel.session.SystemSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -121,6 +125,101 @@ class EngineerCardTest {
         // Click disables button
         btn.doClick();
         assertFalse(btn.isEnabled(), "Button must be temporarily disabled after click");
+    }
+
+    @Test
+    void cardGeneratesHeaderInJapaneseAndEnglish() {
+        SystemSession session = SystemSession.getInstance();
+        Language orig = session.getLanguage();
+        try {
+            // Japanese: カタカナ（英字）（宇宙船）
+            session.setLanguage(Language.JA);
+            QueryResultCard cardJa = QueryResultCard.forEngineer("Felicity Farseer", null, null);
+            assertEquals("フェリシティ・ファーシーア（Felicity Farseer）（宇宙船）", cardJa.getCardTitle());
+
+            QueryResultCard cardOnFootJa = QueryResultCard.forEngineer("Domino Green", null, null);
+            assertEquals("ドミノ・グリーン（Domino Green）（徒歩）", cardOnFootJa.getCardTitle());
+
+            // English: Felicity Farseer (Ship)
+            session.setLanguage(Language.EN);
+            QueryResultCard cardEn = QueryResultCard.forEngineer("Felicity Farseer", null, null);
+            assertEquals("Felicity Farseer (Ship)", cardEn.getCardTitle());
+
+            QueryResultCard cardOnFootEn = QueryResultCard.forEngineer("Domino Green", null, null);
+            assertEquals("Domino Green (On-foot)", cardOnFootEn.getCardTitle());
+        } finally {
+            session.setLanguage(orig);
+        }
+    }
+
+    @Test
+    void cardDisplaysJapaneseConditionsAndSpecialtiesInJapaneseMode() {
+        SystemSession session = SystemSession.getInstance();
+        Language orig = session.getLanguage();
+        try {
+            session.setLanguage(Language.JA);
+
+            // Felicity Farseer
+            QueryResultCard cardFelicity = QueryResultCard.forEngineer("Felicity Farseer", "Frame Shift Drive", null);
+            List<JLabel> labels = findComponentsOfType(cardFelicity, JLabel.class);
+            List<JCheckBox> checkBoxes = findComponentsOfType(cardFelicity, JCheckBox.class);
+
+            // Specialties: フレームシフトドライブ（FSD）
+            boolean hasFsdJa = labels.stream().anyMatch(l -> l.getText().contains("フレームシフトドライブ（FSD）"));
+            assertTrue(hasFsdJa, "Specialties must display Japanese name: フレームシフトドライブ（FSD）");
+
+            // Invite condition
+            boolean hasInviteJa = checkBoxes.stream().anyMatch(cb -> cb.getText().contains("スカウト（Scout）"));
+            assertTrue(hasInviteJa, "Invite condition must be in Japanese");
+
+            // Unlock condition
+            boolean hasUnlockJa = checkBoxes.stream().anyMatch(cb -> cb.getText().contains("メタアロイ（Meta-Alloys）"));
+            assertTrue(hasUnlockJa, "Unlock condition must be in Japanese");
+
+            // Terra Velasquez (On-foot with referral)
+            QueryResultCard cardTerra = QueryResultCard.forEngineer("Terra Velasquez", null, null);
+            List<JCheckBox> cbTerra = findComponentsOfType(cardTerra, JCheckBox.class);
+            boolean hasRefJa = cbTerra.stream().anyMatch(cb -> cb.getText().contains("ジュード・ナバロ（Jude Navarro）"));
+            assertTrue(hasRefJa, "Referral must display Japanese format with katakana and English name");
+        } finally {
+            session.setLanguage(orig);
+        }
+    }
+
+    @Test
+    void cardFilterButtonAppearsWhenShowFilterButtonTrueAndSavesSingleEngineer() {
+        SystemSession session = SystemSession.getInstance();
+        Language orig = session.getLanguage();
+        try {
+            session.setLanguage(Language.JA);
+
+            // When showFilterButton = false (single engineer card or default)
+            QueryResultCard singleCard = QueryResultCard.forEngineer("Felicity Farseer", null, null, false);
+            assertEquals(1, singleCard.getActionButtons().size(), "Single engineer card must have only 1 action button");
+
+            // When showFilterButton = true (multiple engineers displayed)
+            QueryResultCard multiCard = QueryResultCard.forEngineer("Felicity Farseer", "Frame Shift Drive", null, true);
+            List<JButton> buttons = multiCard.getActionButtons();
+            assertEquals(2, buttons.size(), "Multi-engineer card must have 2 action buttons");
+
+            JButton isolateBtn = buttons.get(0);
+            assertEquals("この人に絞る", isolateBtn.getText());
+
+            // Click the isolate button
+            isolateBtn.doClick();
+
+            // Verify QueryResultDisplayManager was updated with single engineer
+            QueryResultDisplayManager mgr = QueryResultDisplayManager.getInstance();
+            assertTrue(mgr.getLatest().isPresent());
+            var latest = mgr.getLatest().get();
+            assertEquals("engineers", latest.queryType());
+            assertNotNull(latest.engineers());
+            EngineersDisplayDto savedDto = latest.engineers();
+            assertEquals("engineer", savedDto.queryKind());
+            assertEquals(List.of("Felicity Farseer"), savedDto.engineerNames());
+        } finally {
+            session.setLanguage(orig);
+        }
     }
 
     @SuppressWarnings("unchecked")

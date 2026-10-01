@@ -13,6 +13,8 @@ import elite.intel.gameapi.engineers.EngineerDirectory;
 import elite.intel.gameapi.engineers.EngineerDirectory.EngineerInfo;
 import elite.intel.gameapi.engineers.EngineerDirectory.Specialty;
 import elite.intel.gameapi.search.spansh.SpanshTimestamps;
+import elite.intel.i18n.Language;
+import elite.intel.session.SystemSession;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -235,13 +237,16 @@ public class QueryResultObjectiveSource implements HudObjectiveSource {
         List<HudRow> rows = new ArrayList<>();
         String queryKind = dto.queryKind();
 
+        Language lang = SystemSession.getInstance().getLanguage();
         if ("module".equalsIgnoreCase(queryKind)) {
-            String mod = dto.moduleName() != null ? dto.moduleName() : "-";
+            String rawMod = dto.moduleName() != null ? dto.moduleName() : "-";
+            String mod = EngineerDirectory.getInstance().localizedSpecialtyName(rawMod, lang);
             rows.add(HudRow.of(HudText.get("overlay.card.row.module"), mod));
 
             String firstEngName = dto.engineerNames().get(0);
             Optional<EngineerInfo> infoOpt = EngineerDirectory.getInstance().findByName(firstEngName);
             Optional<EngineerProgressRecord> progOpt = EngineerProgressManager.getInstance().findByName(firstEngName);
+            String firstEngDispName = EngineerDirectory.getInstance().displayName(firstEngName, lang);
 
             int grade = 0;
             if (infoOpt.isPresent() && infoOpt.get().specialties() != null) {
@@ -260,7 +265,7 @@ public class QueryResultObjectiveSource implements HudObjectiveSource {
             String statusInParens = HudText.get("overlay.card.row.engineerStatusInParens", statusStr);
 
             int others = dto.engineerNames().size() - 1;
-            String secondLine = firstEngName + gradeStr + " " + statusInParens;
+            String secondLine = firstEngDispName + gradeStr + " " + statusInParens;
             if (others > 0) {
                 secondLine += " " + HudText.get("overlay.card.row.engineerOtherCandidates", others);
             }
@@ -268,7 +273,8 @@ public class QueryResultObjectiveSource implements HudObjectiveSource {
 
         } else if ("engineer".equalsIgnoreCase(queryKind)) {
             String engName = dto.engineerNames().get(0);
-            rows.add(HudRow.of(HudText.get("overlay.card.title.engineers"), engName));
+            String dispName = EngineerDirectory.getInstance().displayName(engName, lang);
+            rows.add(HudRow.of(HudText.get("overlay.card.title.engineers"), dispName));
 
             Optional<EngineerInfo> infoOpt = EngineerDirectory.getInstance().findByName(engName);
             Optional<EngineerProgressRecord> progOpt = EngineerProgressManager.getInstance().findByName(engName);

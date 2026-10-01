@@ -8,6 +8,8 @@ import elite.intel.db.managers.EngineerProgressManager;
 import elite.intel.db.managers.QueryResultDisplayManager;
 import elite.intel.db.managers.QueryResultDisplayManager.EngineersDisplayDto;
 import elite.intel.db.managers.QueryResultDisplayManager.LatestDisplay;
+import elite.intel.i18n.Language;
+import elite.intel.session.SystemSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,24 +76,55 @@ class EngineerQueryTest {
 
     @Test
     void engineerQueryReturnsFullEngineerDetails() {
-        progressManager.recordProgress("Felicity Farseer", 300000L, "Unlocked", 5, 0, "2026-10-01T10:00:00Z");
+        SystemSession session = SystemSession.getInstance();
+        Language orig = session.getLanguage();
+        try {
+            progressManager.recordProgress("Felicity Farseer", 300000L, "Unlocked", 5, 0, "2026-10-01T10:00:00Z");
+            EngineerQuery query = new EngineerQuery(() -> mockSol);
 
-        EngineerQuery query = new EngineerQuery(() -> mockSol);
+            // 1. English
+            session.setLanguage(Language.EN);
+            DataDto dataEn = query.buildData(new JsonObject(), "フェリシティ・ファーシーアの開放条件を教えて");
+            assertEquals("engineer", dataEn.type());
+            assertEquals("Felicity Farseer", dataEn.name());
+            assertEquals("ship", dataEn.engineerType());
+            assertEquals("Deciat", dataEn.system());
+            assertEquals("Farseer Inc", dataEn.base());
+            assertNotNull(dataEn.distanceLy());
+            assertTrue(dataEn.distanceLy() > 0);
+            assertEquals("Unlocked", dataEn.progress());
+            assertEquals(5, dataEn.rank());
+            assertEquals(0, dataEn.rankProgress());
+            assertFalse(dataEn.permitRequired());
+            assertNotNull(dataEn.specialties());
+            assertFalse(dataEn.specialties().isEmpty());
+            assertTrue(dataEn.specialties().stream().anyMatch(sp -> "Frame Shift Drive".equals(sp.moduleOrDescription())));
 
-        DataDto data = query.buildData(new JsonObject(), "フェリシティ・ファーシーアの開放条件を教えて");
-        assertEquals("engineer", data.type());
-        assertEquals("Felicity Farseer", data.name());
-        assertEquals("ship", data.engineerType());
-        assertEquals("Deciat", data.system());
-        assertEquals("Farseer Inc", data.base());
-        assertNotNull(data.distanceLy());
-        assertTrue(data.distanceLy() > 0);
-        assertEquals("Unlocked", data.progress());
-        assertEquals(5, data.rank());
-        assertEquals(0, data.rankProgress());
-        assertFalse(data.permitRequired());
-        assertNotNull(data.specialties());
-        assertFalse(data.specialties().isEmpty());
+            // 2. Japanese
+            session.setLanguage(Language.JA);
+            DataDto dataJa = query.buildData(new JsonObject(), "フェリシティ・ファーシーアの開放条件を教えて");
+            assertEquals("engineer", dataJa.type());
+            assertEquals("フェリシティ・ファーシーア", dataJa.name(), "In Japanese mode, LLM data name must be Katakana name");
+            assertEquals("ship", dataJa.engineerType());
+            assertEquals("Deciat", dataJa.system());
+            assertEquals("Farseer Inc", dataJa.base());
+            assertNotNull(dataJa.distanceLy());
+            assertTrue(dataJa.distanceLy() > 0);
+            assertEquals("Unlocked", dataJa.progress());
+            assertEquals(5, dataJa.rank());
+            assertEquals(0, dataJa.rankProgress());
+            assertFalse(dataJa.permitRequired());
+            assertNotNull(dataJa.invite());
+            assertTrue(dataJa.invite().contains("スカウト"));
+            assertNotNull(dataJa.unlock());
+            assertTrue(dataJa.unlock().contains("メタアロイ"));
+            assertNotNull(dataJa.specialties());
+            assertFalse(dataJa.specialties().isEmpty());
+            assertTrue(dataJa.specialties().stream().anyMatch(sp -> "フレームシフトドライブ（FSD）".equals(sp.moduleOrDescription())),
+                    "Specialties must use Japanese localized name");
+        } finally {
+            session.setLanguage(orig);
+        }
     }
 
     @Test
@@ -123,12 +156,27 @@ class EngineerQueryTest {
 
     @Test
     void distanceIsNullWhenCoordinatesUnavailable() {
-        EngineerQuery query = new EngineerQuery(() -> null);
+        SystemSession session = SystemSession.getInstance();
+        Language orig = session.getLanguage();
+        try {
+            EngineerQuery query = new EngineerQuery(() -> null);
 
-        DataDto data = query.buildData(new JsonObject(), "フェリシティ・ファーシーアはどこ？");
-        assertEquals("engineer", data.type());
-        assertEquals("Felicity Farseer", data.name());
-        assertNull(data.distanceLy(), "Distance must be null when coordinates unavailable");
+            // 1. English
+            session.setLanguage(Language.EN);
+            DataDto dataEn = query.buildData(new JsonObject(), "フェリシティ・ファーシーアはどこ？");
+            assertEquals("engineer", dataEn.type());
+            assertEquals("Felicity Farseer", dataEn.name());
+            assertNull(dataEn.distanceLy(), "Distance must be null when coordinates unavailable");
+
+            // 2. Japanese
+            session.setLanguage(Language.JA);
+            DataDto dataJa = query.buildData(new JsonObject(), "フェリシティ・ファーシーアはどこ？");
+            assertEquals("engineer", dataJa.type());
+            assertEquals("フェリシティ・ファーシーア", dataJa.name());
+            assertNull(dataJa.distanceLy(), "Distance must be null when coordinates unavailable");
+        } finally {
+            session.setLanguage(orig);
+        }
     }
 
     @Test

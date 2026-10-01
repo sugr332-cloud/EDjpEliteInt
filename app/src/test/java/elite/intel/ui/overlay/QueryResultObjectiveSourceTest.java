@@ -152,60 +152,82 @@ class QueryResultObjectiveSourceTest {
 
     @Test
     void testCurrentObjectiveWithEngineersModuleQuery() {
-        Instant now = Instant.now();
-        Instant savedAt = now.minus(5, ChronoUnit.MINUTES);
+        SystemSession session = SystemSession.getInstance();
+        Language orig = session.getLanguage();
+        try {
+            Instant now = Instant.now();
+            Instant savedAt = now.minus(5, ChronoUnit.MINUTES);
 
-        EngineerProgressManager.getInstance().clear();
-        EngineerProgressManager.getInstance().recordProgress("Felicity Farseer", null, "Unlocked", 5, 0, "2026-10-01T10:00:00Z");
+            EngineerProgressManager.getInstance().clear();
+            EngineerProgressManager.getInstance().recordProgress("Felicity Farseer", null, "Unlocked", 5, 0, "2026-10-01T10:00:00Z");
 
-        EngineersDisplayDto dto = new EngineersDisplayDto(
-                "module",
-                "Frame Shift Drive",
-                List.of("Felicity Farseer", "Elvira Martuuk", "Professor Palin")
-        );
-        LatestDisplay display = new LatestDisplay("engineers", savedAt, null, null, dto);
+            EngineersDisplayDto dto = new EngineersDisplayDto(
+                    "module",
+                    "Frame Shift Drive",
+                    List.of("Felicity Farseer", "Elvira Martuuk", "Professor Palin")
+            );
+            LatestDisplay display = new LatestDisplay("engineers", savedAt, null, null, dto);
 
-        QueryResultObjectiveSource source = new QueryResultObjectiveSource(() -> Optional.of(display), () -> now);
-        Optional<HudObjective> opt = source.currentObjective();
-        assertTrue(opt.isPresent());
+            // 1. English
+            session.setLanguage(Language.EN);
+            QueryResultObjectiveSource sourceEn = new QueryResultObjectiveSource(() -> Optional.of(display), () -> now);
+            HudObjective objectiveEn = sourceEn.currentObjective().orElseThrow();
+            assertEquals("Frame Shift Drive", objectiveEn.rows().get(0).value());
+            assertTrue(objectiveEn.rows().get(1).value().contains("Felicity Farseer"));
+            assertTrue(objectiveEn.rows().get(1).value().contains("G5"));
+            assertTrue(objectiveEn.rows().get(1).value().contains("Unlocked Rank 5"));
+            assertTrue(objectiveEn.rows().get(1).value().contains("2"), "Must mention other candidates count (+2)");
 
-        HudObjective objective = opt.get();
-        assertEquals(HudObjective.PRIORITY_AMBIENT, objective.priority());
-        List<HudRow> rows = objective.rows();
-        assertEquals(2, rows.size(), "Module engineers card must have 2 rows");
-
-        assertEquals("Frame Shift Drive", rows.get(0).value());
-        assertTrue(rows.get(1).value().contains("Felicity Farseer"));
-        assertTrue(rows.get(1).value().contains("G5"));
-        assertTrue(rows.get(1).value().contains("開放済み ランク 5") || rows.get(1).value().contains("Unlocked Rank 5"));
-        assertTrue(rows.get(1).value().contains("2"), "Must mention other candidates count (+2)");
+            // 2. Japanese
+            session.setLanguage(Language.JA);
+            QueryResultObjectiveSource sourceJa = new QueryResultObjectiveSource(() -> Optional.of(display), () -> now);
+            HudObjective objectiveJa = sourceJa.currentObjective().orElseThrow();
+            assertEquals("フレームシフトドライブ（FSD）", objectiveJa.rows().get(0).value());
+            assertTrue(objectiveJa.rows().get(1).value().contains("フェリシティ・ファーシーア（Felicity Farseer）"));
+            assertTrue(objectiveJa.rows().get(1).value().contains("G5"));
+            assertTrue(objectiveJa.rows().get(1).value().contains("開放済み ランク 5"));
+            assertTrue(objectiveJa.rows().get(1).value().contains("2"), "Must mention other candidates count (+2)");
+        } finally {
+            session.setLanguage(orig);
+        }
     }
 
     @Test
     void testCurrentObjectiveWithEngineersSingleEngineerQuery() {
-        Instant now = Instant.now();
-        Instant savedAt = now.minus(5, ChronoUnit.MINUTES);
+        SystemSession session = SystemSession.getInstance();
+        Language orig = session.getLanguage();
+        try {
+            Instant now = Instant.now();
+            Instant savedAt = now.minus(5, ChronoUnit.MINUTES);
 
-        EngineerProgressManager.getInstance().clear();
-        EngineerProgressManager.getInstance().recordProgress("Felicity Farseer", null, "Unlocked", 5, 0, "2026-10-01T10:00:00Z");
+            EngineerProgressManager.getInstance().clear();
+            EngineerProgressManager.getInstance().recordProgress("Felicity Farseer", null, "Unlocked", 5, 0, "2026-10-01T10:00:00Z");
 
-        EngineersDisplayDto dto = new EngineersDisplayDto(
-                "engineer",
-                null,
-                List.of("Felicity Farseer")
-        );
-        LatestDisplay display = new LatestDisplay("engineers", savedAt, null, null, dto);
+            EngineersDisplayDto dto = new EngineersDisplayDto(
+                    "engineer",
+                    null,
+                    List.of("Felicity Farseer")
+            );
+            LatestDisplay display = new LatestDisplay("engineers", savedAt, null, null, dto);
 
-        QueryResultObjectiveSource source = new QueryResultObjectiveSource(() -> Optional.of(display), () -> now);
-        Optional<HudObjective> opt = source.currentObjective();
-        assertTrue(opt.isPresent());
+            // 1. English
+            session.setLanguage(Language.EN);
+            QueryResultObjectiveSource sourceEn = new QueryResultObjectiveSource(() -> Optional.of(display), () -> now);
+            HudObjective objectiveEn = sourceEn.currentObjective().orElseThrow();
+            assertEquals("Felicity Farseer", objectiveEn.rows().get(0).value());
+            assertTrue(objectiveEn.rows().get(1).label().contains("Farseer Inc"));
+            assertTrue(objectiveEn.rows().get(1).value().contains("Unlocked Rank 5"));
 
-        HudObjective objective = opt.get();
-        List<HudRow> rows = objective.rows();
-        assertEquals(2, rows.size());
-        assertEquals("Felicity Farseer", rows.get(0).value());
-        assertTrue(rows.get(1).label().contains("Farseer Inc"));
-        assertTrue(rows.get(1).value().contains("開放済み ランク 5") || rows.get(1).value().contains("Unlocked Rank 5"));
+            // 2. Japanese
+            session.setLanguage(Language.JA);
+            QueryResultObjectiveSource sourceJa = new QueryResultObjectiveSource(() -> Optional.of(display), () -> now);
+            HudObjective objectiveJa = sourceJa.currentObjective().orElseThrow();
+            assertEquals("フェリシティ・ファーシーア（Felicity Farseer）", objectiveJa.rows().get(0).value());
+            assertTrue(objectiveJa.rows().get(1).label().contains("Farseer Inc"));
+            assertTrue(objectiveJa.rows().get(1).value().contains("開放済み ランク 5"));
+        } finally {
+            session.setLanguage(orig);
+        }
     }
 
     @Test

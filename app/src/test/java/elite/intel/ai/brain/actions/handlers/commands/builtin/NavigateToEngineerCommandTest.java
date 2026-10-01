@@ -12,6 +12,8 @@ import elite.intel.db.managers.QueryResultDisplayManager.LatestDisplay;
 import elite.intel.gameapi.ReminderContact;
 import elite.intel.gameapi.engineers.EngineerDirectory;
 import elite.intel.gameapi.engineers.EngineerDirectory.EngineerInfo;
+import elite.intel.i18n.Language;
+import elite.intel.session.SystemSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -266,24 +268,50 @@ class NavigateToEngineerCommandTest {
 
     @Test
     void testRankAbsent_MultipleCardsDisplayed_ModulePresent_ChoosesEG2FirstNotCardFirst() {
-        // Requirement from user feedback: rank is absent, utterance has FSD -> not card #1, but EG-2 module #1
-        // To verify this: set displayed cards to something NOT #1 in FSD (e.g. Liz Ryder, Hera Tani, Todd)
-        List<String> nonFsdNames = List.of("Liz Ryder", "Hera Tani", "Tod 'The Blaster' McQuinn");
-        EngineersDisplayDto dto = new EngineersDisplayDto("progress", null, nonFsdNames);
-        latestDisplay.set(Optional.of(new LatestDisplay("engineers", Instant.now(), null, null, dto)));
+        SystemSession session = SystemSession.getInstance();
+        Language orig = session.getLanguage();
+        try {
+            // Requirement from user feedback: rank is absent, utterance has FSD -> not card #1, but EG-2 module #1
+            // To verify this: set displayed cards to something NOT #1 in FSD (e.g. Liz Ryder, Hera Tani, Todd)
+            List<String> nonFsdNames = List.of("Liz Ryder", "Hera Tani", "Tod 'The Blaster' McQuinn");
+            EngineersDisplayDto dto = new EngineersDisplayDto("progress", null, nonFsdNames);
+            latestDisplay.set(Optional.of(new LatestDisplay("engineers", Instant.now(), null, null, dto)));
 
-        // Expectation: EG-2 FSD top engineer (Felicity Farseer / Elvira Martuuk)
-        List<RankedModuleEngineer> expectedFsd = EngineerQuery.findEngineersForModule("Frame Shift Drive", currentCoords.get(), engineerDirectory);
-        assertFalse(expectedFsd.isEmpty());
-        String expectedFsdTop = expectedFsd.get(0).engineer().name();
-        String expectedFsdSystem = expectedFsd.get(0).engineer().system();
+            // Expectation: EG-2 FSD top engineer (Felicity Farseer / Elvira Martuuk)
+            List<RankedModuleEngineer> expectedFsd = EngineerQuery.findEngineersForModule("Frame Shift Drive", currentCoords.get(), engineerDirectory);
+            assertFalse(expectedFsd.isEmpty());
+            EngineerInfo topEng = expectedFsd.get(0).engineer();
+            String expectedFsdTop = topEng.name();
+            String expectedFsdSystem = topEng.system();
 
-        JsonObject params = new JsonObject();
-        String result = command.execute(params, "FSD のエンジニアへ航路");
-        assertNotNull(result);
-        assertEquals(1, plottedRoutes.size());
-        assertEquals(expectedFsdSystem, plottedRoutes.get(0).destination(), "Must choose EG-2 order #1, not displayed card #1");
-        assertTrue(result.contains(expectedFsdTop));
+            // 1. English
+            session.setLanguage(Language.EN);
+            plottedRoutes.clear();
+            reminders.clear();
+            JsonObject paramsEn = new JsonObject();
+            String resultEn = command.execute(paramsEn, "FSD のエンジニアへ航路");
+            assertNotNull(resultEn);
+            assertEquals(1, plottedRoutes.size());
+            assertEquals(expectedFsdSystem, plottedRoutes.get(0).destination(), "Must choose EG-2 order #1, not displayed card #1");
+            assertTrue(resultEn.contains(expectedFsdTop), "In English, response should contain English name: " + resultEn);
+            assertTrue(reminders.get(0).text().contains(expectedFsdTop));
+
+            // 2. Japanese
+            session.setLanguage(Language.JA);
+            plottedRoutes.clear();
+            reminders.clear();
+            JsonObject paramsJa = new JsonObject();
+            String resultJa = command.execute(paramsJa, "FSD のエンジニアへ航路");
+            assertNotNull(resultJa);
+            assertEquals(1, plottedRoutes.size());
+            assertEquals(expectedFsdSystem, plottedRoutes.get(0).destination(), "Must choose EG-2 order #1, not displayed card #1");
+            String spokenNameJa = engineerDirectory.spokenName(topEng, Language.JA);
+            assertTrue(resultJa.contains(spokenNameJa), "In Japanese, spoken response should contain katakana name: " + resultJa);
+            String displayNameJa = engineerDirectory.displayName(topEng, Language.JA);
+            assertTrue(reminders.get(0).text().contains(displayNameJa), "In Japanese, reminder should contain display name: " + reminders.get(0).text());
+        } finally {
+            session.setLanguage(orig);
+        }
     }
 
     @Test
