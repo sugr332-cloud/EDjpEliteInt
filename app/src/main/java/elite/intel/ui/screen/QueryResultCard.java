@@ -195,6 +195,7 @@ public class QueryResultCard extends JPanel {
         // 1. 基本情報段落: 星系 / 基地 / 天体 + 距離
         JPanel locPanel = new JPanel(new BorderLayout(8, 0));
         locPanel.setOpaque(false);
+        locPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         locPanel.setBorder(new EmptyBorder(1, 4, 1, 4));
 
         JLabel locLabel = new JLabel(getText("ai.queryResult.row.station") + getText("ai.queryResult.rowSeparator"));
@@ -216,6 +217,7 @@ public class QueryResultCard extends JPanel {
         // 距離行
         JPanel distPanel = new JPanel(new BorderLayout(8, 0));
         distPanel.setOpaque(false);
+        distPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         distPanel.setBorder(new EmptyBorder(1, 4, 1, 4));
 
         JLabel distLabel = new JLabel(getText("ai.queryResult.row.distance") + getText("ai.queryResult.rowSeparator"));
@@ -244,6 +246,7 @@ public class QueryResultCard extends JPanel {
         if (info.specialties() != null && !info.specialties().isEmpty()) {
             JPanel specPanel = new JPanel(new BorderLayout(8, 0));
             specPanel.setOpaque(false);
+            specPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
             specPanel.setBorder(new EmptyBorder(1, 4, 1, 4));
 
             JLabel specLabel = new JLabel(getText("ai.queryResult.engineer.specialties") + getText("ai.queryResult.rowSeparator"));
@@ -280,6 +283,7 @@ public class QueryResultCard extends JPanel {
             barredLbl.setFont(barredLbl.getFont().deriveFont(Font.BOLD, 11.0f));
             barredLbl.setForeground(HUD_COLOR_D94F4F);
             barredLbl.setBorder(new EmptyBorder(2, 4, 2, 4));
+            barredLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
             body.add(barredLbl);
         }
 
@@ -302,6 +306,7 @@ public class QueryResultCard extends JPanel {
 
         JPanel autoProgPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
         autoProgPanel.setOpaque(false);
+        autoProgPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         if (progOpt.isEmpty() || (stage == 0 && !isBarred)) {
             JLabel noRecLbl = new JLabel(getText("ai.queryResult.engineer.noRecord"));
@@ -310,18 +315,32 @@ public class QueryResultCard extends JPanel {
             autoProgPanel.add(noRecLbl);
         }
 
-        // 知っている → 招待済み → 面識あり → 開放済み
-        addAutoStageLabel(autoProgPanel, getText("ai.queryResult.engineer.known"), stage >= 1);
-        addAutoStageLabel(autoProgPanel, getText("ai.queryResult.engineer.invited"), stage >= 2);
-        addAutoStageLabel(autoProgPanel, getText("ai.queryResult.engineer.acquainted"), stage >= 3);
-        addAutoStageLabel(autoProgPanel, getText("ai.queryResult.engineer.unlocked"), stage >= 4);
+        record StageItem(boolean checked, String text) {}
+        List<StageItem> allStageItems = new ArrayList<>();
+        allStageItems.add(new StageItem(stage >= 4, getText("ai.queryResult.engineer.unlocked")));
+        allStageItems.add(new StageItem(stage >= 3, getText("ai.queryResult.engineer.acquainted")));
+        allStageItems.add(new StageItem(stage >= 2, getText("ai.queryResult.engineer.invited")));
+        allStageItems.add(new StageItem(stage >= 1, getText("ai.queryResult.engineer.known")));
 
-        if (rank != null && rank >= 1) {
-            String rankText = getText("ai.queryResult.engineer.rank", rank) + (rankProg != null ? " (" + rankProg + "%)" : "");
-            JLabel rankLbl = new JLabel("☑ " + rankText);
-            rankLbl.setFont(rankLbl.getFont().deriveFont(Font.BOLD, 11.0f));
-            rankLbl.setForeground(HUD_COLOR_4FC56B);
-            autoProgPanel.add(rankLbl);
+        for (int r = 1; r <= 5; r++) {
+            boolean rChecked = (rank != null && rank >= r);
+            String rText = getText("ai.queryResult.engineer.rank", r);
+            if (rank != null && rank == r && rankProg != null && rankProg > 0) {
+                rText += (lang == Language.JA) ? "（" + rankProg + "%）" : " (" + rankProg + "%)";
+            }
+            allStageItems.add(new StageItem(rChecked, rText));
+        }
+
+        // チェック済みが上（先頭）、未チェックが下（後続）
+        for (StageItem it : allStageItems) {
+            if (it.checked()) {
+                addAutoStageLabel(autoProgPanel, it.text(), true);
+            }
+        }
+        for (StageItem it : allStageItems) {
+            if (!it.checked()) {
+                addAutoStageLabel(autoProgPanel, it.text(), false);
+            }
         }
 
         body.add(autoProgPanel);
@@ -338,6 +357,7 @@ public class QueryResultCard extends JPanel {
             chkTitle.setFont(chkTitle.getFont().deriveFont(Font.BOLD, 11.0f));
             chkTitle.setForeground(HUD_COLOR_ROLE_READOUT_LABEL);
             chkTitle.setBorder(new EmptyBorder(2, 4, 2, 4));
+            chkTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
             body.add(chkTitle);
 
             EngineerChecklistManager chkMgr = EngineerChecklistManager.getInstance();
@@ -347,6 +367,7 @@ public class QueryResultCard extends JPanel {
                 String inviteText = dir.localizedInvite(info, lang);
                 String baseText = getText("ai.queryResult.checklist.invite") + ": " + inviteText;
                 JCheckBox cb = createChecklistCheckBox(info.name(), EngineerChecklistManager.ITEM_INVITE, baseText, initChecked);
+                cb.setAlignmentX(Component.LEFT_ALIGNMENT);
                 body.add(cb);
             }
 
@@ -355,6 +376,7 @@ public class QueryResultCard extends JPanel {
                 String unlockText = dir.localizedUnlock(info, lang);
                 String baseText = getText("ai.queryResult.checklist.unlock") + ": " + unlockText;
                 JCheckBox cb = createChecklistCheckBox(info.name(), EngineerChecklistManager.ITEM_UNLOCK, baseText, initChecked);
+                cb.setAlignmentX(Component.LEFT_ALIGNMENT);
                 body.add(cb);
             }
 
@@ -363,6 +385,7 @@ public class QueryResultCard extends JPanel {
                 String refText = dir.formatReferral(info.referral(), lang);
                 String baseText = getText("ai.queryResult.checklist.referral") + ": " + refText;
                 JCheckBox cb = createChecklistCheckBox(info.name(), EngineerChecklistManager.ITEM_REFERRAL_TASK, baseText, initChecked);
+                cb.setAlignmentX(Component.LEFT_ALIGNMENT);
                 body.add(cb);
             }
         }
@@ -394,6 +417,7 @@ public class QueryResultCard extends JPanel {
     public static JCheckBox createChecklistCheckBox(String engineerName, String itemKey, String baseText, boolean initialChecked) {
         JCheckBox cb = new JCheckBox();
         cb.setOpaque(false);
+        cb.setAlignmentX(Component.LEFT_ALIGNMENT);
         cb.setFont(cb.getFont().deriveFont(11.0f));
         cb.setSelected(initialChecked);
         updateChecklistStyle(cb, baseText, initialChecked);
@@ -504,7 +528,7 @@ public class QueryResultCard extends JPanel {
 
         // Footer: Action Buttons
         if (!actionButtons.isEmpty()) {
-            JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 2));
+            JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
             btnPanel.setOpaque(false);
             btnPanel.setBorder(new EmptyBorder(2, 4, 4, 4));
             for (JButton btn : actionButtons) {
@@ -530,7 +554,7 @@ public class QueryResultCard extends JPanel {
         }
 
         if (!actionButtons.isEmpty()) {
-            JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 2));
+            JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
             btnPanel.setOpaque(false);
             btnPanel.setBorder(new EmptyBorder(2, 4, 4, 4));
             for (JButton btn : actionButtons) {

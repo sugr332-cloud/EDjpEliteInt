@@ -11,8 +11,10 @@ import elite.intel.diagnostics.*;
 import elite.intel.eventbus.GameEventBus;
 import elite.intel.gameapi.JournalPreScanner;
 import elite.intel.gameapi.SubscriberRegistration;
+import elite.intel.i18n.Language;
 import elite.intel.session.LoadSessionEvent;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.SystemSession;
 import elite.intel.ui.controller.AppController;
 import elite.intel.ui.screen.AppView;
 import elite.intel.ui.support.GameWindowActivator;
@@ -49,6 +51,7 @@ public class App {
         // init kry and db first!
         Cypher.initializeKey();
         Database.init();
+        initStartupLanguage();
         CustomCommandRegistry.getInstance().load();
         CommandRegistry.getInstance().load();
         QueryRegistry.getInstance().load();
@@ -105,6 +108,14 @@ public class App {
             new AppController();
             view.getUiComponent().setVisible(true);
         });
+    }
+
+    /**
+     * Initializes the app's language to Japanese at startup regardless of stored settings.
+     * Diagnostics mode may subsequently override this via {@link DiagnosticsMode#applyBootLanguage()}.
+     */
+    public static void initStartupLanguage() {
+        SystemSession.getInstance().setLanguage(Language.JA);
     }
 
     /**

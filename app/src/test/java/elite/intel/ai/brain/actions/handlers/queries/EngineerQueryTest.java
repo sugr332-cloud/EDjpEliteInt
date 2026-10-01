@@ -474,5 +474,14 @@ class EngineerQueryTest {
                 "Professor Palin", "Chloe Sedesi", "Mel Brandon"
         )));
     }
+
+    @Test
+    void abrasionBlasterResolvesToModuleNotEngineer() {
+        EngineerQuery query = createTestQuery();
+        JsonObject params = new JsonObject();
+        DataDto data = query.buildData(params, "研磨ブラスターのエンジニアは？");
+        assertEquals("module", data.type());
+        assertEquals("Abrasion Blaster", data.moduleName());
+    }
 }
 

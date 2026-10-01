@@ -157,7 +157,7 @@ class EngineerDirectoryTest {
         assertTrue(palin.isPresent());
         assertEquals("Professor Palin", palin.get().name());
 
-        // "Tod McQuinn", "The Blaster", "ブラスター" -> Tod 'The Blaster' McQuinn
+        // "Tod McQuinn", "The Blaster", "マックイン" -> Tod 'The Blaster' McQuinn
         Optional<EngineerDirectory.EngineerInfo> tod1 = directory.findMentionedIn("where is Tod McQuinn");
         assertTrue(tod1.isPresent());
         assertEquals("Tod 'The Blaster' McQuinn", tod1.get().name());
@@ -166,9 +166,12 @@ class EngineerDirectoryTest {
         assertTrue(tod2.isPresent());
         assertEquals("Tod 'The Blaster' McQuinn", tod2.get().name());
 
-        Optional<EngineerDirectory.EngineerInfo> tod3 = directory.findMentionedIn("ブラスターの開放条件");
+        Optional<EngineerDirectory.EngineerInfo> tod3 = directory.findMentionedIn("マックインの開放条件");
         assertTrue(tod3.isPresent());
         assertEquals("Tod 'The Blaster' McQuinn", tod3.get().name());
+
+        Optional<EngineerDirectory.EngineerInfo> tod4 = directory.findMentionedIn("研磨ブラスターのエンジニアは");
+        assertTrue(tod4.isEmpty(), "研磨ブラスター must not match any engineer");
     }
 
     @Test
@@ -232,5 +235,42 @@ class EngineerDirectoryTest {
         assertEquals("", directory.formatReferral("", Language.JA));
         assertEquals("", directory.formatReferralSpoken(null, Language.JA));
         assertEquals("", directory.formatReferralSpoken("", Language.JA));
+    }
+
+    @Test
+    void decorateNamesForDisplaySixCases() {
+        // 1. フェリシティ・ファーシーアが良いです → フェリシティ・ファーシーア（Felicity Farseer）が良いです
+        String input1 = "フェリシティ・ファーシーアが良いです";
+        String expected1 = "フェリシティ・ファーシーア（Felicity Farseer）が良いです";
+        assertEquals(expected1, directory.decorateNamesForDisplay(input1, Language.JA));
+
+        // 2. パリン教授とデッカー大佐 → 2人とも置き換わる
+        String input2 = "パリン教授とデッカー大佐";
+        String expected2 = "パリン教授（Professor Palin）とブリス・デッカー（Colonel Bris Dekker）";
+        assertEquals(expected2, directory.decorateNamesForDisplay(input2, Language.JA));
+
+        // 3. フェリシティ・ファーシーア（Felicity Farseer） → 変わらない（二重括弧化防止）
+        String input3 = "フェリシティ・ファーシーア（Felicity Farseer）";
+        assertEquals(input3, directory.decorateNamesForDisplay(input3, Language.JA));
+        String input3Half = "フェリシティ・ファーシーア(Felicity Farseer)";
+        assertEquals(input3Half, directory.decorateNamesForDisplay(input3Half, Language.JA));
+
+        // 4. 名前を含まない文 → 変わらない
+        String input4 = "燃料を補給してください";
+        assertEquals(input4, directory.decorateNamesForDisplay(input4, Language.JA));
+
+        // 5. 英語の画面 → 変わらない
+        String input5 = "Felicity Farseer is a ship engineer";
+        assertEquals(input5, directory.decorateNamesForDisplay(input5, Language.EN));
+        assertEquals("フェリシティ・ファーシーア", directory.decorateNamesForDisplay("フェリシティ・ファーシーア", Language.EN));
+
+        // 6. 読み上げ（spokenName）に影響しないこと
+        EngineerDirectory.EngineerInfo felicity = directory.findByName("Felicity Farseer").orElseThrow();
+        assertEquals("フェリシティ・ファーシーア", directory.spokenName(felicity, Language.JA),
+                "Spoken name for TTS must remain Katakana only without English name");
+
+        // 7. 研磨ブラスターを改造できます → 変わらないこと
+        String input7 = "研磨ブラスターを改造できます";
+        assertEquals(input7, directory.decorateNamesForDisplay(input7, Language.JA));
     }
 }

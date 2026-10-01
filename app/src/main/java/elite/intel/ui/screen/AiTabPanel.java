@@ -9,6 +9,8 @@ import elite.intel.ai.ears.MicDiagnosticsReport;
 import elite.intel.eventbus.GameEventBus;
 import elite.intel.eventbus.UiBus;
 import elite.intel.gameapi.UserInputEvent;
+import elite.intel.gameapi.engineers.EngineerDirectory;
+import elite.intel.i18n.Language;
 import elite.intel.session.PlayerSession;
 import elite.intel.session.SystemSession;
 import elite.intel.ui.dialog.AudioInterfaceDialog;
@@ -543,13 +545,19 @@ public class AiTabPanel extends JPanel {
     }
 
     public void addUserMessage(String text) {
-        SwingUtilities.invokeLater(() ->
-                chatPanel.addMessage(text, HudLogArea.Style.USER_INPUT, HudLogArea.Align.LEFT));
+        SwingUtilities.invokeLater(() -> {
+            Language lang = SystemSession.getInstance().getLanguage();
+            String decorated = EngineerDirectory.getInstance().decorateNamesForDisplay(text, lang);
+            chatPanel.addMessage(decorated, HudLogArea.Style.USER_INPUT, HudLogArea.Align.LEFT);
+        });
     }
 
     public void addAiMessage(String text) {
-        SwingUtilities.invokeLater(() ->
-                chatPanel.addMessage(text, HudLogArea.Style.AI_RESPONSE, HudLogArea.Align.RIGHT));
+        SwingUtilities.invokeLater(() -> {
+            Language lang = SystemSession.getInstance().getLanguage();
+            String decorated = EngineerDirectory.getInstance().decorateNamesForDisplay(text, lang);
+            chatPanel.addMessage(decorated, HudLogArea.Style.AI_RESPONSE, HudLogArea.Align.RIGHT);
+        });
     }
 
     /** Renders a structured SYSTEM_LOG entry; the panel shows local {@code HH:mm:ss}, the export uses UTC. */
