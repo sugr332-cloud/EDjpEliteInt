@@ -5,17 +5,22 @@ import elite.intel.ai.brain.actions.handlers.queries.EngineerQuery.DataDto;
 import elite.intel.ai.brain.actions.handlers.queries.EngineerQuery.ModuleEngineerDto;
 import elite.intel.db.dao.LocationDao;
 import elite.intel.db.managers.EngineerProgressManager;
+import elite.intel.db.managers.QueryResultDisplayManager;
+import elite.intel.db.managers.QueryResultDisplayManager.EngineersDisplayDto;
+import elite.intel.db.managers.QueryResultDisplayManager.LatestDisplay;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class EngineerQueryTest {
 
     private final EngineerProgressManager progressManager = EngineerProgressManager.getInstance();
+    private final QueryResultDisplayManager displayManager = QueryResultDisplayManager.getInstance();
 
     // Mock coordinates near Sol (0, 0, 0)
     private final LocationDao.Coordinates mockSol = new LocationDao.Coordinates("Sol", 0.0, 0.0, 0.0);
@@ -23,11 +28,13 @@ class EngineerQueryTest {
     @BeforeEach
     void setUp() {
         progressManager.clear();
+        displayManager.clearAll();
     }
 
     @AfterEach
     void tearDown() {
         progressManager.clear();
+        displayManager.clearAll();
     }
 
     @Test
@@ -147,5 +154,104 @@ class EngineerQueryTest {
         DataDto data = query.buildData(params, "エンジニアの一覧を教えて");
         assertEquals("unknown_module", data.type(), "unknown_module must take precedence over progress listing");
         assertEquals("NonExistentSuperWeapon", data.rawModule());
+    }
+
+    private EngineerQuery createTestQuery() {
+        return new EngineerQuery(() -> mockSol) {
+            @Override
+            protected JsonObject process(elite.intel.ai.brain.actions.handlers.queries.struct.AiData struct, String userInput) {
+                JsonObject res = new JsonObject();
+                res.addProperty("text_to_speech_response", "mock_response");
+                return res;
+            }
+        };
+    }
+
+    @Test
+    void cardEngineersDisplaySavedForModule() throws Exception {
+        EngineerQuery query = createTestQuery();
+        JsonObject params = new JsonObject();
+        params.addProperty("module", "Frame Shift Drive");
+
+        query.handle("query_engineer", params, "FSDのエンジニアは？");
+
+        Optional<LatestDisplay> latestOpt = displayManager.getLatest();
+        assertTrue(latestOpt.isPresent());
+        assertTrue(latestOpt.get().isEngineers());
+
+        EngineersDisplayDto dto = latestOpt.get().engineers();
+        assertEquals("module", dto.queryKind());
+        assertEquals("Frame Shift Drive", dto.moduleName());
+        assertNotNull(dto.engineerNames());
+        assertTrue(dto.engineerNames().size() <= 5);
+        assertTrue(dto.engineerNames().contains("Felicity Farseer"));
+        assertTrue(dto.engineerNames().contains("Elvira Martuuk"));
+    }
+
+    @Test
+    void cardEngineersDisplaySavedForSingleEngineer() throws Exception {
+        EngineerQuery query = createTestQuery();
+        JsonObject params = new JsonObject();
+
+        query.handle("query_engineer", params, "フェリシティ・ファーシーアはどこ？");
+
+        Optional<LatestDisplay> latestOpt = displayManager.getLatest();
+        assertTrue(latestOpt.isPresent());
+        assertTrue(latestOpt.get().isEngineers());
+
+        EngineersDisplayDto dto = latestOpt.get().engineers();
+        assertEquals("engineer", dto.queryKind());
+        assertNull(dto.moduleName());
+        assertEquals(List.of("Felicity Farseer"), dto.engineerNames());
+    }
+
+    @Test
+    void cardEngineersDisplaySavedForProgressWithCorrectOrdering() throws Exception {
+        // Register engineers with various progress statuses
+        progressManager.recordProgress("Zacariah Nemo", null, "Barred", null, null, "2026-10-01T10:00:00Z");
+        progressManager.recordProgress("Bill Turner", null, "Known", null, null, "2026-10-01T10:00:00Z");
+        progressManager.recordProgress("Chloe Sedesi", null, "Invited", null, null, "2026-10-01T10:00:00Z");
+        progressManager.recordProgress("Didi Vatermann", null, "Acquainted", null, null, "2026-10-01T10:00:00Z");
+        progressManager.recordProgress("Felicity Farseer", null, "Unlocked", 5, 0, "2026-10-01T10:00:00Z");
+        progressManager.recordProgress("Elvira Martuuk", null, "Unlocked", 3, 0, "2026-10-01T10:00:00Z");
+
+        EngineerQuery query = createTestQuery();
+        query.handle("query_engineer", new JsonObject(), "エンジニアの進捗は？");
+
+        Optional<LatestDisplay> latestOpt = displayManager.getLatest();
+        assertTrue(latestOpt.isPresent());
+        EngineersDisplayDto dto = latestOpt.get().engineers();
+        assertEquals("progress", dto.queryKind());
+
+        List<String> names = dto.engineerNames();
+        // Ordering: Unlocked (Elvira, Felicity) -> Acquainted (Didi) -> Invited (Chloe) -> Known (Bill) -> Barred (Zacariah)
+        assertEquals("Elvira Martuuk", names.get(0));
+        assertEquals("Felicity Farseer", names.get(1));
+        assertEquals("Didi Vatermann", names.get(2));
+        assertEquals("Chloe Sedesi", names.get(3));
+        assertEquals("Bill Turner", names.get(4));
+        assertEquals("Zacariah Nemo", names.get(5));
+    }
+
+    @Test
+    void unknownModuleDoesNotOverwriteExistingDisplay() throws Exception {
+        // 1. First display Felicity Farseer
+        EngineerQuery query = createTestQuery();
+        query.handle("query_engineer", new JsonObject(), "フェリシティ・ファーシーアはどこ？");
+
+        Optional<LatestDisplay> beforeOpt = displayManager.getLatest();
+        assertTrue(beforeOpt.isPresent());
+        assertEquals("engineer", beforeOpt.get().engineers().queryKind());
+
+        // 2. Query unknown module
+        JsonObject params = new JsonObject();
+        params.addProperty("module", "NonExistentUnknownModuleXYZ");
+        query.handle("query_engineer", params, "未知のモジュール");
+
+        // 3. Display must NOT be overwritten
+        Optional<LatestDisplay> afterOpt = displayManager.getLatest();
+        assertTrue(afterOpt.isPresent());
+        assertEquals("engineer", afterOpt.get().engineers().queryKind());
+        assertEquals(List.of("Felicity Farseer"), afterOpt.get().engineers().engineerNames());
     }
 }
