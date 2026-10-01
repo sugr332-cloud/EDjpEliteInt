@@ -39,7 +39,7 @@ public final class RefuelStationSearch {
     /**
      * Comfortably above any station's pad count; each pad range is really "one or more".
      */
-    private static final int PADS_MANY = 100;
+    static final int PADS_MANY = 100;
 
     /**
      * Human space is roughly this wide around Sol, so a last sweep this far covers every fixed station there
@@ -52,13 +52,13 @@ public final class RefuelStationSearch {
      * burns no fuel, so this is a limit on the commander's evening rather than on their tank - but a station
      * a quarter of a million light seconds out is half an hour of flying, and there is always another.
      */
-    private static final int MAX_ARRIVAL_LS = 25_000;
+    static final int MAX_ARRIVAL_LS = 25_000;
 
     /**
      * Stations to weigh per request. Each Spansh station result carries the station's entire market whether
      * we asked for it or not (~65 KB apiece), so this is a page size paid for in megabytes.
      */
-    private static final int CANDIDATES = 15;
+    static final int CANDIDATES = 15;
 
     private static final Logger log = LogManager.getLogger(RefuelStationSearch.class);
 
@@ -162,7 +162,7 @@ public final class RefuelStationSearch {
      * "At least one pad of this size", the only pad constraint any of these searches has a use for. Spansh
      * exposes no boolean, so it is written as a range nothing can exceed.
      */
-    private static TradeStationSearchCriteria.RangeFilter atLeastOnePad() {
+    static TradeStationSearchCriteria.RangeFilter atLeastOnePad() {
         return new TradeStationSearchCriteria.RangeFilter(1, PADS_MANY);
     }
 
@@ -237,7 +237,7 @@ public final class RefuelStationSearch {
      * A missing pad count reads as no pads of that size. Spansh sends all three for every station; a row
      * that somehow arrives without them is not one to send a commander short of fuel to.
      */
-    private static int count(Integer pads) {
+    static int count(Integer pads) {
         return pads == null ? 0 : pads;
     }
 
@@ -245,7 +245,7 @@ public final class RefuelStationSearch {
      * Spansh's station id, falling back to the name pair when a row has none - the merge only needs to
      * recognise the same station twice, and two stations never share both a name and a system.
      */
-    private static String identity(TradeStationSearchResultDto.StationResult station) {
+    static String identity(TradeStationSearchResultDto.StationResult station) {
         return station.getId() != null ? station.getId() : station.getSystemName() + "|" + station.getName();
     }
 }
