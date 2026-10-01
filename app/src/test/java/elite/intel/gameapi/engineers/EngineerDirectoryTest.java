@@ -188,7 +188,8 @@ class EngineerDirectoryTest {
     @Test
     void specialtyNamesJaLoadedCorrectly() {
         assertEquals(72, directory.getSpecialtyNamesJa().size(), "specialtyNamesJa must contain exactly 72 mappings");
-        assertEquals("フレームシフトドライブ（FSD）", directory.localizedSpecialtyName("Frame Shift Drive", Language.JA));
+        assertEquals("フレームシフトドライブ", directory.localizedSpecialtyName("Frame Shift Drive", Language.JA));
+        assertEquals("研磨ブラスター", directory.localizedSpecialtyName("Abrasion Blaster", Language.JA));
         assertEquals("Frame Shift Drive", directory.localizedSpecialtyName("Frame Shift Drive", Language.EN));
         assertEquals("射程の延長", directory.localizedSpecialtyName("Greater range", Language.JA));
         assertEquals("Greater range", directory.localizedSpecialtyName("Greater range", Language.EN));
@@ -272,5 +273,15 @@ class EngineerDirectoryTest {
         // 7. 研磨ブラスターを改造できます → 変わらないこと
         String input7 = "研磨ブラスターを改造できます";
         assertEquals(input7, directory.decorateNamesForDisplay(input7, Language.JA));
+    }
+
+    @Test
+    void displaySpecialtyNameShowsJapaneseWithEnglishInJaAndEnglishOtherwise() {
+        assertEquals("研磨ブラスター（Abrasion Blaster）", directory.displaySpecialtyName("Abrasion Blaster", Language.JA));
+        assertEquals("射程の延長（Greater range）", directory.displaySpecialtyName("Greater range", Language.JA));
+        assertEquals("フレームシフトドライブ（Frame Shift Drive）", directory.displaySpecialtyName("Frame Shift Drive", Language.JA));
+        assertEquals("Abrasion Blaster", directory.displaySpecialtyName("Abrasion Blaster", Language.EN));
+        assertEquals("No Such Specialty", directory.displaySpecialtyName("No Such Specialty", Language.JA));
+        assertEquals("", directory.displaySpecialtyName(null, Language.JA));
     }
 }

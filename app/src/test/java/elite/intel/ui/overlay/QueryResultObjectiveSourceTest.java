@@ -182,7 +182,7 @@ class QueryResultObjectiveSourceTest {
             session.setLanguage(Language.JA);
             QueryResultObjectiveSource sourceJa = new QueryResultObjectiveSource(() -> Optional.of(display), () -> now);
             HudObjective objectiveJa = sourceJa.currentObjective().orElseThrow();
-            assertEquals("フレームシフトドライブ（FSD）", objectiveJa.rows().get(0).value());
+            assertEquals("フレームシフトドライブ（Frame Shift Drive）", objectiveJa.rows().get(0).value());
             assertTrue(objectiveJa.rows().get(1).value().contains("フェリシティ・ファーシーア（Felicity Farseer）"));
             assertTrue(objectiveJa.rows().get(1).value().contains("G5"));
             assertTrue(objectiveJa.rows().get(1).value().contains("開放済み ランク 5"));
