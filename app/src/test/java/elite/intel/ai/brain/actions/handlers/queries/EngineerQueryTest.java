@@ -382,4 +382,49 @@ class EngineerQueryTest {
         assertEquals("engineer", afterOpt.get().engineers().queryKind());
         assertEquals(List.of("Felicity Farseer"), afterOpt.get().engineers().engineerNames());
     }
+
+    @Test
+    void tpPhraseEngineersListAndEfficacyReturnsAll38DirectoryCards() throws Exception {
+        EngineerQuery query = createTestQuery();
+        JsonObject params = new JsonObject();
+
+        DataDto data = query.buildData(params, "エンジニアの一覧と効能を教えて");
+        assertEquals("directory", data.type());
+        assertEquals("all", data.directoryFilter());
+        assertEquals(38, data.totalCount());
+
+        query.handle("query_engineer", params, "エンジニアの一覧と効能を教えて");
+        Optional<LatestDisplay> latestOpt = displayManager.getLatest();
+        assertTrue(latestOpt.isPresent());
+        EngineersDisplayDto dto = latestOpt.get().engineers();
+        assertEquals("directory", dto.queryKind());
+        assertNotNull(dto.engineerNames());
+        assertEquals(38, dto.engineerNames().size(), "Must contain all 38 engineers on directory card");
+    }
+
+    @Test
+    void tpPhraseFsdRelatedEngineersResolvesModuleFromUtteranceAndDisplaysSixCards() throws Exception {
+        EngineerQuery query = createTestQuery();
+        JsonObject params = new JsonObject();
+
+        DataDto data = query.buildData(params, "FSD に関係するエンジニアは誰が居る？");
+        assertEquals("module", data.type());
+        assertEquals("Frame Shift Drive", data.moduleName());
+        assertNotNull(data.moduleEngineers());
+        assertTrue(data.moduleEngineers().size() <= 5, "Voice data must be capped at 5 or fewer");
+
+        query.handle("query_engineer", params, "FSD に関係するエンジニアは誰が居る？");
+        Optional<LatestDisplay> latestOpt = displayManager.getLatest();
+        assertTrue(latestOpt.isPresent());
+        EngineersDisplayDto dto = latestOpt.get().engineers();
+        assertEquals("module", dto.queryKind());
+        assertEquals("Frame Shift Drive", dto.moduleName());
+        assertNotNull(dto.engineerNames());
+        assertEquals(6, dto.engineerNames().size(), "FSD module card must contain all 6 engineers");
+        assertTrue(dto.engineerNames().containsAll(List.of(
+                "Felicity Farseer", "Elvira Martuuk", "Colonel Bris Dekker",
+                "Professor Palin", "Chloe Sedesi", "Mel Brandon"
+        )));
+    }
 }
+
