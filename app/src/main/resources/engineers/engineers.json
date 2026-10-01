@@ -11,7 +11,81 @@
       "ED Odyssey Materials Helper locale CSV (on-foot requirement text cross-check): https://github.com/jixxed/ed-odyssey-materials-helper"
     ],
     "matching": "Match journal EngineerProgress entries by engineer name (case-insensitive). EngineerID is not stored here.",
-    "notes": "Where sources disagreed, the value used and the alternative are written in each entry's notes. Regenerate after game updates that move or add engineers. namesJa: Japanese katakana spellings for voice matching (no official Japanese client; Claude-written, several variants per name; not from the sources above)."
+    "notes": "Where sources disagreed, the value used and the alternative are written in each entry's notes. Regenerate after game updates that move or add engineers. namesJa: Japanese katakana spellings for voice matching (no official Japanese client; Claude-written, several variants per name; not from the sources above). inviteJa/unlockJa and specialtyNamesJa: Japanese translations written by Claude from the English text above (commodity, faction and rank names keep the in-game English in parentheses)."
+  },
+  "specialtyNamesJa": {
+    "Abrasion Blaster": "研磨ブラスター",
+    "Armour": "装甲（バルクヘッド）",
+    "Auto Field-Maintenance Unit": "自動フィールドメンテナンスユニット",
+    "Beam Laser": "ビームレーザー",
+    "Burst Laser": "バーストレーザー",
+    "Cannon": "キャノン",
+    "Cargo Rack": "カーゴラック",
+    "Chaff Launcher": "チャフランチャー",
+    "Collector Limpet Controller": "コレクターリムペットコントローラー",
+    "Detailed Surface Scanner": "詳細地表スキャナー",
+    "Electronic Countermeasure": "電子対抗装置（ECM）",
+    "Enzyme Missile Rack": "酵素ミサイルラック",
+    "Fragment Cannon": "フラグメントキャノン",
+    "Frame Shift Drive": "フレームシフトドライブ（FSD）",
+    "Frame Shift Drive Interdictor": "FSD インターディクター",
+    "Frame Shift Wake Scanner": "FSD ウェイクスキャナー",
+    "Fuel Scoop": "燃料スクープ",
+    "Fuel Transfer Limpet Controller": "燃料移送リムペットコントローラー",
+    "Guardian Gauss Cannon": "ガーディアン・ガウスキャノン",
+    "Guardian Plasma Charger": "ガーディアン・プラズマチャージャー",
+    "Guardian Shard Cannon": "ガーディアン・シャードキャノン",
+    "Hatch Breaker Limpet Controller": "ハッチブレーカーリムペットコントローラー",
+    "Heat Sink Launcher": "ヒートシンクランチャー",
+    "Hull Reinforcement Package": "船体補強パッケージ",
+    "Kill Warrant Scanner": "キルウォラントスキャナー",
+    "Life Support": "生命維持装置",
+    "Manifest Scanner": "マニフェストスキャナー（カーゴスキャナー）",
+    "Mine Launcher": "機雷ランチャー",
+    "Mining Laser": "採掘レーザー",
+    "Missile Rack": "ミサイルラック",
+    "Module Reinforcement Package": "モジュール補強パッケージ",
+    "Multi-cannon": "マルチキャノン",
+    "Plasma Accelerator": "プラズマアクセラレーター",
+    "Point Defence": "ポイントディフェンス",
+    "Power Distributor": "パワーディストリビューター",
+    "Power Plant": "パワープラント",
+    "Prospector Limpet Controller": "プロスペクターリムペットコントローラー",
+    "Pulse Laser": "パルスレーザー",
+    "Rail Gun": "レールガン",
+    "Refinery": "精製装置",
+    "Seeker Missile Rack": "シーカーミサイルラック",
+    "Sensors": "センサー",
+    "Shield Booster": "シールドブースター",
+    "Shield Cell Bank": "シールドセルバンク",
+    "Shield Generator": "シールドジェネレーター",
+    "Thrusters": "スラスター",
+    "Torpedo Pylon": "魚雷パイロン",
+    "Added melee damage": "近接攻撃のダメージ増加",
+    "Audio masking": "音響マスキング",
+    "Combat movement speed": "戦闘時の移動速度",
+    "Damage resistance": "ダメージ耐性",
+    "Enhanced tracking": "追尾性能の強化",
+    "Extra ammo capacity": "予備弾薬の増加",
+    "Extra backpack capacity": "バックパック容量の増加",
+    "Faster handling": "取り回しの高速化",
+    "Faster shield regen": "シールド回復の高速化",
+    "Greater range": "射程の延長",
+    "Headshot damage": "ヘッドショットのダメージ増加",
+    "Improved battery capacity": "バッテリー容量の増加",
+    "Improved hip fire accuracy": "腰だめ射撃の精度向上",
+    "Improved jump assist": "ジャンプアシストの強化",
+    "Increased air reserves": "空気の予備量の増加",
+    "Increased sprint duration": "全力疾走の持続時間の延長",
+    "Magazine size": "マガジン容量の増加",
+    "Night vision": "暗視",
+    "Noise suppressor": "サプレッサー（消音）",
+    "Quieter footsteps": "足音の低減",
+    "Reduced tool battery consumption": "ツールのバッテリー消費の低減",
+    "Reload speed": "リロード速度",
+    "Scope": "スコープ",
+    "Stability": "安定性",
+    "Stowed reloading": "収納時のリロード"
   },
   "engineers": [
     {
@@ -26,7 +100,9 @@
       "base": "Farseer Inc",
       "body": "Deciat 6 A",
       "invite": "Gain exploration rank Scout or higher",
+      "inviteJa": "探査ランク「スカウト（Scout）」以上になる",
       "unlock": "Provide 1 unit of Meta-Alloys",
+      "unlockJa": "メタアロイ（Meta-Alloys）を 1 個納める",
       "referral": null,
       "specialties": [
         {
@@ -86,7 +162,9 @@
       "base": "Long Sight Base",
       "body": "Khun 5",
       "invite": "Attain a maximum distance from your career start location of at least 300 light years",
+      "inviteJa": "キャリアの開始地点から 300 光年以上離れた場所まで行く",
       "unlock": "Provide 3 units of Soontill Relics",
+      "unlockJa": "スーンティル・レリック（Soontill Relics）を 3 個納める",
       "referral": null,
       "specialties": [
         {
@@ -133,7 +211,9 @@
       "base": "Black Hide",
       "body": "Wyrd A 2",
       "invite": "Deal with at least 5 black markets",
+      "inviteJa": "ブラックマーケットで 5 回以上取引する",
       "unlock": "Pay 500,000 credits",
+      "unlockJa": "500,000 クレジットを支払う",
       "referral": null,
       "specialties": [
         {
@@ -181,7 +261,9 @@
       "base": "Trophy Camp",
       "body": "Trus Madi",
       "invite": "Earn more than 15 bounty vouchers",
+      "inviteJa": "バウンティバウチャー（賞金の報酬券）を 15 枚より多く獲得する",
       "unlock": "Provide 100,000 credits worth of bounty vouchers",
+      "unlockJa": "100,000 クレジット分のバウンティバウチャーを納める",
       "referral": null,
       "specialties": [
         {
@@ -226,7 +308,9 @@
       "base": "Demolition Unlimited",
       "body": "Makalu",
       "invite": "Gain Cordial or Friendly status with Eurybia Blue Mafia",
+      "inviteJa": "Eurybia Blue Mafia との関係を「Cordial」または「Friendly」にする",
       "unlock": "Provide 200 units of Landmines",
+      "unlockJa": "地雷（Landmines）を 200 個納める",
       "referral": null,
       "specialties": [
         {
@@ -293,7 +377,9 @@
       "base": "Pater's Memorial",
       "body": "Giryak 2 A",
       "invite": "Earn more than 50 combat bonds (INARA: federal combat bonds)",
+      "inviteJa": "戦闘債券（コンバットボンド）を 50 枚より多く獲得する（INARA では連邦の戦闘債券）",
       "unlock": "Provide 100,000 or 1,000,000 credits worth of combat bonds",
+      "unlockJa": "100,000 または 1,000,000 クレジット分の戦闘債券を納める",
       "referral": "Felicity Farseer",
       "specialties": [
         {
@@ -372,7 +458,9 @@
       "base": "Prospector's Rest",
       "body": "Kuk B 3",
       "invite": "Mine at least 500 tons of ore",
+      "inviteJa": "鉱石を 500 トン以上採掘する",
       "unlock": "Provide 10 units of Painite",
+      "unlockJa": "ペイナイト（Painite）を 10 個納める",
       "referral": "Tod 'The Blaster' McQuinn",
       "specialties": [
         {
@@ -413,7 +501,9 @@
       "base": "The Jet's Hole",
       "body": "Kuwemaki A 3 A",
       "invite": "Gain rank Outsider or higher with the Empire (Imperial Navy)",
+      "inviteJa": "帝国海軍ランク「アウトサイダー（Outsider）」以上になる",
       "unlock": "Provide 50 units of Kamitra Cigars",
+      "unlockJa": "カミトラ・シガー（Kamitra Cigars）を 50 個納める",
       "referral": "Liz Ryder",
       "specialties": [
         {
@@ -460,7 +550,9 @@
       "base": "Trader's Rest",
       "body": "Laksak A 1",
       "invite": "Trade in at least 50 markets",
+      "inviteJa": "50 か所以上の市場で取引する",
       "unlock": "Provide 200 units of Gold",
+      "unlockJa": "金（Gold）を 200 個納める",
       "referral": "The Dweller",
       "specialties": [
         {
@@ -507,7 +599,9 @@
       "base": "Qwent Research Base",
       "body": "Lucifer",
       "invite": "Gain invitation from Sirius Corporation",
+      "inviteJa": "Sirius Corporation から招待を受ける",
       "unlock": "Provide 25 units of Modular Terminals",
+      "unlockJa": "モジュラー・ターミナル（Modular Terminals）を 25 個納める",
       "referral": "Elvira Martuuk",
       "specialties": [
         {
@@ -546,7 +640,9 @@
       "base": "Nemo Cyber Party Base",
       "body": "Yoru 4",
       "invite": "Gain invitation from Party of Yoru",
+      "inviteJa": "Party of Yoru から招待を受ける",
       "unlock": "Provide 25 units of Xihe Biomorphic Companions",
+      "unlockJa": "シーヘ・バイオモーフィック・コンパニオン（Xihe Biomorphic Companions）を 25 個納める",
       "referral": "Elvira Martuuk",
       "specialties": [
         {
@@ -588,7 +684,9 @@
       "base": "The Beach",
       "body": "Beta-3 Tucani 2 B A",
       "invite": "Gain rank Midshipman or higher with the Federal Navy",
+      "inviteJa": "連邦海軍ランク「ミッドシップマン（Midshipman）」以上になる",
       "unlock": "Provide 50 units of Aberrant Shield Pattern Analysis",
+      "unlockJa": "異常シールドパターン解析（Aberrant Shield Pattern Analysis）を 50 個納める",
       "referral": "Juri Ishmaak",
       "specialties": [
         {
@@ -643,7 +741,9 @@
       "base": "Dekker's Yard",
       "body": "Iapetus",
       "invite": "Friendly with the Federation",
+      "inviteJa": "連邦との関係を「Friendly」にする",
       "unlock": "Provide 1,000,000 or 10,000,000 credits worth of federal combat bonds",
+      "unlockJa": "1,000,000 または 10,000,000 クレジット分の連邦の戦闘債券を納める",
       "referral": "Juri Ishmaak",
       "specialties": [
         {
@@ -683,7 +783,9 @@
       "base": "Vatermann LLC",
       "body": "Leesti 1 A",
       "invite": "Gain trade rank Merchant or higher",
+      "inviteJa": "交易ランク「マーチャント（Merchant）」以上になる",
       "unlock": "Provide 50 units of Lavian Brandy",
+      "unlockJa": "ラヴィアン・ブランデー（Lavian Brandy）を 50 個納める",
       "referral": "Selene Jean",
       "specialties": [
         {
@@ -720,7 +822,9 @@
       "base": "Turner Metallics Inc",
       "body": "Alioth 4 A",
       "invite": "Gain Friendly status with the Alliance (plus Allied with Alioth Independents for the Alioth permit)",
+      "inviteJa": "同盟（Alliance）との関係を「Friendly」にする（Alioth の許可証には Alioth Independents と「Allied」になることも必要）",
       "unlock": "Provide 50 units of Bromellite",
+      "unlockJa": "ブロメライト（Bromellite）を 50 個納める",
       "referral": "Selene Jean",
       "specialties": [
         {
@@ -795,7 +899,9 @@
       "base": "Broo's Legacy",
       "body": "Muang 5 A",
       "invite": "Gain combat rank Competent or higher",
+      "inviteJa": "戦闘ランク「コンピテント（Competent）」以上になる",
       "unlock": "Provide 50 units of Fujin Tea",
+      "unlockJa": "風神茶（Fujin Tea）を 50 個納める",
       "referral": "Hera Tani",
       "specialties": [
         {
@@ -836,7 +942,9 @@
       "base": "Fortune's Loss",
       "body": "Achenar 4 A",
       "invite": "Friendly with the Empire",
+      "inviteJa": "帝国との関係を「Friendly」にする",
       "unlock": "Provide 50 units of Decoded Emission Data",
+      "unlockJa": "解読済み放射データ（Decoded Emission Data）を 50 個納める",
       "referral": "Hera Tani",
       "specialties": [
         {
@@ -909,7 +1017,9 @@
       "base": "Phoenix Base",
       "body": "Meene AB 5 D",
       "invite": "Gain exploration rank Surveyor or higher",
+      "inviteJa": "探査ランク「サーベイヤー（Surveyor）」以上になる",
       "unlock": "Provide 50 units of Classified Scan Databanks",
+      "unlockJa": "機密スキャンデータバンク（Classified Scan Databanks）を 50 個納める",
       "referral": "Lei Cheung",
       "specialties": [
         {
@@ -988,7 +1098,9 @@
       "base": "Abel Laboratory",
       "body": "Arque 4 E",
       "invite": "Attain a maximum distance from your career start location of at least 5,000 light years",
+      "inviteJa": "キャリアの開始地点から 5,000 光年以上離れた場所まで行く",
       "unlock": "Provide 25 units of Sensor Fragments",
+      "unlockJa": "センサーの破片（Sensor Fragments）を 25 個納める",
       "referral": "Marco Qwent",
       "specialties": [
         {
@@ -1028,7 +1140,9 @@
       "base": "Jameson Base",
       "body": "Shinrarta Dezhra A 1",
       "invite": "Gain combat rank Dangerous or higher",
+      "inviteJa": "戦闘ランク「デンジャラス（Dangerous）」以上になる",
       "unlock": "Provide 25 units of Kongga Ale",
+      "unlockJa": "コンガ・エール（Kongga Ale）を 25 個納める",
       "referral": "Marco Qwent",
       "specialties": [
         {
@@ -1097,7 +1211,9 @@
       "base": "Cinder Dock",
       "body": "Shenve A 6",
       "invite": "Attain a maximum distance from your career start location of at least 5,000 light years",
+      "inviteJa": "キャリアの開始地点から 5,000 光年以上離れた場所まで行く",
       "unlock": "Provide 25 units of Sensor Fragments",
+      "unlockJa": "センサーの破片（Sensor Fragments）を 25 個納める",
       "referral": "Marco Qwent",
       "specialties": [
         {
@@ -1136,7 +1252,9 @@
       "base": "Sanctuary",
       "body": "Asura 1 A",
       "invite": "Gain combat rank Expert or higher",
+      "inviteJa": "戦闘ランク「エキスパート（Expert）」以上になる",
       "unlock": "Provide 200 units of Progenitor Cells",
+      "unlockJa": "始祖細胞（Progenitor Cells）を 200 個納める",
       "referral": "Tod 'The Blaster' McQuinn",
       "specialties": [
         {
@@ -1213,7 +1331,9 @@
       "base": "The Brig",
       "body": "Luchtaine A 1 C",
       "invite": "Gain invitation from Colonia Council",
+      "inviteJa": "Colonia Council から招待を受ける",
       "unlock": "Provide 100,000 credits worth of bounty vouchers",
+      "unlockJa": "100,000 クレジット分のバウンティバウチャーを納める",
       "referral": "Elvira Martuuk",
       "specialties": [
         {
@@ -1280,7 +1400,9 @@
       "base": "Kraken's Retreat",
       "body": "Los A 2 B",
       "invite": "Gain trade rank Dealer or higher",
+      "inviteJa": "交易ランク「ディーラー（Dealer）」以上になる",
       "unlock": "Provide 25 units of Occupied Escape Pods",
+      "unlockJa": "乗員入り脱出ポッド（Occupied Escape Pods）を 25 個納める",
       "referral": "Liz Ryder",
       "specialties": [
         {
@@ -1349,7 +1471,9 @@
       "base": "The Watchtower",
       "body": "Tir A 2",
       "invite": "Gain exploration rank Surveyor or higher",
+      "inviteJa": "探査ランク「サーベイヤー（Surveyor）」以上になる",
       "unlock": "Mine 10 units of Osmium (self-mined) and deliver",
+      "unlockJa": "自分で採掘したオスミウム（Osmium）を 10 個納める",
       "referral": "The Dweller",
       "specialties": [
         {
@@ -1414,7 +1538,9 @@
       "base": "The Jackrabbit",
       "body": "Orishis 4",
       "invite": "Travel at least 100 light years in Apex Interstellar shuttles",
+      "inviteJa": "Apex Interstellar のシャトルで合計 100 光年以上移動する",
       "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "unlockJa": "納品は不要（招待の条件を満たすと利用できる）",
       "referral": null,
       "specialties": [
         "Greater range",
@@ -1448,7 +1574,9 @@
       "base": "Nevermore Terrace",
       "body": "Siris 5 C",
       "invite": "Complete 10 surface (on-foot) conflict zones (EDOMH: 'low threat Conflict Zones')",
+      "inviteJa": "地上（徒歩）の紛争地帯を 10 回クリアする（EDOMH では「低脅威の紛争地帯」）",
       "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "unlockJa": "納品は不要（招待の条件を満たすと利用できる）",
       "referral": null,
       "specialties": [
         "Faster handling",
@@ -1483,7 +1611,9 @@
       "base": "Marshall's Drift",
       "body": "Aurai 1 A",
       "invite": "Complete 10 Restore or Reactivation on-foot missions",
+      "inviteJa": "徒歩の「Restore」または「Reactivation」ミッションを合計 10 回完了する",
       "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "unlockJa": "納品は不要（招待の条件を満たすと利用できる）",
       "referral": null,
       "specialties": [
         "Reload speed",
@@ -1516,7 +1646,9 @@
       "base": "The Last Call",
       "body": "Capoya 2",
       "invite": "Sell 5 Opinion Polls to bartenders",
+      "inviteJa": "世論調査（Opinion Polls）をバーテンダーに 5 個売る",
       "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "unlockJa": "納品は不要（招待の条件を満たすと利用できる）",
       "referral": "Domino Green",
       "specialties": [
         "Stowed reloading",
@@ -1550,7 +1682,9 @@
       "base": "Rascal's Choice",
       "body": "Shou Xing 1",
       "invite": "Complete 6 Covert Heist and/or Covert Theft on-foot missions",
+      "inviteJa": "徒歩の「Covert Heist」または「Covert Theft」ミッションを合計 6 回完了する",
       "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "unlockJa": "納品は不要（招待の条件を満たすと利用できる）",
       "referral": "Jude Navarro",
       "specialties": [
         "Improved hip fire accuracy",
@@ -1583,7 +1717,9 @@
       "base": "Beck Facility",
       "body": "Jolapa 6 A",
       "invite": "Sell a total of 15 Multimedia Entertainment, Classic Entertainment and/or Cat Media to bartenders",
+      "inviteJa": "マルチメディア娯楽（Multimedia Entertainment）、クラシック娯楽（Classic Entertainment）、猫メディア（Cat Media）を合計 15 個バーテンダーに売る",
       "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "unlockJa": "納品は不要（招待の条件を満たすと利用できる）",
       "referral": "Hero Ferrari",
       "specialties": [
         "Greater range",
@@ -1617,7 +1753,9 @@
       "base": "Ankh's Promise",
       "body": "Candiaei 9 C",
       "invite": "Sell a total of 20 Biological Sample, Employee Genetic Data and/or Genetic Research to bartenders",
+      "inviteJa": "生体サンプル（Biological Sample）、従業員の遺伝子データ（Employee Genetic Data）、遺伝子研究（Genetic Research）を合計 20 個バーテンダーに売る",
       "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "unlockJa": "納品は不要（招待の条件を満たすと利用できる）",
       "referral": "Terra Velasquez",
       "specialties": [
         "Stability",
@@ -1651,7 +1789,9 @@
       "base": "Salamander Bank",
       "body": "Bayan 7 B",
       "invite": "Sell 5 Smear Campaign Plans to bartenders",
+      "inviteJa": "中傷キャンペーン計画（Smear Campaign Plans）をバーテンダーに 5 個売る",
       "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "unlockJa": "納品は不要（招待の条件を満たすと利用できる）",
       "referral": "Kit Fowler",
       "specialties": [
         "Faster handling",
@@ -1686,7 +1826,9 @@
       "base": "Laszlo's Resolve",
       "body": "Xuane A 3",
       "invite": "Reach Unfriendly reputation or lower with Sirius Corporation",
+      "inviteJa": "Sirius Corporation との関係を「Unfriendly」以下にする",
       "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "unlockJa": "納品は不要（招待の条件を満たすと利用できる）",
       "referral": "Wellington Beck",
       "specialties": [
         "Reload speed",
@@ -1718,7 +1860,9 @@
       "base": "The Divine Apparatus",
       "body": "Deriso 3 A",
       "invite": "Reach Friendly reputation with the Colonia Council",
+      "inviteJa": "Colonia Council との関係を「Friendly」にする",
       "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "unlockJa": "納品は不要（招待の条件を満たすと利用できる）",
       "referral": null,
       "specialties": [
         "Noise suppressor",
@@ -1754,7 +1898,9 @@
       "base": "Bresa Modifications",
       "body": "Desy 7 A",
       "invite": "Visit (dock and disembark at) 5 settlements in the Colonia system",
+      "inviteJa": "Colonia 星系の居住地（セトルメント）5 か所を訪れる（ドッキングして降りる）",
       "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "unlockJa": "納品は不要（招待の条件を満たすと利用できる）",
       "referral": null,
       "specialties": [
         "Magazine size",
@@ -1791,7 +1937,9 @@
       "base": "Rosa's Shop",
       "body": "Kojeara 4 B",
       "invite": "Sell a total of 10 Culinary Recipes or Cocktail Recipes to stations in Colonia",
+      "inviteJa": "料理レシピ（Culinary Recipes）またはカクテルレシピ（Cocktail Recipes）を Colonia 星系のステーションで合計 10 個売る",
       "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "unlockJa": "納品は不要（招待の条件を満たすと利用できる）",
       "referral": null,
       "specialties": [
         "Greater range",
@@ -1828,7 +1976,9 @@
       "base": "Eidolon Hold",
       "body": "Einheriar 1 A",
       "invite": "Complete the referral tasks for Baltanos (10 Faction Associates), Eleanor Bresa (10 Digital Designs) and Rosa Dayette (10 Manufacturing Instructions)",
+      "inviteJa": "紹介作業を完了する: バルタノス（Baltanos）に派閥の協力者（Faction Associates）10 個、エレノア・ブレサ（Eleanor Bresa）にデジタルデザイン（Digital Designs）10 個、ローザ・デイエット（Rosa Dayette）に製造指示書（Manufacturing Instructions）10 個",
       "unlock": "No item delivery; access granted when the invitation requirement is met",
+      "unlockJa": "納品は不要（招待の条件を満たすと利用できる）",
       "referral": "Baltanos, Eleanor Bresa, Rosa Dayette",
       "specialties": [
         "Audio masking",
