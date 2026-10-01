@@ -137,6 +137,7 @@ class AiActionMapGeneratorTest {
             "navigate_from_memory",
             "navigate_to_bio_sample_codex_entry",
             "navigate_to_coordinates",
+            "navigate_to_engineer",
             "navigate_to_fleet_carrier",
             "navigate_to_home_system",
             "navigate_to_landing_zone",

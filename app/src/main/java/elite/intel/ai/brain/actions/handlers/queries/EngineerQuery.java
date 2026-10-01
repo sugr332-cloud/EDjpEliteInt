@@ -213,31 +213,26 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
         );
     }
 
-    private DataDto buildModuleEngineersData(String moduleName, LocationDao.Coordinates here, String query) {
-        EngineerDirectory dir = EngineerDirectory.getInstance();
-        EngineerProgressManager pm = EngineerProgressManager.getInstance();
+    public record RankedModuleEngineer(
+            EngineerInfo engineer,
+            int maxGrade,
+            Double distanceLy
+    ) {}
 
-        List<ModuleEngineerDto> candidates = new ArrayList<>();
-
+    public static List<RankedModuleEngineer> findEngineersForModule(
+            String moduleName,
+            LocationDao.Coordinates here,
+            EngineerDirectory dir) {
+        if (moduleName == null || dir == null) {
+            return Collections.emptyList();
+        }
+        List<RankedModuleEngineer> candidates = new ArrayList<>();
         for (EngineerInfo eng : dir.getShipEngineers()) {
             if (eng.specialties() == null) continue;
             for (Specialty sp : eng.specialties()) {
                 if (moduleName.equalsIgnoreCase(sp.module())) {
                     Double dist = calculateDistanceLy(here, eng.coords());
-                    Optional<EngineerProgressRecord> prog = pm.findByName(eng.name());
-                    String progressStr = prog.map(EngineerProgressRecord::progress).orElse("記録なし");
-                    Integer rank = prog.map(EngineerProgressRecord::rank).orElse(null);
-
-                    candidates.add(new ModuleEngineerDto(
-                            eng.name(),
-                            eng.system(),
-                            eng.base(),
-                            dist,
-                            sp.maxGrade(),
-                            progressStr,
-                            rank,
-                            eng.permitRequired()
-                    ));
+                    candidates.add(new RankedModuleEngineer(eng, sp.maxGrade(), dist));
                     break;
                 }
             }
@@ -253,6 +248,34 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
             if (b.distanceLy() == null) return -1;
             return Double.compare(a.distanceLy(), b.distanceLy());
         });
+
+        return candidates;
+    }
+
+    private DataDto buildModuleEngineersData(String moduleName, LocationDao.Coordinates here, String query) {
+        EngineerDirectory dir = EngineerDirectory.getInstance();
+        EngineerProgressManager pm = EngineerProgressManager.getInstance();
+
+        List<RankedModuleEngineer> ranked = findEngineersForModule(moduleName, here, dir);
+
+        List<ModuleEngineerDto> candidates = new ArrayList<>();
+        for (RankedModuleEngineer item : ranked) {
+            EngineerInfo eng = item.engineer();
+            Optional<EngineerProgressRecord> prog = pm.findByName(eng.name());
+            String progressStr = prog.map(EngineerProgressRecord::progress).orElse("記録なし");
+            Integer rank = prog.map(EngineerProgressRecord::rank).orElse(null);
+
+            candidates.add(new ModuleEngineerDto(
+                    eng.name(),
+                    eng.system(),
+                    eng.base(),
+                    item.distanceLy(),
+                    item.maxGrade(),
+                    progressStr,
+                    rank,
+                    eng.permitRequired()
+            ));
+        }
 
         // Limit to 5
         List<ModuleEngineerDto> limited = candidates.stream().limit(5).toList();
@@ -292,7 +315,7 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
         );
     }
 
-    private Double calculateDistanceLy(LocationDao.Coordinates here, EngineerDirectory.Coords coords) {
+    public static Double calculateDistanceLy(LocationDao.Coordinates here, EngineerDirectory.Coords coords) {
         if (here == null || coords == null) {
             return null;
         }
