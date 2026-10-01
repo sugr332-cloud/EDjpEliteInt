@@ -1,6 +1,7 @@
 package elite.intel.ui.screen;
 
 import com.google.gson.JsonObject;
+import elite.intel.ai.brain.actions.handlers.commands.builtin.NavigateToEngineerCommand;
 import elite.intel.ai.brain.actions.handlers.commands.builtin.NavigateToSearchResultCommand;
 import elite.intel.ai.brain.actions.handlers.queries.NearestOutfittingQuery.OutfittingDataDto;
 import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeCandidateDto;
@@ -349,7 +350,12 @@ public class QueryResultCard extends JPanel {
             }
         }
 
-        return new QueryResultCard(title, body, Collections.emptyList());
+        List<JButton> buttons = new ArrayList<>();
+        JButton goBtn = new HudButton(getText("ai.queryResult.btn.engineerStation"), false);
+        buttons.add(goBtn);
+        setupEngineerButtonAction(goBtn, buttons, info.name());
+
+        return new QueryResultCard(title, body, buttons);
     }
 
     private static void addAutoStageLabel(JPanel container, String text, boolean checked) {
@@ -401,6 +407,16 @@ public class QueryResultCard extends JPanel {
             params.addProperty("leg", leg);
             params.addProperty("source", "gui");
             GuiCommandRunner.runAfterClosingWindow(null, NavigateToSearchResultCommand.ID, params, true);
+        });
+    }
+
+    private static void setupEngineerButtonAction(JButton button, List<JButton> cardButtons, String engineerName) {
+        button.addActionListener(e -> {
+            disableButtonsTemporarily(cardButtons);
+            JsonObject params = new JsonObject();
+            params.addProperty("name", engineerName);
+            params.addProperty("source", "gui");
+            GuiCommandRunner.runAfterClosingWindow(null, NavigateToEngineerCommand.ID, params, true);
         });
     }
 

@@ -104,6 +104,25 @@ class EngineerCardTest {
         assertFalse(EngineerChecklistManager.getInstance().isChecked(engName, EngineerChecklistManager.ITEM_INVITE));
     }
 
+    @Test
+    void cardGeneratesStationButtonAndDisablesTemporarilyOnClick() {
+        QueryResultCard card = QueryResultCard.forEngineer("Felicity Farseer", null, null);
+        assertNotNull(card);
+        List<JButton> buttons = card.getActionButtons();
+        assertNotNull(buttons);
+        assertEquals(1, buttons.size(), "Engineer card must have exactly one action button");
+
+        JButton btn = buttons.get(0);
+        String txt = btn.getText().toLowerCase();
+        assertTrue(btn.getText().contains("ステーションへ発進") || txt.contains("plot to station"),
+                "Button text was: " + btn.getText());
+        assertTrue(btn.isEnabled());
+
+        // Click disables button
+        btn.doClick();
+        assertFalse(btn.isEnabled(), "Button must be temporarily disabled after click");
+    }
+
     @SuppressWarnings("unchecked")
     private static <T extends Component> List<T> findComponentsOfType(Container container, Class<T> type) {
         List<T> list = new ArrayList<>();
