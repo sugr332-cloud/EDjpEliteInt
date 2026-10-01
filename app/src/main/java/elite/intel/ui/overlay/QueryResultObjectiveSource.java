@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -196,6 +197,36 @@ public class QueryResultObjectiveSource implements HudObjectiveSource {
         }
     }
 
+    static String formatEngineerStatus(String progress, Integer rank) {
+        if (progress == null || progress.isBlank()) {
+            return getText("ai.queryResult.engineer.noRecord");
+        }
+        switch (progress.toLowerCase(Locale.ROOT)) {
+            case "unlocked" -> {
+                String unlockedText = getText("ai.queryResult.engineer.unlocked");
+                if (rank != null && rank >= 1) {
+                    return unlockedText + " " + getText("ai.queryResult.engineer.rank", rank);
+                }
+                return unlockedText;
+            }
+            case "barred" -> {
+                return getText("ai.queryResult.engineer.barred");
+            }
+            case "acquainted" -> {
+                return getText("ai.queryResult.engineer.acquainted");
+            }
+            case "invited" -> {
+                return getText("ai.queryResult.engineer.invited");
+            }
+            case "known" -> {
+                return getText("ai.queryResult.engineer.known");
+            }
+            default -> {
+                return progress;
+            }
+        }
+    }
+
     private Optional<HudObjective> buildEngineersObjective(EngineersDisplayDto dto, Instant now) {
         if (dto == null || dto.engineerNames() == null || dto.engineerNames().isEmpty()) {
             return Optional.empty();
@@ -222,23 +253,14 @@ public class QueryResultObjectiveSource implements HudObjectiveSource {
                 }
             }
             String gradeStr = grade > 0 ? " G" + grade : "";
-            String statusStr = "";
-            if (progOpt.isPresent() && progOpt.get().progress() != null) {
-                String p = progOpt.get().progress();
-                Integer r = progOpt.get().rank();
-                if ("Unlocked".equalsIgnoreCase(p)) {
-                    statusStr = r != null ? "（開放済み R" + r + "）" : "（開放済み）";
-                } else if ("Barred".equalsIgnoreCase(p)) {
-                    statusStr = "（出入り禁止）";
-                } else {
-                    statusStr = "（" + p + "）";
-                }
-            } else {
-                statusStr = "（記録なし）";
-            }
+            String statusStr = formatEngineerStatus(
+                    progOpt.map(EngineerProgressRecord::progress).orElse(null),
+                    progOpt.map(EngineerProgressRecord::rank).orElse(null)
+            );
+            String statusInParens = HudText.get("overlay.card.row.engineerStatusInParens", statusStr);
 
             int others = dto.engineerNames().size() - 1;
-            String secondLine = firstEngName + gradeStr + statusStr;
+            String secondLine = firstEngName + gradeStr + " " + statusInParens;
             if (others > 0) {
                 secondLine += " " + HudText.get("overlay.card.row.engineerOtherCandidates", others);
             }
@@ -252,24 +274,14 @@ public class QueryResultObjectiveSource implements HudObjectiveSource {
             Optional<EngineerProgressRecord> progOpt = EngineerProgressManager.getInstance().findByName(engName);
 
             String loc = infoOpt.map(i -> i.base() + " (" + i.system() + ")").orElse("-");
-            String statusStr = "";
-            if (progOpt.isPresent() && progOpt.get().progress() != null) {
-                String p = progOpt.get().progress();
-                Integer r = progOpt.get().rank();
-                if ("Unlocked".equalsIgnoreCase(p)) {
-                    statusStr = r != null ? "開放済み R" + r : "開放済み";
-                } else if ("Barred".equalsIgnoreCase(p)) {
-                    statusStr = "出入り禁止";
-                } else {
-                    statusStr = p;
-                }
-            } else {
-                statusStr = "記録なし";
-            }
+            String statusStr = formatEngineerStatus(
+                    progOpt.map(EngineerProgressRecord::progress).orElse(null),
+                    progOpt.map(EngineerProgressRecord::rank).orElse(null)
+            );
             rows.add(HudRow.of(loc, statusStr));
 
         } else {
-            rows.add(HudRow.of(HudText.get("overlay.card.title.engineers"), getText("ai.queryResult.header.engineers.progress", "")));
+            rows.add(HudRow.of(HudText.get("overlay.card.title.engineers"), HudText.get("overlay.card.row.engineerProgressList")));
 
             int total = dto.engineerNames().size();
             long unlockedCount = 0;
@@ -279,7 +291,7 @@ public class QueryResultObjectiveSource implements HudObjectiveSource {
                     unlockedCount++;
                 }
             }
-            String summary = "開放済み: " + unlockedCount + "人 / 全" + total + "人";
+            String summary = HudText.get("overlay.card.row.engineerUnlockedSummary", unlockedCount, total);
             rows.add(HudRow.of(HudText.get("overlay.card.row.progress"), summary));
         }
 

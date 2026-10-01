@@ -7,6 +7,8 @@ import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeC
 import elite.intel.db.managers.EngineerProgressManager;
 import elite.intel.db.managers.QueryResultDisplayManager.EngineersDisplayDto;
 import elite.intel.db.managers.QueryResultDisplayManager.LatestDisplay;
+import elite.intel.i18n.Language;
+import elite.intel.session.SystemSession;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -175,7 +177,7 @@ class QueryResultObjectiveSourceTest {
         assertEquals("Frame Shift Drive", rows.get(0).value());
         assertTrue(rows.get(1).value().contains("Felicity Farseer"));
         assertTrue(rows.get(1).value().contains("G5"));
-        assertTrue(rows.get(1).value().contains("開放済み R5") || rows.get(1).value().contains("Unlocked"));
+        assertTrue(rows.get(1).value().contains("開放済み ランク 5") || rows.get(1).value().contains("Unlocked Rank 5"));
         assertTrue(rows.get(1).value().contains("2"), "Must mention other candidates count (+2)");
     }
 
@@ -203,7 +205,7 @@ class QueryResultObjectiveSourceTest {
         assertEquals(2, rows.size());
         assertEquals("Felicity Farseer", rows.get(0).value());
         assertTrue(rows.get(1).label().contains("Farseer Inc"));
-        assertTrue(rows.get(1).value().contains("開放済み") || rows.get(1).value().contains("Unlocked"));
+        assertTrue(rows.get(1).value().contains("開放済み ランク 5") || rows.get(1).value().contains("Unlocked Rank 5"));
     }
 
     @Test
@@ -229,6 +231,156 @@ class QueryResultObjectiveSourceTest {
         HudObjective objective = opt.get();
         List<HudRow> rows = objective.rows();
         assertEquals(2, rows.size());
-        assertTrue(rows.get(1).value().contains("1人 / 全2人") || rows.get(1).value().contains("1 / 2"));
+        assertEquals(HudText.get("overlay.card.row.engineerProgressList"), rows.get(0).value());
+        assertTrue(rows.get(1).value().contains("開放済み: 1人 / 全2人") || rows.get(1).value().contains("Unlocked: 1 / 2"));
+    }
+
+    @Test
+    void testCurrentObjectiveWithEngineersSingleEngineerInvitedAndAcquaintedStatusLocalizes() {
+        SystemSession session = SystemSession.getInstance();
+        Language orig = session.getLanguage();
+        try {
+            session.setLanguage(Language.JA);
+
+            Instant now = Instant.now();
+            Instant savedAt = now.minus(5, ChronoUnit.MINUTES);
+
+            // 1. Invited
+            EngineerProgressManager.getInstance().clear();
+            EngineerProgressManager.getInstance().recordProgress("Felicity Farseer", null, "Invited", null, null, "2026-10-01T10:00:00Z");
+            EngineersDisplayDto dtoInv = new EngineersDisplayDto("engineer", null, List.of("Felicity Farseer"));
+            QueryResultObjectiveSource srcInv = new QueryResultObjectiveSource(
+                    () -> Optional.of(new LatestDisplay("engineers", savedAt, null, null, dtoInv)), () -> now
+            );
+            HudObjective objInv = srcInv.currentObjective().orElseThrow();
+            assertEquals("招待済み", objInv.rows().get(1).value());
+
+            // 2. Acquainted
+            EngineerProgressManager.getInstance().recordProgress("Felicity Farseer", null, "Acquainted", null, null, "2026-10-01T10:00:00Z");
+            QueryResultObjectiveSource srcAcq = new QueryResultObjectiveSource(
+                    () -> Optional.of(new LatestDisplay("engineers", savedAt, null, null, dtoInv)), () -> now
+            );
+            HudObjective objAcq = srcAcq.currentObjective().orElseThrow();
+            assertEquals("面識あり", objAcq.rows().get(1).value());
+
+            // 3. Known
+            EngineerProgressManager.getInstance().recordProgress("Felicity Farseer", null, "Known", null, null, "2026-10-01T10:00:00Z");
+            QueryResultObjectiveSource srcKnown = new QueryResultObjectiveSource(
+                    () -> Optional.of(new LatestDisplay("engineers", savedAt, null, null, dtoInv)), () -> now
+            );
+            HudObjective objKnown = srcKnown.currentObjective().orElseThrow();
+            assertEquals("知っている", objKnown.rows().get(1).value());
+
+            // 4. Barred
+            EngineerProgressManager.getInstance().recordProgress("Felicity Farseer", null, "Barred", null, null, "2026-10-01T10:00:00Z");
+            QueryResultObjectiveSource srcBarred = new QueryResultObjectiveSource(
+                    () -> Optional.of(new LatestDisplay("engineers", savedAt, null, null, dtoInv)), () -> now
+            );
+            HudObjective objBarred = srcBarred.currentObjective().orElseThrow();
+            assertTrue(objBarred.rows().get(1).value().contains("出入り禁止"));
+
+            // 5. No Record
+            EngineerProgressManager.getInstance().clear();
+            QueryResultObjectiveSource srcNoRec = new QueryResultObjectiveSource(
+                    () -> Optional.of(new LatestDisplay("engineers", savedAt, null, null, dtoInv)), () -> now
+            );
+            HudObjective objNoRec = srcNoRec.currentObjective().orElseThrow();
+            assertEquals("記録なし", objNoRec.rows().get(1).value());
+        } finally {
+            session.setLanguage(orig);
+        }
+    }
+
+    @Test
+    void testCurrentObjectiveWithEngineersProgressQueryDoesNotContainSearchTime() {
+        Instant now = Instant.now();
+        Instant savedAt = now.minus(5, ChronoUnit.MINUTES);
+
+        EngineersDisplayDto dto = new EngineersDisplayDto(
+                "progress",
+                null,
+                List.of("Felicity Farseer", "Elvira Martuuk")
+        );
+        LatestDisplay display = new LatestDisplay("engineers", savedAt, null, null, dto);
+
+        QueryResultObjectiveSource source = new QueryResultObjectiveSource(() -> Optional.of(display), () -> now);
+        Optional<HudObjective> opt = source.currentObjective();
+        assertTrue(opt.isPresent());
+
+        HudObjective objective = opt.get();
+        List<HudRow> rows = objective.rows();
+        assertEquals(2, rows.size());
+
+        assertFalse(rows.get(0).value().contains("検索時刻"), "Must not contain Japanese search time label");
+        assertFalse(rows.get(0).value().contains("Time"), "Must not contain English search time label");
+        assertEquals(HudText.get("overlay.card.row.engineerProgressList"), rows.get(0).value());
+    }
+
+    @Test
+    void testCurrentObjectiveWithEngineersInEnglishLocaleHasNoJapanese() {
+        SystemSession session = SystemSession.getInstance();
+        Language orig = session.getLanguage();
+        try {
+            session.setLanguage(Language.EN);
+
+            Instant now = Instant.now();
+            Instant savedAt = now.minus(5, ChronoUnit.MINUTES);
+
+            EngineerProgressManager.getInstance().clear();
+            EngineerProgressManager.getInstance().recordProgress("Felicity Farseer", null, "Unlocked", 5, 0, "2026-10-01T10:00:00Z");
+
+            // 1. Module
+            EngineersDisplayDto modDto = new EngineersDisplayDto(
+                    "module", "Frame Shift Drive", List.of("Felicity Farseer", "Elvira Martuuk")
+            );
+            QueryResultObjectiveSource srcMod = new QueryResultObjectiveSource(
+                    () -> Optional.of(new LatestDisplay("engineers", savedAt, null, null, modDto)), () -> now
+            );
+            HudObjective objMod = srcMod.currentObjective().orElseThrow();
+            assertFalse(containsJapanese(objMod.title()), "Title contains Japanese in English locale: " + objMod.title());
+            for (HudRow row : objMod.rows()) {
+                assertFalse(containsJapanese(row.label()), "Label contains Japanese in English locale: " + row.label());
+                assertFalse(containsJapanese(row.value()), "Value contains Japanese in English locale: " + row.value());
+            }
+
+            // 2. Single Engineer
+            EngineersDisplayDto engDto = new EngineersDisplayDto(
+                    "engineer", null, List.of("Felicity Farseer")
+            );
+            QueryResultObjectiveSource srcEng = new QueryResultObjectiveSource(
+                    () -> Optional.of(new LatestDisplay("engineers", savedAt, null, null, engDto)), () -> now
+            );
+            HudObjective objEng = srcEng.currentObjective().orElseThrow();
+            assertFalse(containsJapanese(objEng.title()), "Title contains Japanese in English locale: " + objEng.title());
+            for (HudRow row : objEng.rows()) {
+                assertFalse(containsJapanese(row.label()), "Label contains Japanese in English locale: " + row.label());
+                assertFalse(containsJapanese(row.value()), "Value contains Japanese in English locale: " + row.value());
+            }
+
+            // 3. Progress
+            EngineersDisplayDto progDto = new EngineersDisplayDto(
+                    "progress", null, List.of("Felicity Farseer")
+            );
+            QueryResultObjectiveSource srcProg = new QueryResultObjectiveSource(
+                    () -> Optional.of(new LatestDisplay("engineers", savedAt, null, null, progDto)), () -> now
+            );
+            HudObjective objProg = srcProg.currentObjective().orElseThrow();
+            assertFalse(containsJapanese(objProg.title()), "Title contains Japanese in English locale: " + objProg.title());
+            for (HudRow row : objProg.rows()) {
+                assertFalse(containsJapanese(row.label()), "Label contains Japanese in English locale: " + row.label());
+                assertFalse(containsJapanese(row.value()), "Value contains Japanese in English locale: " + row.value());
+            }
+        } finally {
+            session.setLanguage(orig);
+        }
+    }
+
+    private static boolean containsJapanese(String s) {
+        if (s == null) return false;
+        return s.chars().anyMatch(ch ->
+                Character.UnicodeBlock.of(ch) == Character.UnicodeBlock.HIRAGANA ||
+                Character.UnicodeBlock.of(ch) == Character.UnicodeBlock.KATAKANA ||
+                Character.UnicodeBlock.of(ch) == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
+        );
     }
 }
