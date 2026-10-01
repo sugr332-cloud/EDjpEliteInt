@@ -183,9 +183,137 @@ class EngineerQueryTest {
         assertEquals("module", dto.queryKind());
         assertEquals("Frame Shift Drive", dto.moduleName());
         assertNotNull(dto.engineerNames());
-        assertTrue(dto.engineerNames().size() <= 5);
+        assertEquals(6, dto.engineerNames().size(), "FSD module card must contain all 6 engineers");
         assertTrue(dto.engineerNames().contains("Felicity Farseer"));
         assertTrue(dto.engineerNames().contains("Elvira Martuuk"));
+    }
+
+    @Test
+    void moduleCardDisplaysAllEngineersWhileVoiceDataLimitsToFive() throws Exception {
+        EngineerQuery query = createTestQuery();
+        JsonObject params = new JsonObject();
+        params.addProperty("module", "Sensors");
+
+        DataDto data = query.buildData(params, "センサーを改造できるエンジニア");
+        assertEquals("module", data.type());
+        assertNotNull(data.moduleEngineers());
+        assertEquals(5, data.moduleEngineers().size(), "Voice/LLM candidates must remain capped at 5");
+
+        query.handle("query_engineer", params, "センサーを改造できるエンジニア");
+        Optional<LatestDisplay> latestOpt = displayManager.getLatest();
+        assertTrue(latestOpt.isPresent());
+        EngineersDisplayDto dto = latestOpt.get().engineers();
+        assertEquals("module", dto.queryKind());
+        assertEquals("Sensors", dto.moduleName());
+        assertEquals(8, dto.engineerNames().size(), "Sensors module card must contain all 8 engineers");
+    }
+
+    @Test
+    void directoryQueryReturnsAll38EngineersSortedShipThenOnFootAlphabetical() throws Exception {
+        EngineerQuery query = createTestQuery();
+        DataDto data = query.buildData(new JsonObject(), "エンジニアの効能と得意分野を教えて");
+
+        assertEquals("directory", data.type());
+        assertEquals("all", data.directoryFilter());
+        assertEquals(38, data.totalCount());
+        assertEquals(25, data.shipCount());
+        assertEquals(13, data.onFootCount());
+        assertNull(data.specialties());
+        assertNull(data.name());
+        assertNull(data.moduleEngineers());
+
+        // Spoken YAML must contain counts but no names or specialties
+        String yaml = data.toYaml();
+        assertTrue(yaml.contains("totalCount: 38"));
+        assertTrue(yaml.contains("shipCount: 25"));
+        assertTrue(yaml.contains("onFootCount: 13"));
+        assertFalse(yaml.contains("Felicity Farseer"));
+        assertFalse(yaml.contains("cardEngineerNames"));
+
+        // Saved card display must contain all 38
+        query.handle("query_engineer", new JsonObject(), "エンジニアの効能と得意分野を教えて");
+        Optional<LatestDisplay> latestOpt = displayManager.getLatest();
+        assertTrue(latestOpt.isPresent());
+        EngineersDisplayDto dto = latestOpt.get().engineers();
+        assertEquals("directory", dto.queryKind());
+        assertNull(dto.moduleName());
+        assertEquals(38, dto.engineerNames().size());
+
+        // First 25 are ship engineers in alphabetical order
+        List<String> names = dto.engineerNames();
+        for (int i = 0; i < 25; i++) {
+            var info = elite.intel.gameapi.engineers.EngineerDirectory.getInstance().findByName(names.get(i)).orElseThrow();
+            assertTrue(info.isShip(), "First 25 must be ship engineers: " + names.get(i));
+        }
+        for (int i = 0; i < 24; i++) {
+            assertTrue(names.get(i).compareToIgnoreCase(names.get(i + 1)) <= 0,
+                    "Ship engineers must be sorted alphabetically: " + names.get(i) + " vs " + names.get(i + 1));
+        }
+
+        // Remaining 13 are on-foot engineers in alphabetical order
+        for (int i = 25; i < 38; i++) {
+            var info = elite.intel.gameapi.engineers.EngineerDirectory.getInstance().findByName(names.get(i)).orElseThrow();
+            assertTrue(info.isOnFoot(), "Remaining 13 must be on-foot engineers: " + names.get(i));
+        }
+        for (int i = 25; i < 37; i++) {
+            assertTrue(names.get(i).compareToIgnoreCase(names.get(i + 1)) <= 0,
+                    "On-foot engineers must be sorted alphabetically: " + names.get(i) + " vs " + names.get(i + 1));
+        }
+    }
+
+    @Test
+    void directoryQueryShipFilterFilters25Engineers() throws Exception {
+        EngineerQuery query = createTestQuery();
+        DataDto data = query.buildData(new JsonObject(), "船のエンジニアの得意分野");
+
+        assertEquals("directory", data.type());
+        assertEquals("ship", data.directoryFilter());
+        assertEquals(25, data.totalCount());
+        assertEquals(25, data.shipCount());
+        assertEquals(0, data.onFootCount());
+
+        query.handle("query_engineer", new JsonObject(), "船のエンジニアの得意分野");
+        Optional<LatestDisplay> latestOpt = displayManager.getLatest();
+        assertTrue(latestOpt.isPresent());
+        EngineersDisplayDto dto = latestOpt.get().engineers();
+        assertEquals(25, dto.engineerNames().size());
+        for (String name : dto.engineerNames()) {
+            var info = elite.intel.gameapi.engineers.EngineerDirectory.getInstance().findByName(name).orElseThrow();
+            assertTrue(info.isShip());
+        }
+    }
+
+    @Test
+    void directoryQueryOnFootFilterFilters13Engineers() throws Exception {
+        EngineerQuery query = createTestQuery();
+        DataDto data = query.buildData(new JsonObject(), "徒歩のエンジニアは何ができる？");
+
+        assertEquals("directory", data.type());
+        assertEquals("onfoot", data.directoryFilter());
+        assertEquals(13, data.totalCount());
+        assertEquals(0, data.shipCount());
+        assertEquals(13, data.onFootCount());
+
+        query.handle("query_engineer", new JsonObject(), "徒歩のエンジニアは何ができる？");
+        Optional<LatestDisplay> latestOpt = displayManager.getLatest();
+        assertTrue(latestOpt.isPresent());
+        EngineersDisplayDto dto = latestOpt.get().engineers();
+        assertEquals(13, dto.engineerNames().size());
+        for (String name : dto.engineerNames()) {
+            var info = elite.intel.gameapi.engineers.EngineerDirectory.getInstance().findByName(name).orElseThrow();
+            assertTrue(info.isOnFoot());
+        }
+    }
+
+    @Test
+    void progressQueryMaintainedWhenNoDirectoryKeywords() {
+        EngineerQuery query = createTestQuery();
+
+        DataDto data1 = query.buildData(new JsonObject(), "エンジニアの一覧");
+        assertEquals("progress", data1.type(), "一覧 alone without directory keywords must be progress");
+
+        DataDto data2 = query.buildData(new JsonObject(), "エンジニアの進み具合は");
+        assertEquals("progress", data2.type());
     }
 
     @Test

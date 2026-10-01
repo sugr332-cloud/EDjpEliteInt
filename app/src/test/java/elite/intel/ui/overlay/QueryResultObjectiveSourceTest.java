@@ -370,9 +370,100 @@ class QueryResultObjectiveSourceTest {
                 assertFalse(containsJapanese(row.label()), "Label contains Japanese in English locale: " + row.label());
                 assertFalse(containsJapanese(row.value()), "Value contains Japanese in English locale: " + row.value());
             }
+
+            // 4. Directory
+            EngineersDisplayDto dirDto = new EngineersDisplayDto(
+                    "directory", null, List.of("Felicity Farseer", "Domino Green")
+            );
+            QueryResultObjectiveSource srcDir = new QueryResultObjectiveSource(
+                    () -> Optional.of(new LatestDisplay("engineers", savedAt, null, null, dirDto)), () -> now
+            );
+            HudObjective objDir = srcDir.currentObjective().orElseThrow();
+            assertFalse(containsJapanese(objDir.title()), "Title contains Japanese in English locale: " + objDir.title());
+            for (HudRow row : objDir.rows()) {
+                assertFalse(containsJapanese(row.label()), "Label contains Japanese in English locale: " + row.label());
+                assertFalse(containsJapanese(row.value()), "Value contains Japanese in English locale: " + row.value());
+            }
         } finally {
             session.setLanguage(orig);
         }
+    }
+
+    @Test
+    void testCurrentObjectiveWithEngineersDirectoryBothShipAndOnFoot() {
+        Instant now = Instant.now();
+        Instant savedAt = now.minus(5, ChronoUnit.MINUTES);
+
+        EngineersDisplayDto dto = new EngineersDisplayDto(
+                "directory",
+                null,
+                List.of("Felicity Farseer", "Elvira Martuuk", "Domino Green")
+        );
+        LatestDisplay display = new LatestDisplay("engineers", savedAt, null, null, dto);
+
+        QueryResultObjectiveSource source = new QueryResultObjectiveSource(() -> Optional.of(display), () -> now);
+        Optional<HudObjective> opt = source.currentObjective();
+        assertTrue(opt.isPresent());
+
+        HudObjective objective = opt.get();
+        List<HudRow> rows = objective.rows();
+        assertEquals(2, rows.size(), "Directory card must have 2 rows");
+
+        assertEquals(HudText.get("overlay.card.row.engineerDirectoryList"), rows.get(0).value());
+        assertTrue(rows.get(1).value().contains("2") && rows.get(1).value().contains("1"),
+                "Second row must summarize 2 ship and 1 on-foot engineers: " + rows.get(1).value());
+    }
+
+    @Test
+    void testCurrentObjectiveWithEngineersDirectoryShipOnly() {
+        Instant now = Instant.now();
+        Instant savedAt = now.minus(5, ChronoUnit.MINUTES);
+
+        EngineersDisplayDto dto = new EngineersDisplayDto(
+                "directory",
+                null,
+                List.of("Felicity Farseer", "Elvira Martuuk")
+        );
+        LatestDisplay display = new LatestDisplay("engineers", savedAt, null, null, dto);
+
+        QueryResultObjectiveSource source = new QueryResultObjectiveSource(() -> Optional.of(display), () -> now);
+        Optional<HudObjective> opt = source.currentObjective();
+        assertTrue(opt.isPresent());
+
+        HudObjective objective = opt.get();
+        List<HudRow> rows = objective.rows();
+        assertEquals(2, rows.size());
+
+        assertEquals(HudText.get("overlay.card.row.engineerDirectoryList"), rows.get(0).value());
+        assertTrue(rows.get(1).value().contains("2"));
+        assertTrue(rows.get(1).value().contains("宇宙船") || rows.get(1).value().contains("Ship"));
+        assertFalse(rows.get(1).value().contains("徒歩") || rows.get(1).value().contains("On-foot"));
+    }
+
+    @Test
+    void testCurrentObjectiveWithEngineersDirectoryOnFootOnly() {
+        Instant now = Instant.now();
+        Instant savedAt = now.minus(5, ChronoUnit.MINUTES);
+
+        EngineersDisplayDto dto = new EngineersDisplayDto(
+                "directory",
+                null,
+                List.of("Domino Green", "Hero Ferrari")
+        );
+        LatestDisplay display = new LatestDisplay("engineers", savedAt, null, null, dto);
+
+        QueryResultObjectiveSource source = new QueryResultObjectiveSource(() -> Optional.of(display), () -> now);
+        Optional<HudObjective> opt = source.currentObjective();
+        assertTrue(opt.isPresent());
+
+        HudObjective objective = opt.get();
+        List<HudRow> rows = objective.rows();
+        assertEquals(2, rows.size());
+
+        assertEquals(HudText.get("overlay.card.row.engineerDirectoryList"), rows.get(0).value());
+        assertTrue(rows.get(1).value().contains("2"));
+        assertTrue(rows.get(1).value().contains("徒歩") || rows.get(1).value().contains("On-foot"));
+        assertFalse(rows.get(1).value().contains("宇宙船") || rows.get(1).value().contains("Ship"));
     }
 
     private static boolean containsJapanese(String s) {

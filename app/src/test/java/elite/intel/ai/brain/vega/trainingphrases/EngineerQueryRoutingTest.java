@@ -62,7 +62,12 @@ class EngineerQueryRoutingTest {
             "開放済みのエンジニアは",
             "フェリシティ・ファーシーアの開放条件は",
             "エンジニアの一覧",
-            "エンジニアはどこ"
+            "エンジニアはどこ",
+            "エンジニアの効能",
+            "エンジニアの得意分野",
+            "エンジニアは何ができる？",
+            "船のエンジニアの得意分野",
+            "徒歩のエンジニアは何ができる？"
     })
     void japanesePhrasesOfferQueryEngineer(String utterance) {
         Ranked ranked = rank(Language.JA, PlayerSituation.IN_SHIP_DEEP_SPACE, utterance);
@@ -81,7 +86,12 @@ class EngineerQueryRoutingTest {
             "engineer for thrusters",
             "unlocked engineers",
             "where is the engineer",
-            "engineer unlock requirements"
+            "engineer unlock requirements",
+            "what can engineers do",
+            "engineer specialties",
+            "ship engineer specialties",
+            "on-foot engineer specialties",
+            "what can on-foot engineers do"
     })
     void englishPhrasesOfferQueryEngineer(String utterance) {
         Ranked ranked = rank(Language.EN, PlayerSituation.IN_SHIP_DEEP_SPACE, utterance);

@@ -98,8 +98,47 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
             Map<String, List<ProgressEngineerDto>> progressGroups,
             // For type='unknown_module'
             String rawModule,
-            String message
+            String message,
+            // For type='directory' (EG-5)
+            String directoryFilter,
+            Integer totalCount,
+            Integer shipCount,
+            Integer onFootCount,
+            // For card display (all candidates for module/directory)
+            @com.fasterxml.jackson.annotation.JsonIgnore
+            List<String> cardEngineerNames
     ) implements ToYamlConvertable {
+        public DataDto(
+                String type,
+                String query,
+                String moduleName,
+                List<ModuleEngineerDto> moduleEngineers,
+                String name,
+                String engineerType,
+                String system,
+                String base,
+                String body,
+                Double distanceLy,
+                String invite,
+                String unlock,
+                String referral,
+                List<SpecialtyDto> specialties,
+                String progress,
+                Integer rank,
+                Integer rankProgress,
+                boolean permitRequired,
+                String notes,
+                boolean onlyUnlocked,
+                Map<String, List<ProgressEngineerDto>> progressGroups,
+                String rawModule,
+                String message
+        ) {
+            this(type, query, moduleName, moduleEngineers, name, engineerType, system, base, body,
+                    distanceLy, invite, unlock, referral, specialties, progress, rank, rankProgress,
+                    permitRequired, notes, onlyUnlocked, progressGroups, rawModule, message,
+                    null, null, null, null, null);
+        }
+
         @Override
         public String toYaml() {
             return YamlFactory.toYaml(this);
@@ -123,13 +162,14 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
                 Answer the user's question about Elite Dangerous engineers concisely and accurately based on the provided data.
                 
                 Data structure:
-                - type: 'engineer', 'module', 'progress', or 'unknown_module'
+                - type: 'engineer', 'module', 'progress', 'directory', or 'unknown_module'
                 
                 Rules:
                 - Answer in the user's language concisely.
                 - For type 'module': mention up to the top 3 engineers, including their maximum grade and progress status. For any engineer with permitRequired=true, explicitly mention that a system permit is required.
                 - For type 'engineer': summarize the engineer's details (system, base, requirements, specialties, progress status).
                 - For type 'progress': summarize the player's engineering progress by status group.
+                - For type 'directory': state only how many engineers are displayed on the card (and the breakdown between ship and on-foot if applicable). Do NOT list names or specialties.
                 - For type 'unknown_module': state that the requested module could not be identified.
                 - Never attempt to set route, press keys, or display cards; this is a voice query response only.
                 - Do not guess or extrapolate beyond the provided data.
@@ -183,8 +223,81 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
             );
         }
 
-        // 4. Progress list / general progress query
+        // 4. Directory query check (EG-5)
+        String norm = originalUserInput != null ? Normalizer.normalize(originalUserInput, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT) : "";
+        if (isDirectoryQuery(norm)) {
+            return buildDirectoryData(norm, originalUserInput);
+        }
+
+        // 5. Progress list / general progress query
         return buildProgressData(originalUserInput);
+    }
+
+    private boolean isDirectoryQuery(String norm) {
+        if (norm == null || norm.isBlank()) {
+            return false;
+        }
+        return norm.contains("効能")
+                || norm.contains("得意")
+                || norm.contains("専門")
+                || norm.contains("何ができる")
+                || norm.contains("できること")
+                || norm.contains("specialt")
+                || norm.contains("what can");
+    }
+
+    private DataDto buildDirectoryData(String norm, String originalUserInput) {
+        boolean shipFilter = norm.contains("宇宙船") || norm.contains("船") || norm.contains("ship");
+        boolean onFootFilter = norm.contains("徒歩") || norm.contains("オンフット") || norm.contains("スーツ")
+                || norm.contains("on-foot") || norm.contains("on foot");
+
+        String filterKind = "all";
+        if (shipFilter && !onFootFilter) {
+            filterKind = "ship";
+        } else if (onFootFilter && !shipFilter) {
+            filterKind = "onfoot";
+        }
+
+        EngineerDirectory dir = EngineerDirectory.getInstance();
+        List<EngineerInfo> allShip = dir.getShipEngineers().stream()
+                .sorted(Comparator.comparing(EngineerInfo::name, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        List<EngineerInfo> allOnFoot = dir.getOnFootEngineers().stream()
+                .sorted(Comparator.comparing(EngineerInfo::name, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+
+        List<EngineerInfo> targetEngineers = new ArrayList<>();
+        int shipCount = 0;
+        int onFootCount = 0;
+
+        if ("ship".equals(filterKind)) {
+            targetEngineers.addAll(allShip);
+            shipCount = allShip.size();
+            onFootCount = 0;
+        } else if ("onfoot".equals(filterKind)) {
+            targetEngineers.addAll(allOnFoot);
+            shipCount = 0;
+            onFootCount = allOnFoot.size();
+        } else {
+            targetEngineers.addAll(allShip);
+            targetEngineers.addAll(allOnFoot);
+            shipCount = allShip.size();
+            onFootCount = allOnFoot.size();
+        }
+
+        List<String> cardNames = targetEngineers.stream()
+                .map(EngineerInfo::name)
+                .toList();
+
+        return new DataDto(
+                "directory", originalUserInput,
+                null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, false, null,
+                false, null,
+                null, null,
+                filterKind, targetEngineers.size(), shipCount, onFootCount,
+                cardNames
+        );
     }
 
     private DataDto buildEngineerDetailData(EngineerInfo eng, LocationDao.Coordinates here, String query) {
@@ -277,15 +390,22 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
             ));
         }
 
-        // Limit to 5
+        // Limit to 5 for spoken/LLM data
         List<ModuleEngineerDto> limited = candidates.stream().limit(5).toList();
+
+        // Card displays all candidates (EG-5)
+        List<String> allCardNames = ranked.stream()
+                .map(r -> r.engineer().name())
+                .toList();
 
         return new DataDto(
                 "module", query,
                 moduleName, limited,
                 null, null, null, null, null, null, null, null, null, null, null, null, null, false, null,
                 false, null,
-                null, null
+                null, null,
+                null, null, null, null,
+                allCardNames
         );
     }
 
@@ -332,15 +452,21 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
         }
         QueryResultDisplayManager displayMgr = QueryResultDisplayManager.getInstance();
         if ("module".equals(data.type())) {
-            if (data.moduleEngineers() != null && !data.moduleEngineers().isEmpty()) {
-                List<String> names = data.moduleEngineers().stream()
-                        .map(ModuleEngineerDto::name)
-                        .toList();
+            List<String> names = data.cardEngineerNames() != null ? data.cardEngineerNames() :
+                    (data.moduleEngineers() != null ? data.moduleEngineers().stream().map(ModuleEngineerDto::name).toList() : Collections.emptyList());
+            if (!names.isEmpty()) {
                 displayMgr.saveEngineers(new EngineersDisplayDto("module", data.moduleName(), names));
             }
         } else if ("engineer".equals(data.type())) {
             if (data.name() != null && !data.name().isBlank()) {
                 displayMgr.saveEngineers(new EngineersDisplayDto("engineer", null, List.of(data.name())));
+            }
+        } else if ("directory".equals(data.type())) {
+            List<String> names = data.cardEngineerNames();
+            if (names != null && !names.isEmpty()) {
+                displayMgr.saveEngineers(new EngineersDisplayDto("directory", null, names));
+            } else {
+                displayMgr.clearEngineers();
             }
         } else if ("progress".equals(data.type())) {
             List<String> sortedNames = extractSortedProgressEngineers(data.onlyUnlocked());
