@@ -19,7 +19,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Manages persisted query results (trade candidates and nearest outfitting) for display in the AI tab
+ * Manages persisted query results (trade candidates, nearest outfitting, and engineers) for display in the AI tab
  * and the native HUD overlay, following the derive-never-remember rule.
  */
 public final class QueryResultDisplayManager {
@@ -29,6 +29,7 @@ public final class QueryResultDisplayManager {
 
     public static final String TYPE_TRADE_CANDIDATES = "trade_candidates";
     public static final String TYPE_OUTFITTING = "outfitting";
+    public static final String TYPE_ENGINEERS = "engineers";
 
     private final Gson gson = GsonFactory.getGson();
 
@@ -42,12 +43,29 @@ public final class QueryResultDisplayManager {
     public record DisplayRecord<T>(String queryType, Instant savedAt, T data) {
     }
 
+    public record EngineersDisplayDto(
+            String queryKind,
+            String moduleName,
+            List<String> engineerNames
+    ) {
+    }
+
     public record LatestDisplay(
             String queryType,
             Instant savedAt,
             TradeCandidatesDataDto tradeCandidates,
-            OutfittingDataDto outfitting
+            OutfittingDataDto outfitting,
+            EngineersDisplayDto engineers
     ) {
+        public LatestDisplay(
+                String queryType,
+                Instant savedAt,
+                TradeCandidatesDataDto tradeCandidates,
+                OutfittingDataDto outfitting
+        ) {
+            this(queryType, savedAt, tradeCandidates, outfitting, null);
+        }
+
         public boolean isTradeCandidates() {
             return TYPE_TRADE_CANDIDATES.equals(queryType);
         }
@@ -55,10 +73,16 @@ public final class QueryResultDisplayManager {
         public boolean isOutfitting() {
             return TYPE_OUTFITTING.equals(queryType);
         }
+
+        public boolean isEngineers() {
+            return TYPE_ENGINEERS.equals(queryType);
+        }
     }
 
     private static void validateType(String queryType) {
-        if (!TYPE_TRADE_CANDIDATES.equals(queryType) && !TYPE_OUTFITTING.equals(queryType)) {
+        if (!TYPE_TRADE_CANDIDATES.equals(queryType)
+                && !TYPE_OUTFITTING.equals(queryType)
+                && !TYPE_ENGINEERS.equals(queryType)) {
             throw new IllegalArgumentException("Unsupported query_type: " + queryType);
         }
     }
@@ -97,6 +121,23 @@ public final class QueryResultDisplayManager {
         clearInternal(TYPE_OUTFITTING);
     }
 
+    public void saveEngineers(EngineersDisplayDto dto) {
+        if (dto == null) {
+            clearEngineers();
+            return;
+        }
+        boolean hasEngineers = dto.engineerNames() != null && !dto.engineerNames().isEmpty();
+        if (hasEngineers) {
+            saveInternal(TYPE_ENGINEERS, dto);
+        } else {
+            clearEngineers();
+        }
+    }
+
+    public void clearEngineers() {
+        clearInternal(TYPE_ENGINEERS);
+    }
+
     private void saveInternal(String queryType, Object dto) {
         validateType(queryType);
         try {
@@ -133,6 +174,7 @@ public final class QueryResultDisplayManager {
             });
             UiBus.publish(new QueryResultDisplayUpdatedEvent(TYPE_TRADE_CANDIDATES));
             UiBus.publish(new QueryResultDisplayUpdatedEvent(TYPE_OUTFITTING));
+            UiBus.publish(new QueryResultDisplayUpdatedEvent(TYPE_ENGINEERS));
         } catch (Exception e) {
             log.error("Failed to clear all query result displays: {}", e.getMessage(), e);
         }
@@ -144,6 +186,10 @@ public final class QueryResultDisplayManager {
 
     public Optional<DisplayRecord<OutfittingDataDto>> getOutfitting() {
         return getRecord(TYPE_OUTFITTING, OutfittingDataDto.class);
+    }
+
+    public Optional<DisplayRecord<EngineersDisplayDto>> getEngineers() {
+        return getRecord(TYPE_ENGINEERS, EngineersDisplayDto.class);
     }
 
     private <T> Optional<DisplayRecord<T>> getRecord(String queryType, Class<T> clazz) {
@@ -188,10 +234,13 @@ public final class QueryResultDisplayManager {
         Instant savedAt = parseInstantOrEpoch(row.savedAt());
         if (TYPE_TRADE_CANDIDATES.equals(row.queryType())) {
             TradeCandidatesDataDto data = gson.fromJson(row.payloadJson(), TradeCandidatesDataDto.class);
-            return (data != null) ? new LatestDisplay(TYPE_TRADE_CANDIDATES, savedAt, data, null) : null;
+            return (data != null) ? new LatestDisplay(TYPE_TRADE_CANDIDATES, savedAt, data, null, null) : null;
         } else if (TYPE_OUTFITTING.equals(row.queryType())) {
             OutfittingDataDto data = gson.fromJson(row.payloadJson(), OutfittingDataDto.class);
-            return (data != null) ? new LatestDisplay(TYPE_OUTFITTING, savedAt, null, data) : null;
+            return (data != null) ? new LatestDisplay(TYPE_OUTFITTING, savedAt, null, data, null) : null;
+        } else if (TYPE_ENGINEERS.equals(row.queryType())) {
+            EngineersDisplayDto data = gson.fromJson(row.payloadJson(), EngineersDisplayDto.class);
+            return (data != null) ? new LatestDisplay(TYPE_ENGINEERS, savedAt, null, null, data) : null;
         }
         return null;
     }

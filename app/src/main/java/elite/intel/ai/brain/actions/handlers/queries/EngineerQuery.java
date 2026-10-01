@@ -10,6 +10,8 @@ import elite.intel.gameapi.engineers.EngineerDirectory;
 import elite.intel.gameapi.engineers.EngineerDirectory.EngineerInfo;
 import elite.intel.gameapi.engineers.EngineerDirectory.Specialty;
 import elite.intel.gameapi.engineers.EngineerModuleMatcher;
+import elite.intel.db.managers.QueryResultDisplayManager;
+import elite.intel.db.managers.QueryResultDisplayManager.EngineersDisplayDto;
 import elite.intel.util.NavigationUtils;
 import elite.intel.util.yaml.ToYamlConvertable;
 import elite.intel.util.yaml.YamlFactory;
@@ -132,6 +134,7 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
                 - Never attempt to set route, press keys, or display cards; this is a voice query response only.
                 - Do not guess or extrapolate beyond the provided data.
                 """;
+        saveDisplayResult(data);
         return process(new AiDataStruct(instructions, data), originalUserInput);
     }
 
@@ -298,5 +301,56 @@ public class EngineerQuery extends BaseQueryAnalyzer implements IntelQuery {
                 coords.x(), coords.y(), coords.z()
         );
         return Math.round(dist * 10.0) / 10.0;
+    }
+
+    private void saveDisplayResult(DataDto data) {
+        if (data == null || "unknown_module".equals(data.type())) {
+            return;
+        }
+        QueryResultDisplayManager displayMgr = QueryResultDisplayManager.getInstance();
+        if ("module".equals(data.type())) {
+            if (data.moduleEngineers() != null && !data.moduleEngineers().isEmpty()) {
+                List<String> names = data.moduleEngineers().stream()
+                        .map(ModuleEngineerDto::name)
+                        .toList();
+                displayMgr.saveEngineers(new EngineersDisplayDto("module", data.moduleName(), names));
+            }
+        } else if ("engineer".equals(data.type())) {
+            if (data.name() != null && !data.name().isBlank()) {
+                displayMgr.saveEngineers(new EngineersDisplayDto("engineer", null, List.of(data.name())));
+            }
+        } else if ("progress".equals(data.type())) {
+            List<String> sortedNames = extractSortedProgressEngineers(data.onlyUnlocked());
+            if (!sortedNames.isEmpty()) {
+                displayMgr.saveEngineers(new EngineersDisplayDto("progress", null, sortedNames));
+            } else {
+                displayMgr.clearEngineers();
+            }
+        }
+    }
+
+    private List<String> extractSortedProgressEngineers(boolean onlyUnlocked) {
+        List<EngineerProgressRecord> allRecords = EngineerProgressManager.getInstance().getAll();
+        if (allRecords == null || allRecords.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return allRecords.stream()
+                .filter(rec -> !onlyUnlocked || "Unlocked".equalsIgnoreCase(rec.progress()))
+                .sorted(Comparator.comparingInt((EngineerProgressRecord r) -> progressPriority(r.progress()))
+                        .thenComparing(EngineerProgressRecord::displayName, String.CASE_INSENSITIVE_ORDER))
+                .map(EngineerProgressRecord::displayName)
+                .toList();
+    }
+
+    private int progressPriority(String progress) {
+        if (progress == null) return 6;
+        return switch (progress.toLowerCase(Locale.ROOT)) {
+            case "unlocked" -> 1;
+            case "acquainted" -> 2;
+            case "invited" -> 3;
+            case "known" -> 4;
+            case "barred" -> 5;
+            default -> 6;
+        };
     }
 }

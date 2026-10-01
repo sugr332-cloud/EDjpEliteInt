@@ -4,7 +4,10 @@ import com.google.common.eventbus.Subscribe;
 import elite.intel.ai.brain.actions.handlers.queries.NearestOutfittingQuery.OutfittingDataDto;
 import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeCandidateDto;
 import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeCandidatesDataDto;
+import elite.intel.db.dao.LocationDao;
+import elite.intel.db.managers.LocationManager;
 import elite.intel.db.managers.QueryResultDisplayManager;
+import elite.intel.db.managers.QueryResultDisplayManager.EngineersDisplayDto;
 import elite.intel.db.managers.QueryResultDisplayManager.LatestDisplay;
 import elite.intel.eventbus.UiBus;
 import elite.intel.ui.event.QueryResultDisplayUpdatedEvent;
@@ -87,6 +90,8 @@ public class QueryResultDisplayPanel extends JPanel {
             displayTradeCandidates(latest.tradeCandidates(), timeStr, now);
         } else if (latest.isOutfitting()) {
             displayOutfitting(latest.outfitting(), timeStr, now);
+        } else if (latest.isEngineers()) {
+            displayEngineers(latest.engineers(), timeStr, now);
         } else {
             showEmpty();
         }
@@ -134,6 +139,38 @@ public class QueryResultDisplayPanel extends JPanel {
         cardsContainer.removeAll();
         QueryResultCard card = QueryResultCard.forOutfitting(dto, now);
         cardsContainer.add(card);
+        cardsContainer.revalidate();
+        cardsContainer.repaint();
+    }
+
+    private void displayEngineers(EngineersDisplayDto dto, String timeStr, Instant now) {
+        if (dto == null || dto.engineerNames() == null || dto.engineerNames().isEmpty()) {
+            showEmpty();
+            return;
+        }
+
+        if ("module".equalsIgnoreCase(dto.queryKind())) {
+            String mod = dto.moduleName() != null ? dto.moduleName() : "-";
+            headerLabel.setText(getText("ai.queryResult.header.engineers.module", mod, timeStr));
+        } else if ("engineer".equalsIgnoreCase(dto.queryKind())) {
+            String engName = !dto.engineerNames().isEmpty() ? dto.engineerNames().get(0) : "-";
+            headerLabel.setText(getText("ai.queryResult.header.engineers.engineer", engName, timeStr));
+        } else {
+            headerLabel.setText(getText("ai.queryResult.header.engineers.progress", timeStr));
+        }
+
+        LocationDao.Coordinates here = null;
+        try {
+            here = LocationManager.getInstance().getGalacticCoordinates();
+        } catch (Exception ignored) {
+        }
+
+        cardsContainer.removeAll();
+        for (String name : dto.engineerNames()) {
+            QueryResultCard card = QueryResultCard.forEngineer(name, dto.moduleName(), here);
+            cardsContainer.add(card);
+            cardsContainer.add(Box.createVerticalStrut(6));
+        }
         cardsContainer.revalidate();
         cardsContainer.repaint();
     }

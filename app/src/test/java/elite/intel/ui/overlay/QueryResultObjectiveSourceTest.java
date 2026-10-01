@@ -4,6 +4,8 @@ import elite.intel.ai.brain.actions.handlers.queries.NearestOutfittingQuery.Matc
 import elite.intel.ai.brain.actions.handlers.queries.NearestOutfittingQuery.OutfittingDataDto;
 import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeCandidateDto;
 import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeCandidatesDataDto;
+import elite.intel.db.managers.EngineerProgressManager;
+import elite.intel.db.managers.QueryResultDisplayManager.EngineersDisplayDto;
 import elite.intel.db.managers.QueryResultDisplayManager.LatestDisplay;
 import org.junit.jupiter.api.Test;
 
@@ -144,5 +146,89 @@ class QueryResultObjectiveSourceTest {
         assertEquals("Shinrarta Dezhra", rows.get(2).value());
         assertTrue(rows.get(3).value().contains("12.34 ly"));
         assertTrue(rows.get(4).value().contains("5,100,000 cr"));
+    }
+
+    @Test
+    void testCurrentObjectiveWithEngineersModuleQuery() {
+        Instant now = Instant.now();
+        Instant savedAt = now.minus(5, ChronoUnit.MINUTES);
+
+        EngineerProgressManager.getInstance().clear();
+        EngineerProgressManager.getInstance().recordProgress("Felicity Farseer", null, "Unlocked", 5, 0, "2026-10-01T10:00:00Z");
+
+        EngineersDisplayDto dto = new EngineersDisplayDto(
+                "module",
+                "Frame Shift Drive",
+                List.of("Felicity Farseer", "Elvira Martuuk", "Professor Palin")
+        );
+        LatestDisplay display = new LatestDisplay("engineers", savedAt, null, null, dto);
+
+        QueryResultObjectiveSource source = new QueryResultObjectiveSource(() -> Optional.of(display), () -> now);
+        Optional<HudObjective> opt = source.currentObjective();
+        assertTrue(opt.isPresent());
+
+        HudObjective objective = opt.get();
+        assertEquals(HudObjective.PRIORITY_AMBIENT, objective.priority());
+        List<HudRow> rows = objective.rows();
+        assertEquals(2, rows.size(), "Module engineers card must have 2 rows");
+
+        assertEquals("Frame Shift Drive", rows.get(0).value());
+        assertTrue(rows.get(1).value().contains("Felicity Farseer"));
+        assertTrue(rows.get(1).value().contains("G5"));
+        assertTrue(rows.get(1).value().contains("開放済み R5") || rows.get(1).value().contains("Unlocked"));
+        assertTrue(rows.get(1).value().contains("2"), "Must mention other candidates count (+2)");
+    }
+
+    @Test
+    void testCurrentObjectiveWithEngineersSingleEngineerQuery() {
+        Instant now = Instant.now();
+        Instant savedAt = now.minus(5, ChronoUnit.MINUTES);
+
+        EngineerProgressManager.getInstance().clear();
+        EngineerProgressManager.getInstance().recordProgress("Felicity Farseer", null, "Unlocked", 5, 0, "2026-10-01T10:00:00Z");
+
+        EngineersDisplayDto dto = new EngineersDisplayDto(
+                "engineer",
+                null,
+                List.of("Felicity Farseer")
+        );
+        LatestDisplay display = new LatestDisplay("engineers", savedAt, null, null, dto);
+
+        QueryResultObjectiveSource source = new QueryResultObjectiveSource(() -> Optional.of(display), () -> now);
+        Optional<HudObjective> opt = source.currentObjective();
+        assertTrue(opt.isPresent());
+
+        HudObjective objective = opt.get();
+        List<HudRow> rows = objective.rows();
+        assertEquals(2, rows.size());
+        assertEquals("Felicity Farseer", rows.get(0).value());
+        assertTrue(rows.get(1).label().contains("Farseer Inc"));
+        assertTrue(rows.get(1).value().contains("開放済み") || rows.get(1).value().contains("Unlocked"));
+    }
+
+    @Test
+    void testCurrentObjectiveWithEngineersProgressQuery() {
+        Instant now = Instant.now();
+        Instant savedAt = now.minus(5, ChronoUnit.MINUTES);
+
+        EngineerProgressManager.getInstance().clear();
+        EngineerProgressManager.getInstance().recordProgress("Felicity Farseer", null, "Unlocked", 5, 0, "2026-10-01T10:00:00Z");
+        EngineerProgressManager.getInstance().recordProgress("Elvira Martuuk", null, "Invited", null, null, "2026-10-01T10:00:00Z");
+
+        EngineersDisplayDto dto = new EngineersDisplayDto(
+                "progress",
+                null,
+                List.of("Felicity Farseer", "Elvira Martuuk")
+        );
+        LatestDisplay display = new LatestDisplay("engineers", savedAt, null, null, dto);
+
+        QueryResultObjectiveSource source = new QueryResultObjectiveSource(() -> Optional.of(display), () -> now);
+        Optional<HudObjective> opt = source.currentObjective();
+        assertTrue(opt.isPresent());
+
+        HudObjective objective = opt.get();
+        List<HudRow> rows = objective.rows();
+        assertEquals(2, rows.size());
+        assertTrue(rows.get(1).value().contains("1人 / 全2人") || rows.get(1).value().contains("1 / 2"));
     }
 }

@@ -4,8 +4,14 @@ import elite.intel.ai.brain.actions.handlers.queries.NearestOutfittingQuery.Outf
 import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeCandidateDto;
 import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeCandidatesDataDto;
 import elite.intel.db.FuzzySearch;
+import elite.intel.db.dao.EngineerProgressDao.EngineerProgressRecord;
+import elite.intel.db.managers.EngineerProgressManager;
 import elite.intel.db.managers.QueryResultDisplayManager;
+import elite.intel.db.managers.QueryResultDisplayManager.EngineersDisplayDto;
 import elite.intel.db.managers.QueryResultDisplayManager.LatestDisplay;
+import elite.intel.gameapi.engineers.EngineerDirectory;
+import elite.intel.gameapi.engineers.EngineerDirectory.EngineerInfo;
+import elite.intel.gameapi.engineers.EngineerDirectory.Specialty;
 import elite.intel.gameapi.search.spansh.SpanshTimestamps;
 
 import java.time.Duration;
@@ -15,6 +21,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
+
+import static elite.intel.ui.i18n.MultiLingualTextProvider.getText;
 
 /**
  * Projects the most recent trade candidate or outfitting query result into a HUD objective card.
@@ -57,6 +65,8 @@ public class QueryResultObjectiveSource implements HudObjectiveSource {
             return buildTradeCandidatesObjective(latest.tradeCandidates(), now);
         } else if (latest.isOutfitting()) {
             return buildOutfittingObjective(latest.outfitting(), now);
+        } else if (latest.isEngineers()) {
+            return buildEngineersObjective(latest.engineers(), now);
         }
 
         return Optional.empty();
@@ -184,5 +194,101 @@ public class QueryResultObjectiveSource implements HudObjectiveSource {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private Optional<HudObjective> buildEngineersObjective(EngineersDisplayDto dto, Instant now) {
+        if (dto == null || dto.engineerNames() == null || dto.engineerNames().isEmpty()) {
+            return Optional.empty();
+        }
+
+        List<HudRow> rows = new ArrayList<>();
+        String queryKind = dto.queryKind();
+
+        if ("module".equalsIgnoreCase(queryKind)) {
+            String mod = dto.moduleName() != null ? dto.moduleName() : "-";
+            rows.add(HudRow.of(HudText.get("overlay.card.row.module"), mod));
+
+            String firstEngName = dto.engineerNames().get(0);
+            Optional<EngineerInfo> infoOpt = EngineerDirectory.getInstance().findByName(firstEngName);
+            Optional<EngineerProgressRecord> progOpt = EngineerProgressManager.getInstance().findByName(firstEngName);
+
+            int grade = 0;
+            if (infoOpt.isPresent() && infoOpt.get().specialties() != null) {
+                for (Specialty sp : infoOpt.get().specialties()) {
+                    if (sp.module().equalsIgnoreCase(dto.moduleName())) {
+                        grade = sp.maxGrade();
+                        break;
+                    }
+                }
+            }
+            String gradeStr = grade > 0 ? " G" + grade : "";
+            String statusStr = "";
+            if (progOpt.isPresent() && progOpt.get().progress() != null) {
+                String p = progOpt.get().progress();
+                Integer r = progOpt.get().rank();
+                if ("Unlocked".equalsIgnoreCase(p)) {
+                    statusStr = r != null ? "（開放済み R" + r + "）" : "（開放済み）";
+                } else if ("Barred".equalsIgnoreCase(p)) {
+                    statusStr = "（出入り禁止）";
+                } else {
+                    statusStr = "（" + p + "）";
+                }
+            } else {
+                statusStr = "（記録なし）";
+            }
+
+            int others = dto.engineerNames().size() - 1;
+            String secondLine = firstEngName + gradeStr + statusStr;
+            if (others > 0) {
+                secondLine += " " + HudText.get("overlay.card.row.engineerOtherCandidates", others);
+            }
+            rows.add(HudRow.of(HudText.get("overlay.card.title.engineers"), secondLine));
+
+        } else if ("engineer".equalsIgnoreCase(queryKind)) {
+            String engName = dto.engineerNames().get(0);
+            rows.add(HudRow.of(HudText.get("overlay.card.title.engineers"), engName));
+
+            Optional<EngineerInfo> infoOpt = EngineerDirectory.getInstance().findByName(engName);
+            Optional<EngineerProgressRecord> progOpt = EngineerProgressManager.getInstance().findByName(engName);
+
+            String loc = infoOpt.map(i -> i.base() + " (" + i.system() + ")").orElse("-");
+            String statusStr = "";
+            if (progOpt.isPresent() && progOpt.get().progress() != null) {
+                String p = progOpt.get().progress();
+                Integer r = progOpt.get().rank();
+                if ("Unlocked".equalsIgnoreCase(p)) {
+                    statusStr = r != null ? "開放済み R" + r : "開放済み";
+                } else if ("Barred".equalsIgnoreCase(p)) {
+                    statusStr = "出入り禁止";
+                } else {
+                    statusStr = p;
+                }
+            } else {
+                statusStr = "記録なし";
+            }
+            rows.add(HudRow.of(loc, statusStr));
+
+        } else {
+            rows.add(HudRow.of(HudText.get("overlay.card.title.engineers"), getText("ai.queryResult.header.engineers.progress", "")));
+
+            int total = dto.engineerNames().size();
+            long unlockedCount = 0;
+            for (String name : dto.engineerNames()) {
+                Optional<EngineerProgressRecord> progOpt = EngineerProgressManager.getInstance().findByName(name);
+                if (progOpt.isPresent() && "Unlocked".equalsIgnoreCase(progOpt.get().progress())) {
+                    unlockedCount++;
+                }
+            }
+            String summary = "開放済み: " + unlockedCount + "人 / 全" + total + "人";
+            rows.add(HudRow.of(HudText.get("overlay.card.row.progress"), summary));
+        }
+
+        return Optional.of(new HudObjective(
+                ID,
+                HudText.get("overlay.card.title.engineers"),
+                null,
+                rows,
+                HudObjective.PRIORITY_AMBIENT
+        ));
     }
 }

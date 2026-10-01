@@ -1,14 +1,21 @@
 package elite.intel.ui.screen;
 
-import elite.intel.ai.brain.actions.handlers.queries.NearestOutfittingQuery.OutfittingDataDto;
-import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeCandidateDto;
 import com.google.gson.JsonObject;
 import elite.intel.ai.brain.actions.handlers.commands.builtin.NavigateToSearchResultCommand;
+import elite.intel.ai.brain.actions.handlers.queries.NearestOutfittingQuery.OutfittingDataDto;
+import elite.intel.ai.brain.actions.handlers.queries.TradeCandidatesQuery.TradeCandidateDto;
 import elite.intel.db.FuzzySearch;
+import elite.intel.db.dao.EngineerProgressDao.EngineerProgressRecord;
+import elite.intel.db.dao.LocationDao;
+import elite.intel.db.managers.EngineerChecklistManager;
+import elite.intel.db.managers.EngineerProgressManager;
+import elite.intel.gameapi.engineers.EngineerDirectory;
+import elite.intel.gameapi.engineers.EngineerDirectory.EngineerInfo;
+import elite.intel.gameapi.engineers.EngineerDirectory.Specialty;
 import elite.intel.ui.overlay.QueryResultObjectiveSource;
 import elite.intel.ui.support.GuiCommandRunner;
-import elite.intel.ui.theme.HudPalette;
 import elite.intel.ui.widget.HudButton;
+import elite.intel.util.NavigationUtils;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -17,14 +24,16 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 
 import static elite.intel.ui.i18n.MultiLingualTextProvider.getText;
 import static elite.intel.ui.theme.AppTheme.hudMajorPanelBorder;
 import static elite.intel.ui.theme.HudPalette.*;
 
 /**
- * A bordered card component displaying one trade candidate or outfitting result item.
- * Lays out key:value rows vertically in fixed order.
+ * A bordered card component displaying one trade candidate, outfitting result, or engineer item.
+ * Lays out key:value rows vertically in fixed order, or custom body for engineers.
  */
 public class QueryResultCard extends JPanel {
 
@@ -44,6 +53,13 @@ public class QueryResultCard extends JPanel {
         this.rows = rows != null ? List.copyOf(rows) : Collections.emptyList();
         this.actionButtons = actionButtons != null ? List.copyOf(actionButtons) : Collections.emptyList();
         buildUi();
+    }
+
+    public QueryResultCard(String title, JComponent customBody, List<JButton> actionButtons) {
+        this.title = title;
+        this.rows = Collections.emptyList();
+        this.actionButtons = actionButtons != null ? List.copyOf(actionButtons) : Collections.emptyList();
+        buildCustomUi(customBody);
     }
 
     public List<JButton> getActionButtons() {
@@ -141,6 +157,242 @@ public class QueryResultCard extends JPanel {
         return new QueryResultCard(title, list, buttons);
     }
 
+    public static QueryResultCard forEngineer(String engineerName, String highlightModule, LocationDao.Coordinates here) {
+        Optional<EngineerInfo> opt = EngineerDirectory.getInstance().findByName(engineerName);
+        if (opt.isEmpty()) {
+            JPanel emptyBody = new JPanel();
+            emptyBody.setOpaque(false);
+            JLabel lbl = new JLabel(getText("ai.queryResult.engineer.noRecord"));
+            lbl.setForeground(HUD_COLOR_5A6368);
+            emptyBody.add(lbl);
+            return new QueryResultCard(engineerName, emptyBody, Collections.emptyList());
+        }
+
+        EngineerInfo info = opt.get();
+        String typeStr = "onfoot".equalsIgnoreCase(info.type())
+                ? getText("ai.queryResult.engineer.onfoot")
+                : getText("ai.queryResult.engineer.ship");
+        String title = info.name() + " (" + typeStr + ")";
+
+        JPanel body = new JPanel();
+        body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+        body.setOpaque(false);
+
+        // 1. 基本情報段落: 星系 / 基地 / 天体 + 距離
+        JPanel locPanel = new JPanel(new BorderLayout(8, 0));
+        locPanel.setOpaque(false);
+        locPanel.setBorder(new EmptyBorder(1, 4, 1, 4));
+
+        JLabel locLabel = new JLabel(getText("ai.queryResult.row.station") + getText("ai.queryResult.rowSeparator"));
+        locLabel.setFont(locLabel.getFont().deriveFont(11.0f));
+        locLabel.setForeground(HUD_COLOR_ROLE_READOUT_LABEL);
+
+        String stationText = info.system() + " / " + info.base() + (info.body() != null && !info.body().isBlank() ? " (" + info.body() + ")" : "");
+        if (info.permitRequired()) {
+            stationText += "  " + getText("ai.queryResult.engineer.permitRequired");
+        }
+        JLabel locValue = new JLabel(stationText);
+        locValue.setFont(locValue.getFont().deriveFont(11.0f));
+        locValue.setForeground(info.permitRequired() ? HUD_COLOR_D94F4F : HUD_COLOR_ROLE_PRIMARY_TEXT);
+
+        locPanel.add(locLabel, BorderLayout.WEST);
+        locPanel.add(locValue, BorderLayout.CENTER);
+        body.add(locPanel);
+
+        // 距離行
+        JPanel distPanel = new JPanel(new BorderLayout(8, 0));
+        distPanel.setOpaque(false);
+        distPanel.setBorder(new EmptyBorder(1, 4, 1, 4));
+
+        JLabel distLabel = new JLabel(getText("ai.queryResult.row.distance") + getText("ai.queryResult.rowSeparator"));
+        distLabel.setFont(distLabel.getFont().deriveFont(11.0f));
+        distLabel.setForeground(HUD_COLOR_ROLE_READOUT_LABEL);
+
+        String distStr = "-";
+        if (here != null && info.coords() != null) {
+            double d = NavigationUtils.calculateGalacticDistance(
+                    here.x(), here.y(), here.z(),
+                    info.coords().x(), info.coords().y(), info.coords().z()
+            );
+            distStr = (Math.round(d * 10.0) / 10.0) + " ly";
+        }
+        JLabel distValue = new JLabel(distStr);
+        distValue.setFont(distValue.getFont().deriveFont(11.0f));
+        distValue.setForeground(HUD_COLOR_ROLE_PRIMARY_TEXT);
+
+        distPanel.add(distLabel, BorderLayout.WEST);
+        distPanel.add(distValue, BorderLayout.CENTER);
+        body.add(distPanel);
+
+        body.add(Box.createVerticalStrut(4));
+
+        // 2. 得意分野段落
+        if (info.specialties() != null && !info.specialties().isEmpty()) {
+            JPanel specPanel = new JPanel(new BorderLayout(8, 0));
+            specPanel.setOpaque(false);
+            specPanel.setBorder(new EmptyBorder(1, 4, 1, 4));
+
+            JLabel specLabel = new JLabel(getText("ai.queryResult.engineer.specialties") + getText("ai.queryResult.rowSeparator"));
+            specLabel.setFont(specLabel.getFont().deriveFont(11.0f));
+            specLabel.setForeground(HUD_COLOR_ROLE_READOUT_LABEL);
+
+            JPanel specList = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
+            specList.setOpaque(false);
+
+            for (Specialty sp : info.specialties()) {
+                String spText = sp.module() + (sp.maxGrade() > 0 ? " G" + sp.maxGrade() : "");
+                boolean isMatch = highlightModule != null && sp.module().equalsIgnoreCase(highlightModule);
+
+                JLabel spComp = new JLabel(spText);
+                spComp.setFont(spComp.getFont().deriveFont(isMatch ? Font.BOLD : Font.PLAIN, 11.0f));
+                spComp.setForeground(isMatch ? HUD_COLOR_4FC56B : HUD_COLOR_ROLE_PRIMARY_TEXT);
+                specList.add(spComp);
+            }
+
+            specPanel.add(specLabel, BorderLayout.WEST);
+            specPanel.add(specList, BorderLayout.CENTER);
+            body.add(specPanel);
+        }
+
+        body.add(Box.createVerticalStrut(4));
+
+        // 3. 現在状況・自動チェックリスト段落
+        Optional<EngineerProgressRecord> progOpt = EngineerProgressManager.getInstance().findByName(info.name());
+        boolean isBarred = progOpt.isPresent() && "Barred".equalsIgnoreCase(progOpt.get().progress());
+
+        if (isBarred) {
+            JLabel barredLbl = new JLabel("⚠ " + getText("ai.queryResult.engineer.barred"));
+            barredLbl.setFont(barredLbl.getFont().deriveFont(Font.BOLD, 11.0f));
+            barredLbl.setForeground(HUD_COLOR_D94F4F);
+            barredLbl.setBorder(new EmptyBorder(2, 4, 2, 4));
+            body.add(barredLbl);
+        }
+
+        String progress = progOpt.map(EngineerProgressRecord::progress).orElse(null);
+        Integer rank = progOpt.map(EngineerProgressRecord::rank).orElse(null);
+        Integer rankProg = progOpt.map(EngineerProgressRecord::rankProgress).orElse(null);
+
+        int stage = 0;
+        if (progress != null) {
+            switch (progress.toLowerCase(Locale.ROOT)) {
+                case "known" -> stage = 1;
+                case "invited" -> stage = 2;
+                case "acquainted" -> stage = 3;
+                case "unlocked" -> stage = 4;
+            }
+        }
+        if (rank != null && rank >= 1) {
+            stage = Math.max(stage, 4);
+        }
+
+        JPanel autoProgPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
+        autoProgPanel.setOpaque(false);
+
+        if (progOpt.isEmpty() || (stage == 0 && !isBarred)) {
+            JLabel noRecLbl = new JLabel(getText("ai.queryResult.engineer.noRecord"));
+            noRecLbl.setFont(noRecLbl.getFont().deriveFont(11.0f));
+            noRecLbl.setForeground(HUD_COLOR_5A6368);
+            autoProgPanel.add(noRecLbl);
+        }
+
+        // 知っている → 招待済み → 面識あり → 開放済み
+        addAutoStageLabel(autoProgPanel, getText("ai.queryResult.engineer.known"), stage >= 1);
+        addAutoStageLabel(autoProgPanel, getText("ai.queryResult.engineer.invited"), stage >= 2);
+        addAutoStageLabel(autoProgPanel, getText("ai.queryResult.engineer.acquainted"), stage >= 3);
+        addAutoStageLabel(autoProgPanel, getText("ai.queryResult.engineer.unlocked"), stage >= 4);
+
+        if (rank != null && rank >= 1) {
+            String rankText = getText("ai.queryResult.engineer.rank", rank) + (rankProg != null ? " (" + rankProg + "%)" : "");
+            JLabel rankLbl = new JLabel("☑ " + rankText);
+            rankLbl.setFont(rankLbl.getFont().deriveFont(Font.BOLD, 11.0f));
+            rankLbl.setForeground(HUD_COLOR_4FC56B);
+            autoProgPanel.add(rankLbl);
+        }
+
+        body.add(autoProgPanel);
+
+        body.add(Box.createVerticalStrut(4));
+
+        // 4. 手動チェックリスト段落
+        boolean hasInvite = info.invite() != null && !info.invite().isBlank();
+        boolean hasUnlock = info.unlock() != null && !info.unlock().isBlank();
+        boolean hasReferral = "onfoot".equalsIgnoreCase(info.type()) && info.referral() != null && !info.referral().isBlank();
+
+        if (hasInvite || hasUnlock || hasReferral) {
+            JLabel chkTitle = new JLabel(getText("ai.queryResult.checklist.title") + getText("ai.queryResult.rowSeparator"));
+            chkTitle.setFont(chkTitle.getFont().deriveFont(Font.BOLD, 11.0f));
+            chkTitle.setForeground(HUD_COLOR_ROLE_READOUT_LABEL);
+            chkTitle.setBorder(new EmptyBorder(2, 4, 2, 4));
+            body.add(chkTitle);
+
+            EngineerChecklistManager chkMgr = EngineerChecklistManager.getInstance();
+
+            if (hasInvite) {
+                boolean initChecked = chkMgr.isChecked(info.name(), EngineerChecklistManager.ITEM_INVITE);
+                String baseText = getText("ai.queryResult.checklist.invite") + ": " + info.invite();
+                JCheckBox cb = createChecklistCheckBox(info.name(), EngineerChecklistManager.ITEM_INVITE, baseText, initChecked);
+                body.add(cb);
+            }
+
+            if (hasUnlock) {
+                boolean initChecked = chkMgr.isChecked(info.name(), EngineerChecklistManager.ITEM_UNLOCK);
+                String baseText = getText("ai.queryResult.checklist.unlock") + ": " + info.unlock();
+                JCheckBox cb = createChecklistCheckBox(info.name(), EngineerChecklistManager.ITEM_UNLOCK, baseText, initChecked);
+                body.add(cb);
+            }
+
+            if (hasReferral) {
+                boolean initChecked = chkMgr.isChecked(info.name(), EngineerChecklistManager.ITEM_REFERRAL_TASK);
+                String baseText = getText("ai.queryResult.checklist.referral") + ": " + info.referral();
+                JCheckBox cb = createChecklistCheckBox(info.name(), EngineerChecklistManager.ITEM_REFERRAL_TASK, baseText, initChecked);
+                body.add(cb);
+            }
+        }
+
+        return new QueryResultCard(title, body, Collections.emptyList());
+    }
+
+    private static void addAutoStageLabel(JPanel container, String text, boolean checked) {
+        JLabel lbl = new JLabel((checked ? "☑ " : "☐ ") + text);
+        lbl.setFont(lbl.getFont().deriveFont(11.0f));
+        lbl.setForeground(checked ? HUD_COLOR_4FC56B : HUD_COLOR_5A6368);
+        container.add(lbl);
+    }
+
+    public static JCheckBox createChecklistCheckBox(String engineerName, String itemKey, String baseText, boolean initialChecked) {
+        JCheckBox cb = new JCheckBox();
+        cb.setOpaque(false);
+        cb.setFont(cb.getFont().deriveFont(11.0f));
+        cb.setSelected(initialChecked);
+        updateChecklistStyle(cb, baseText, initialChecked);
+
+        // 修正 1: ActionListener のみ使用（setSelected では呼ばれず、ユーザークリック時のみ発火）
+        cb.addActionListener(e -> {
+            boolean checked = cb.isSelected();
+            EngineerChecklistManager.getInstance().setChecked(engineerName, itemKey, checked);
+            updateChecklistStyle(cb, baseText, checked);
+        });
+        return cb;
+    }
+
+    private static void updateChecklistStyle(JCheckBox cb, String baseText, boolean checked) {
+        if (checked) {
+            cb.setText("<html><strike style='color:#5A6368;'>" + escapeHtml(baseText) + "</strike></html>");
+            cb.setForeground(HUD_COLOR_5A6368);
+        } else {
+            cb.setText(baseText);
+            cb.setForeground(HUD_COLOR_ROLE_PRIMARY_TEXT);
+        }
+    }
+
+    private static String escapeHtml(String text) {
+        if (text == null) return "";
+        return text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
+    }
+
     private static void setupButtonAction(JButton button, List<JButton> cardButtons, int rank, String leg) {
         button.addActionListener(e -> {
             disableButtonsTemporarily(cardButtons);
@@ -209,6 +461,32 @@ public class QueryResultCard extends JPanel {
         add(rowsPanel, BorderLayout.CENTER);
 
         // Footer: Action Buttons
+        if (!actionButtons.isEmpty()) {
+            JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 2));
+            btnPanel.setOpaque(false);
+            btnPanel.setBorder(new EmptyBorder(2, 4, 4, 4));
+            for (JButton btn : actionButtons) {
+                btnPanel.add(btn);
+            }
+            add(btnPanel, BorderLayout.SOUTH);
+        }
+    }
+
+    private void buildCustomUi(JComponent customBody) {
+        setLayout(new BorderLayout(0, 4));
+        setBackground(HUD_COLOR_ROLE_PANEL_BACKGROUND);
+        setBorder(hudMajorPanelBorder());
+
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 12.0f));
+        titleLabel.setForeground(HUD_COLOR_FF822E);
+        titleLabel.setBorder(new EmptyBorder(2, 4, 4, 4));
+        add(titleLabel, BorderLayout.NORTH);
+
+        if (customBody != null) {
+            add(customBody, BorderLayout.CENTER);
+        }
+
         if (!actionButtons.isEmpty()) {
             JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 2));
             btnPanel.setOpaque(false);

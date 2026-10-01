@@ -32,5 +32,18 @@ public class EngineerProgressSubscriber {
                     eventTimestamp
             );
         }
+
+        try {
+            var latestOpt = elite.intel.db.managers.QueryResultDisplayManager.getInstance().getLatest();
+            if (latestOpt.isPresent() && latestOpt.get().isEngineers()) {
+                elite.intel.eventbus.UiBus.publish(
+                        new elite.intel.ui.event.QueryResultDisplayUpdatedEvent(
+                                elite.intel.db.managers.QueryResultDisplayManager.TYPE_ENGINEERS
+                        )
+                );
+            }
+        } catch (Exception e) {
+            log.warn("Failed to notify engineer display update: {}", e.getMessage());
+        }
     }
 }
