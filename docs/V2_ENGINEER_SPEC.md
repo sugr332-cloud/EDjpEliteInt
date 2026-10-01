@@ -98,6 +98,15 @@
   - 手動チェックは新規テーブル `engineer_checklist`。項目は `invite`（招待の条件）、`unlock`（開放の条件）、徒歩のエンジニアで紹介の作業がある場合は `referral_task`。
   - チェックは AI タブのカードでのみ付け外しする。HUD は要約のみでクリックしない。
   - 「ステーションへ発進」ボタンは EG-4 で足す（EG-3 のカードにはまだ置かない）。
+  - EG-3 の詳細（2026-10-01、EG-2 のレビュー後に確定）:
+    - `engineer_checklist`: キーは（正規化した名前 `name_key`、項目 `item`）。`item` は 'invite'／'unlock'／'referral_task' のいずれか。チェックの有無と更新日時を持つ。01054 で `query_result_display` の作り直しと一緒に作る。
+    - `query_result_display` に保存するのは「どの種類の質問だったか（module／engineer／progress）、聞かれたモジュール名、表示するエンジニアの名前の並び」だけにする。進み具合・ランク・手動チェック・距離は表示のたびに DB と現在地から読み直す（保存した値を表示しない）。
+    - `query_engineer` が答えたとき、"module" は答えた最大 5 人、"engineer" はその 1 人、"progress" は記録のあるエンジニア全員（「開放済み」の絞り込みがあればそれに従う。並びは開放済み→面識あり→招待済み→知っている→出入り禁止、同じ中は名前順）のカードを出す。"unknown_module" はカードを出さない（前の表示も消さない）。
+    - 自動のチェック: 知っている（Known）→ 招待済み（Invited）→ 面識あり（Acquainted）→ 開放済み（Unlocked）→ ランク 1〜5。後の段階に進んでいれば前の段階もチェック済みとして表示する。今のランクには次のランクまでの % を添える。出入り禁止（Barred）はチェックリストの上に目立つ形で表示する。記録が無いエンジニアは全て未チェックで「記録なし」。
+    - 手動のチェック: 招待の条件（invite）、開放の条件（unlock）、紹介の作業（referral_task、徒歩のエンジニアで referral があるときだけ）。項目の横に engineers.json の条件の文章を出す。クリックで付け外しし、すぐ DB に保存して表示を更新する。
+    - Journal で進み具合が更新されたとき（`EngineerProgressSubscriber` が記録したとき）、今エンジニアのカードを表示していれば表示を更新する。
+    - HUD は 1〜2 行の要約のみ（例: 「エンジニア: Frame Shift Drive — Felicity Farseer G5（開放済み R5）ほか 2 人」）。クリックしない。
+    - 画面の文言は `gui*.properties`（日本語と英語。他の言語は i18n-parity-baseline.txt の MISSING 行）。
 - EG-4:
   - 新規コマンド `navigate_to_engineer`。文言は `responses*.properties` に置く（`commands*.properties` ではない）。エイリアス、`AiActionMapGeneratorTest`、埋め込みルーティングテストを含める。
   - `permitRequired` が true のエンジニアへは、航路を設定したうえで「許可証が必要な星系です」と添える。
@@ -114,6 +123,6 @@
 |---|---|---|---|---|
 | EG-0 | 固定データの JSON（Claude 作成） | `app/src/main/resources/engineers/engineers.json`（Claude が作成） | JSON の形式チェック（EG-1 のテストで読み込めること） | DONE（2026-10-01。38 人: 宇宙船 25・徒歩 13。出どころ・食い違いは JSON の `meta` と各項目の `notes`） |
 | EG-1 | 進み具合の保存 | PLAN CHECK で確定 | 新規テスト（一覧の形・1 人分の形・更新・古いイベントで上書きしない・起動前の取り込み・固定データとの対応）、全体テスト（失敗 0 件） | DONE（2026-10-01、main 2c1ae3d。全体テスト 3,446 件・失敗 0 件） |
-| EG-2 | 声で聞く | PLAN CHECK で確定 | 新規テスト（得意分野から・名前から・一覧）、エイリアス関連テスト、埋め込みルーティングテスト、全体テスト（失敗 0 件） | PLAN CHECK 承認済み（`v2/eg-2`） |
+| EG-2 | 声で聞く | PLAN CHECK で確定 | 新規テスト（得意分野から・名前から・一覧）、エイリアス関連テスト、埋め込みルーティングテスト、全体テスト（失敗 0 件） | レビュー済み（`v2/eg-2` @ 9f6d169、:app:test 3,458 件・:app:embeddingTest 211 件、失敗 0 件）。MERGE GATE 許可 |
 | EG-3 | カードとチェックリスト | PLAN CHECK で確定 | 新規テスト（表示内容・自動チェック・手動チェックの保存）、全体テスト（失敗 0 件）。実機: AI タブに枠とチェックリストが出ること | 未着手 |
 | EG-4 | エンジニアへの案内 | PLAN CHECK で確定 | 新規テスト（別の星系→航路・同じ星系→航路なし・本船外→断る・ボタンから）、全体テスト（失敗 0 件）。実機: ボタンと声で航路が設定されること | 未着手 |
