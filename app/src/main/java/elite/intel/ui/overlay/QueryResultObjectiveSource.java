@@ -280,6 +280,32 @@ public class QueryResultObjectiveSource implements HudObjectiveSource {
             );
             rows.add(HudRow.of(loc, statusStr));
 
+        } else if ("directory".equalsIgnoreCase(queryKind)) {
+            rows.add(HudRow.of(HudText.get("overlay.card.title.engineers"), HudText.get("overlay.card.row.engineerDirectoryList")));
+
+            int shipCount = 0;
+            int onFootCount = 0;
+            for (String name : dto.engineerNames()) {
+                Optional<EngineerInfo> infoOpt = EngineerDirectory.getInstance().findByName(name);
+                if (infoOpt.isPresent()) {
+                    if (infoOpt.get().isShip()) {
+                        shipCount++;
+                    } else if (infoOpt.get().isOnFoot()) {
+                        onFootCount++;
+                    }
+                }
+            }
+
+            String summary;
+            if (shipCount > 0 && onFootCount > 0) {
+                summary = HudText.get("overlay.card.row.engineerDirectorySummaryBoth", shipCount, onFootCount);
+            } else if (shipCount > 0) {
+                summary = HudText.get("overlay.card.row.engineerDirectorySummaryShip", shipCount);
+            } else {
+                summary = HudText.get("overlay.card.row.engineerDirectorySummaryOnFoot", onFootCount);
+            }
+            rows.add(HudRow.of(HudText.get("overlay.card.row.engineerSummary"), summary));
+
         } else {
             rows.add(HudRow.of(HudText.get("overlay.card.title.engineers"), HudText.get("overlay.card.row.engineerProgressList")));
 
