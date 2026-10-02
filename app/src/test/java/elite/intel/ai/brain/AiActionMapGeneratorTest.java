@@ -142,6 +142,7 @@ class AiActionMapGeneratorTest {
             "navigate_to_home_system",
             "navigate_to_landing_zone",
             "navigate_to_active_mission",
+            "navigate_to_nearest_orbital_station",
             "navigate_to_next_trade_stop",
             "navigate_to_pirate_mission_provider",
             "navigate_to_pirate_mission_target",
